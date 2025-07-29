@@ -28,6 +28,7 @@ else
                 settings.set("farm.id", math.floor(id))
                 settings.save()
                 print("ID set")
+                break
             else
                 print("Must be a number between 1 and 99!")
             end
