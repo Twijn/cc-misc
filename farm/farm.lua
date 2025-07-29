@@ -91,14 +91,16 @@ local function harvestAll()
         local stopAt = nil
         repeat
             if stopAt then
-                stopAt = stopAt - 1
+                if stopAt > 0 then
+                    stopAt = stopAt - 1
+                else break end
             else
                 local b, blo = turtle.inspect()
                 if b and blo.name == "minecraft:farmland" then
                     stopAt = 2
                 end
             end
-        until not turtle.up() or (stopAt and stopAt == 0)
+        until not turtle.up()
         if stopAt and stopAt == 0 then
             harvestRow()
         else
