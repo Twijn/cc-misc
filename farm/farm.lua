@@ -85,7 +85,27 @@ local function harvestRow()
 end
 
 local function harvestAll()
+    -- Harvest the first (starting) row
     harvestRow()
+    while true do
+        local stopAt = nil
+        repeat
+            if stopAt then
+                stopAt = stopAt - 1
+            else
+                local b, blo = turtle.inspect()
+                if b and blo.name == "minecraft:farmland" then
+                    stopAt = 2
+                end
+            end
+        until not turtle.up() or (stopAt and stopAt == 0)
+        if stopAt and stopAt == 0 then
+            harvestRow()
+        else
+            break
+        end
+    end
+    while turtle.down() do end
     empty()
 end
 
