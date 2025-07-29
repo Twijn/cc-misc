@@ -87,16 +87,14 @@ end
 local function harvestAll()
     -- Harvest the first (starting) row
     harvestRow()
-    while true do
-        repeat
-            local b, blo = turtle.inspect()
-            if b and blo.name == "minecraft:farmland" then
-                if turtle.up() and turtle.up() then
-                    harvestRow()
-                end
+    repeat
+        local b, blo = turtle.inspect()
+        if b and blo.name == "minecraft:farmland" then
+            if turtle.up() and turtle.up() then
+                harvestRow()
             end
-        until not turtle.up()
-    end
+        end
+    until not turtle.up()
     while turtle.down() do end
     empty()
 end
