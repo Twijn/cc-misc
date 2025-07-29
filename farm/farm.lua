@@ -88,24 +88,14 @@ local function harvestAll()
     -- Harvest the first (starting) row
     harvestRow()
     while true do
-        local stopAt = nil
         repeat
-            if stopAt then
-                if stopAt > 0 then
-                    stopAt = stopAt - 1
-                else break end
-            else
-                local b, blo = turtle.inspect()
-                if b and blo.name == "minecraft:farmland" then
-                    stopAt = 2
+            local b, blo = turtle.inspect()
+            if b and blo.name == "minecraft:farmland" then
+                if turtle.up() and turtle.up() then
+                    harvestRow()
                 end
             end
         until not turtle.up()
-        if stopAt and stopAt == 0 then
-            harvestRow()
-        else
-            break
-        end
     end
     while turtle.down() do end
     empty()
