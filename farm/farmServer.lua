@@ -2,7 +2,7 @@ local modemBroadcast = 70
 local modemReceive = 69
 local modemSide = "bottom"
 
-local FARM_INTERVAL = 10 * 60 * 1000 -- 10 minutes
+local FARM_INTERVAL = 20 * 60 * 1000 -- 20 minutes
 
 local tables = require("tables")
 
