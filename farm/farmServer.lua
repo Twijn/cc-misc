@@ -2,7 +2,11 @@ local modemBroadcast = 70
 local modemReceive = 69
 local modemSide = "bottom"
 
+local FARM_INTERVAL = 10 * 60 * 1000 -- 10 minutes
+
 local tables = require("tables")
+
+local lastFarmTime = 0
 
 local crops = {
     ["minecraft:wheat"] = {
@@ -62,6 +66,51 @@ for name, _ in pairs(outputChests) do
     outputChests[name] = peripheral.wrap(name)
     if not outputChests[name] then
         error("Could not find output chest " .. name)
+    end
+end
+
+local function saveLastFarmed()
+    lastFarmTime = os.epoch("utc")
+    local f = fs.open(".last-farm", "w")
+    f.write(lastFarmTime)
+    f.close()
+end
+
+if fs.exists(".last-farm") then
+    local f = fs.open(".last-farm", "r")
+    lastFarmTime = tonumber(f.readLine())
+    f.close()
+
+    if not lastFarmTime then
+        lastFarmTime = 0
+    end
+end
+
+local function getRelativeTime(millis)
+    local sec = math.floor(millis / 1000)
+    if sec >= 86400 then
+        local val = math.floor(sec / 8640) / 10
+        return val .. " day" .. (val == 1 and "" or "s")
+    elseif sec >= 3600 then
+        local val = math.floor(sec / 360) / 10
+        return val .. " hour" .. (val == 1 and "" or "s")
+    elseif sec >= 60 then
+        local val = math.floor(sec / 6) / 10
+        return val .. " minute" .. (val == 1 and "" or "s")
+    else
+        return sec .. " second" .. (sec == 1 and "" or "s")
+    end
+end
+
+local function printLastFarmed()
+    local timeSinceFarm = os.epoch("utc") - lastFarmTime
+    local farmIn = FARM_INTERVAL - timeSinceFarm
+
+    print("Last farmed " .. getRelativeTime(timeSinceFarm) .. " ago")
+    if farmIn > 0 then
+        print("Will farm again in approx. " .. getRelativeTime(farmIn))
+    else
+        print("Will farm ASAP!")
     end
 end
 
@@ -194,9 +243,14 @@ local function modemLoop()
         local _, __, channel, replyChannel, msg = os.pullEvent("modem_message")
         if msg and type(msg) == "table" and msg.type then
             if msg.type == "identify" then
-                print("Identified turtle " .. msg.id)
                 if not turtles[msg.id] then
-                    turtles[msg.id] = {}
+                    print("Identified turtle " .. msg.id)
+                    turtles[msg.id] = {
+                        returned = true,
+                    }
+                elseif not turtles[msg.id].returned then
+                    print(string.format("Turtle %d returned after %s!", msg.id, getRelativeTime(os.epoch("utc") - lastFarmTime)))
+                    turtles[msg.id].returned = true
                 end
                 turtles[msg.id].channel = replyChannel
             elseif msg.type == "settings" then
@@ -208,22 +262,55 @@ end
 
 local function farm()
     identify()
-    sleep(5)
+    sleep(2)
     assignCrops()
-    sleep(10)
+    sleep(5)
+    for i, turt in pairs(turtles) do
+        turt.returned = false
+    end
     startFarming()
+    saveLastFarmed()
+    sleep(2)
+    while true do
+        local timeSinceFarm = os.epoch("utc") - lastFarmTime
+
+        if timeSinceFarm > 180000 then break end
+
+        identify()
+        sleep(1)
+
+        local quick = false
+        local completed = true
+        for i, turt in pairs(turtles) do
+            quick = quick or turt.returned
+            completed = completed and turt.returned
+        end
+
+        if completed then break end
+        sleep(quick and 1 or 10)
+        print("Waiting for turtles to return...")
+    end
+
+    for i, turt in pairs(turtles) do
+        if not turt.returned then
+            print(string.format("Turtle %d never returned! Is it still alive? :(", i))
+        end
+    end
+    print("Finished farming cycle!")
 end
 
 local function farmLoop()
     sleep(2)
+    printLastFarmed()
     while true do
-        sleep(2)
-        identify()
-        sleep(5)
-        assignCrops()
-        sleep(10)
-        startFarming()
-        sleep(500)
+        local timeSinceFarm = os.epoch("utc") - lastFarmTime
+        local farmIn = FARM_INTERVAL - timeSinceFarm
+
+        if farmIn <= 0 then
+            print("Starting farm cycle...")
+            farm()
+        end
+        sleep(math.max(farmIn / 1000, 0) + 2)
     end
 end
 
@@ -260,7 +347,7 @@ local function commandLoop()
     while true do
         local command = read():lower()
         if command == "farm" then
-            startFarming()
+            farm()
         elseif command == "empty" then
             print("Sending empty command")
             modem.transmit(modemBroadcast, modemReceive, {
@@ -271,8 +358,10 @@ local function commandLoop()
                 type = "update"
             })
             shell.run("update server")
+        elseif command == "time" then
+            printLastFarmed()
         else
-            print("Unknown command. Valid options: farm, empty, update")
+            print("Unknown command. Valid options: farm, empty, update, time")
         end
     end
 end
