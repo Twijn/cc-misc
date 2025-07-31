@@ -2,6 +2,8 @@ local modemSend = 69
 local modemBroadcast = 70
 local modemReceive = tonumber(1000 .. settings.get("farm.id"))
 
+local minimumFuelLevel = 200
+
 print(string.format("Modem settings: (s%d) (b%d) (r%d)", modemSend, modemBroadcast, modemReceive))
 
 local tables = require("tables")
@@ -36,7 +38,7 @@ local function empty()
         end
     end
 
-    if turtle.getFuelLevel() < 100 then
+    if turtle.getFuelLevel() < minimumFuelLevel then
         print("Refueling!")
         turtle.suckDown(8)
         for slot = 1, 16 do
