@@ -3,10 +3,12 @@ local modemReceive = 69
 local modemSide = "bottom"
 
 local FARM_INTERVAL = 20 * 60 * 1000 -- 20 minutes
+local BREED_INTERVAL = 6 * 60 * 1000 -- 6 minutes
 
 local tables = require("tables")
 
 local lastFarmTime = 0
+local lastBreedTime = 0
 
 local crops = {
     ["minecraft:wheat"] = {
@@ -30,6 +32,13 @@ local crops = {
         grownAge = 7,
         target = 1024,
     },
+    ["minecraft:potatoes"] = {
+        name = "Potato",
+        cropName = "minecraft:potato",
+        seedName = "minecraft:potato",
+        grownAge = 7,
+        target = 2048,
+    },
 }
 
 local locations = {
@@ -38,6 +47,8 @@ local locations = {
     ["minecraft:beetroot"] = "sc-goodies:iron_chest_40",
     ["minecraft:beetroot_seeds"] = "sc-goodies:iron_chest_41",
     ["minecraft:carrot"] = "sc-goodies:iron_chest_42",
+    ["minecraft:potato"] = "sc-goodies:iron_chest_44",
+    ["minecraft:poisonous_potato"] = "sc-goodies:iron_chest_45",
     ["minecraft:charcoal"] = settings.get("chest.fuel"),
 }
 
@@ -86,6 +97,23 @@ if fs.exists(".last-farm") then
     end
 end
 
+local function saveLastBred()
+    lastBreedTime = os.epoch("utc")
+    local f = fs.open(".last-bred", "w")
+    f.write(lastBreedTime)
+    f.close()
+end
+
+if fs.exists(".last-bred") then
+    local f = fs.open(".last-bred", "r")
+    lastBreedTime = tonumber(f.readLine())
+    f.close()
+
+    if not lastBreedTime then
+        lastBreedTime = 0
+    end
+end
+
 local function getRelativeTime(millis)
     local sec = math.floor(millis / 1000)
     if sec >= 86400 then
@@ -111,6 +139,18 @@ local function printLastFarmed()
         print("Will farm again in approx. " .. getRelativeTime(farmIn))
     else
         print("Will farm ASAP!")
+    end
+end
+
+local function printLastBred()
+    local timeSinceBreed = os.epoch("utc") - lastBreedTime
+    local breedIn = BREED_INTERVAL - timeSinceBreed
+
+    print("Last bred " .. getRelativeTime(timeSinceBreed) .. " ago")
+    if breedIn > 0 then
+        print("Will breed again in approx. " .. getRelativeTime(breedIn))
+    else
+        print("Will breed ASAP!")
     end
 end
 
@@ -314,6 +354,28 @@ local function farmLoop()
     end
 end
 
+local function breed()
+    print("Starting breed cycle...")
+    modem.transmit(modemBroadcast, modemReceive, {
+        type = "breed",
+    })
+    saveLastBred()
+end
+
+local function breedLoop()
+    printLastBred()
+    while true do
+        local timeSinceBreed = os.epoch("utc") - lastBreedTime
+        local breedIn = BREED_INTERVAL - timeSinceBreed
+
+        if breedIn <= 0 then
+            breed()
+        end
+
+        sleep(math.max(breedIn / 1000, 0) + 2)
+    end
+end
+
 local function maintainOutputs()
     while true do
         for name, chest in pairs(outputChests) do
@@ -359,11 +421,14 @@ local function commandLoop()
             })
             shell.run("update server")
         elseif command == "time" then
+            printLastBred()
             printLastFarmed()
+        elseif command == "breed" then
+            breed()
         else
-            print("Unknown command. Valid options: farm, empty, update, time")
+            print("Unknown command. Valid options: farm, breed, empty, update, time")
         end
     end
 end
 
-parallel.waitForAny(modemLoop, farmLoop, commandLoop, maintainOutputs)
+parallel.waitForAny(modemLoop, farmLoop, breedLoop, commandLoop, maintainOutputs)

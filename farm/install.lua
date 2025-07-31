@@ -1,7 +1,7 @@
 local args = {...}
 
-if #args < 0 or (args[1] ~= "server" and args[1] ~= "turtle") then
-    print("Improper usage: expected 'server' or 'turtle'")
+if #args < 0 or (args[1] ~= "server" and args[1] ~= "turtle" and args[1] ~= "breeder") then
+    print("Improper usage: expected 'server' | 'turtle' | 'breeder'")
     return
 end
 
@@ -17,7 +17,7 @@ if args[1] == "server" then
         local startup = fs.open("startup.lua", "w")
         startup.write('shell.run("farmServer")')
     end
-else
+elseif args[1] == "turtle" then
     fs.delete("startup.lua")
     shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/farm.lua startup.lua")
     if not settings.get("farm.id") then
@@ -34,5 +34,8 @@ else
             end
         end
     end
+elseif args[1] == "breeder" then
+    fs.delete("startup.lua")
+    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/breeder.lua startup.lua")
 end
 os.reboot()

@@ -3,5 +3,5 @@ A horrible farming program I made that automatically adjusts what it's farming t
 
 Install the program using:
 ```text
-wget run https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/install.lua <server|turtle>
+wget run https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/install.lua <server|turtle|breeder>
 ```
