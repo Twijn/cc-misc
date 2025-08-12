@@ -8,7 +8,6 @@ local modemBroadcast = 70
 local breedTimeout = 5 * 1000 -- 5 seconds
 
 local modem = peripheral.wrap(modemSide)
-local sensor = peripheral.find("plethora:sensor")
 
 if not modem then
     error("modem was not found!")

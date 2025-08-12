@@ -1,6 +1,4 @@
-local s = require("lib/s")
 local config = require("config")
-local tables = require("lib/tables")
 
 local locations = config.chestLocations
 local farmOutputChests = config.farmOutputChests
