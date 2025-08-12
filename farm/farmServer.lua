@@ -3,6 +3,9 @@ local breeder = require("lib/breeder")
 local storage = require("lib/storage")
 local monitor = require("lib/monitor")
 local timeutil = require("lib/timeutil")
+local s = require("lib/s")
+
+local modem = s.peripheral("modem.side", "modem", true)
 
 local function printTimeTo(interval, name)
     print()
