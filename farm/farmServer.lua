@@ -4,6 +4,8 @@ local storage = require("lib/storage")
 local monitor = require("lib/monitor")
 local timeutil = require("lib/timeutil")
 
+local modem = s.peripheral("modem.side", "modem", true)
+
 local function printTimeTo(interval, name)
     print()
     print(string.format("%s last ran %s ago", name, interval.getTimeSinceRun(true)))
