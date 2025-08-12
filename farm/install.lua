@@ -40,6 +40,9 @@ if args[1] == "server" then
         local startup = fs.open("startup.lua", "w")
         startup.write('shell.run("farmServer")')
     end
+    if not fs.exists("config.lua") then
+        shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/config.lua")
+    end
     addLibs("lib/breeder.lua", "lib/cropFarm.lua", "lib/monitor.lua", "lib/storage.lua")
 elseif args[1] == "turtle" then
     fs.delete("startup.lua")
