@@ -6,6 +6,8 @@ local timeutil = require("lib/timeutil")
 local s = require("lib/s")
 
 local modem = s.peripheral("modem.side", "modem", true)
+local modemBroadcast = s.number("modem.broadcast", 0, 65535, 70)
+local modemReceive = s.number("modem.receive", 0, 65535, 69)
 
 local function printTimeTo(interval, name)
     print()
