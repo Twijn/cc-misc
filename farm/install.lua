@@ -8,16 +8,14 @@ end
 -- LEGACY CODE for when tables was at root
 fs.delete("tables.lua")
 
-local time = os.epoch("utc")
-
 local libs = {
-    ["lib/s.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/s.lua?v="..time,
-    ["lib/tables.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/tables.lua?v="..time,
-    ["lib/timeutil.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/timeutil.lua?v="..time,
-    ["lib/breeder.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/breeder.lua?v="..time,
-    ["lib/cropFarm.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/cropFarm.lua?v="..time,
-    ["lib/monitor.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/monitor.lua?v="..time,
-    ["lib/storage.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/storage.lua?v="..time,
+    ["lib/s.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/s.lua",
+    ["lib/tables.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/tables.lua",
+    ["lib/timeutil.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/timeutil.lua",
+    ["lib/breeder.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/breeder.lua",
+    ["lib/cropFarm.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/cropFarm.lua",
+    ["lib/monitor.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/monitor.lua",
+    ["lib/storage.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/storage.lua",
 }
 local requiredLibs = {
     "lib/s.lua", "lib/tables.lua", "lib/timeutil.lua"
@@ -33,22 +31,22 @@ end
 fs.makeDir("lib")
 
 fs.delete("update.lua")
-shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/install.lua?v="..time.." update.lua")
+shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/install.lua update.lua")
 
 if args[1] == "server" then
     fs.delete("farmServer.lua")
-    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/farmServer.lua?v="..time)
+    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/farmServer.lua")
     if not fs.exists("startup.lua") then
         local startup = fs.open("startup.lua", "w")
         startup.write('shell.run("farmServer")')
     end
     if not fs.exists("config.lua") then
-        shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/config.lua?v="..time)
+        shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/config.lua")
     end
     addLibs("lib/breeder.lua", "lib/cropFarm.lua", "lib/monitor.lua", "lib/storage.lua")
 elseif args[1] == "turtle" then
     fs.delete("startup.lua")
-    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/client/farm.lua?v="..time.." startup.lua")
+    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/client/farm.lua startup.lua")
     if not settings.get("farm.id") then
         while true do
             print("Enter a numerical number to use for the turtle ID (1-99). Must be unique!")
@@ -65,7 +63,7 @@ elseif args[1] == "turtle" then
     end
 elseif args[1] == "breeder" then
     fs.delete("startup.lua")
-    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/client/breeder.lua?v="..time.." startup.lua")
+    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/client/breeder.lua startup.lua")
 end
 
 for _, file in pairs(requiredLibs) do
