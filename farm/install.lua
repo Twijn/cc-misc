@@ -5,9 +5,32 @@ if #args < 0 or (args[1] ~= "server" and args[1] ~= "turtle" and args[1] ~= "bre
     return
 end
 
+-- LEGACY CODE for when tables was at root
 fs.delete("tables.lua")
+
+local libs = {
+    ["lib/s.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/s.lua",
+    ["lib/tables.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/tables.lua",
+    ["lib/timeutil.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/timeutil.lua",
+    ["lib/breeder.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/breeder.lua",
+    ["lib/cropFarm.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/cropFarm.lua",
+    ["lib/monitor.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/monitor.lua",
+    ["lib/storage.lua"] = "wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/lib/storage.lua",
+}
+local requiredLibs = {
+    "lib/s.lua", "lib/tables.lua", "lib/timeutil.lua"
+}
+
+local function addLibs(...)
+    local newLibs = { ... }
+    for _, name in pairs(newLibs) do
+        table.insert(requiredLibs, name)
+    end
+end
+
+fs.makeDir("lib")
+
 fs.delete("update.lua")
-shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/tables.lua")
 shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/install.lua update.lua")
 
 if args[1] == "server" then
@@ -17,9 +40,10 @@ if args[1] == "server" then
         local startup = fs.open("startup.lua", "w")
         startup.write('shell.run("farmServer")')
     end
+    addLibs("lib/breeder.lua", "lib/cropFarm.lua", "lib/monitor.lua", "lib/storage.lua")
 elseif args[1] == "turtle" then
     fs.delete("startup.lua")
-    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/farm.lua startup.lua")
+    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/client/farm.lua startup.lua")
     if not settings.get("farm.id") then
         while true do
             print("Enter a numerical number to use for the turtle ID (1-99). Must be unique!")
@@ -36,6 +60,14 @@ elseif args[1] == "turtle" then
     end
 elseif args[1] == "breeder" then
     fs.delete("startup.lua")
-    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/breeder.lua startup.lua")
+    shell.run("wget https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/farm/client/breeder.lua startup.lua")
 end
+
+for _, file in pairs(requiredLibs) do
+    local wget = libs[file]
+    if not wget then error("could not find required library " .. file) end
+    fs.delete(file)
+    shell.run(string.format("%s %s", wget, file))
+end
+
 os.reboot()

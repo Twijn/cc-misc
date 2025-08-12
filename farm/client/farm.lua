@@ -1,3 +1,5 @@
+local tables = require("lib/tables")
+
 local modemSend = 69
 local modemBroadcast = 70
 local modemReceive = tonumber(1000 .. settings.get("farm.id"))
@@ -5,8 +7,6 @@ local modemReceive = tonumber(1000 .. settings.get("farm.id"))
 local minimumFuelLevel = 200
 
 print(string.format("Modem settings: (s%d) (b%d) (r%d)", modemSend, modemBroadcast, modemReceive))
-
-local tables = require("tables")
 
 -- Return back "home" if the block underneath is not a chest
 local blockFound, block = turtle.inspectDown()
