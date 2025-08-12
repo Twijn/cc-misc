@@ -7,6 +7,8 @@ local s = require("lib/s")
 
 local modem = s.peripheral("modem.side", "modem", true)
 
+local modem = s.peripheral("modem.side", "modem", true)
+
 local function printTimeTo(interval, name)
     print()
     print(string.format("%s last ran %s ago", name, interval.getTimeSinceRun(true)))
