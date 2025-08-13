@@ -1,10 +1,15 @@
+local s = require("lib/s")
 local tables = require("lib/tables")
 
-local modemSend = 69
-local modemBroadcast = 70
-local modemReceive = tonumber(1000 .. settings.get("farm.id"))
+local turtleId = s.number("farm.id", 1, 99)
 
-local minimumFuelLevel = 200
+local modem = s.peripheral("modem.side", "modem", true)
+
+local modemSend = s.number("modem.send", 0, 65535, 69)
+local modemBroadcast = s.number("modem.broadcast", 0, 65535, 70)
+local modemReceive = tonumber(1000 .. turtleId)
+
+local minimumFuelLevel = s.number("fuel.minimum-level", 100, 500, 200)
 
 print(string.format("Modem settings: (s%d) (b%d) (r%d)", modemSend, modemBroadcast, modemReceive))
 
@@ -13,12 +18,6 @@ local blockFound, block = turtle.inspectDown()
 if not blockFound or block.name ~= "minecraft:chest" then
     while turtle.back() do end
     while turtle.down() do end
-end
-
-local modem = peripheral.wrap("back")
-
-if not modem then
-    error("modem not found")
 end
 
 local crops = nil
@@ -110,7 +109,7 @@ end
 local function identify()
     modem.transmit(modemSend, modemReceive, {
         type = "identify",
-        id = settings.get("farm.id"),
+        id = turtleId,
     })
 end
 

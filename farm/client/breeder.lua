@@ -1,160 +1,88 @@
-local s = require("lib/s")
-local tables = require("lib/tables")
+local breedItem = "minecraft:wheat"
 
-local turtleId = s.number("farm.id", 1, 99)
+local redstoneSide = "bottom"
 
-local modem = s.peripheral("modem.side", "modem", true)
+local modemSide = "bottom"
+local modemBroadcast = 70
 
-local modemSend = s.number("modem.send", 0, 65535, 69)
-local modemBroadcast = s.number("modem.broadcast", 0, 65535, 70)
-local modemReceive = tonumber(1000 .. turtleId)
+local breedTimeout = 5 * 1000 -- 5 seconds
 
-local minimumFuelLevel = s.number("fuel.minimum-level", 100, 500, 200)
+local modem = peripheral.wrap(modemSide)
 
-print(string.format("Modem settings: (s%d) (b%d) (r%d)", modemSend, modemBroadcast, modemReceive))
-
--- Return back "home" if the block underneath is not a chest
-local blockFound, block = turtle.inspectDown()
-if not blockFound or block.name ~= "minecraft:chest" then
-    while turtle.back() do end
-    while turtle.down() do end
+if not modem then
+    error("modem was not found!")
 end
 
-local crops = nil
-local crop = nil
-
-local function empty()
-    if not crop then
-        print("Can't empty now: Need a crop to harvest!")
-        return
+local function rep(func, iterations)
+    for i=1, iterations do
+        func()
     end
-
-    for slot = tables.count(crops)+1, 16 do
-        local detail = turtle.getItemDetail(slot)
-        if detail then
-            turtle.select(slot)
-            turtle.dropDown()
-        end
-    end
-
-    if turtle.getFuelLevel() < minimumFuelLevel then
-        print("Refueling!")
-        turtle.suckDown(8)
-        for slot = 1, 16 do
-            turtle.select(slot)
-            turtle.refuel(8)
-        end
-    end
-    turtle.select(1)
 end
 
-local function harvest()
-    turtle.digDown()
-    for slot = 1,16 do
-        local detail = turtle.getItemDetail(slot)
-        if detail and detail.name == crop.seedName then
-            if slot > tables.count(crops) or detail.count > 1 then
-                turtle.select(slot)
-                turtle.placeDown()
-                break
+function redstone.pulse(side)
+    redstone.setOutput(side, true)
+    sleep(.1)
+    redstone.setOutput(side, false)
+end
+
+local function breedSide()
+    redstone.pulse(redstoneSide)
+    local lastBreed = os.epoch("utc")
+    while true do
+        if turtle.place() then
+            lastBreed = os.epoch("utc")
+        end
+
+        if os.epoch("utc") - lastBreed >= breedTimeout then break end
+
+        sleep()
+    end
+    redstone.pulse(redstoneSide)
+    sleep(1)
+end
+
+local function replenish()
+    local item = turtle.getItemDetail(1)
+    if item and item.count > 48 then return end
+
+    local itemsNeeded = 64 - (item and item.count or 0)
+    local chests = table.pack(peripheral.find("inventory"))
+    for i, chest in pairs(chests) do
+        if type(chest) == "table" and chest.list then
+            for slot, item in pairs(chest.list()) do
+                if item.name == breedItem then
+                    itemsNeeded = itemsNeeded - chest.pushItems(modem.getNameLocal(), slot, itemsNeeded, 1)
+                    if itemsNeeded == 0 then return end
+                end
             end
         end
-        if slot == 16 then
-            print("No seeds found :(")
-            return false
-        end
     end
-    turtle.select(1)
-    return true
 end
 
-local function harvestRow()
-    repeat
-        local found, block = turtle.inspectDown()
-        if not found then
-            if not harvest() then break end
-        elseif crops[block.name] then
-            local harvestCrop = crops[block.name]
-
-            if harvestCrop.grownAge and block.state.age >= harvestCrop.grownAge then
-                if not harvest() then break end
-            end
-        end
-    until not turtle.forward()
-
-    while turtle.back() do end
-end
-
-local function harvestAll()
-    -- Harvest the first (starting) row
-    harvestRow()
-    repeat
-        local b, blo = turtle.inspect()
-        if b and blo.name == "minecraft:farmland" then
-            if turtle.up() and turtle.up() then
-                harvestRow()
-            end
-        end
-    until not turtle.up()
-    while turtle.down() do end
-    empty()
-end
-
-local function requestSettings()
-    modem.transmit(modemSend, modemReceive, {
-        type = "settings"
-    })
-end
-
-local function identify()
-    modem.transmit(modemSend, modemReceive, {
-        type = "identify",
-        id = turtleId,
-    })
+local function breed()
+    replenish()
+    print("Breeding!")
+    breedSide()
+    rep(turtle.turnRight, 2)
+    breedSide()
+    rep(turtle.turnRight, 2)
+    replenish()
 end
 
 local function modemLoop()
-    modem.open(modemReceive)
     modem.open(modemBroadcast)
-
-    requestSettings()
     while true do
-        local e, side, channel, replyChannel, msg = os.pullEvent("modem_message")
-        if msg and type(msg) == "table" and msg.type then
-            if msg.type == "identify" then
-                identify()
-            elseif msg.type == "settings" then
-                if msg.settings then
-                    for name, value in pairs(msg.settings) do
-                        print(string.format("Setting %s = %s", name, value))
-                        settings.set(name, value)
-                    end
-                    settings.save()
-                end
-                if msg.crops then
-                    crops = msg.crops
-                end
-                if msg.crop then
-                    crop = crops[msg.crop]
-                    print("Using crop " .. crop.name)
-                    empty()
-                end
-            elseif msg.type == "farm" then
-                if crops and crop then
-                    print("Now farming!")
-                    harvestAll()
-                else
-                    print("Unable to farm because server didn't send me crops >:( requesting now!")
-                    requestSettings()
-                end
-            elseif msg.type == "empty" then
-                print("Emptying by command")
-                empty()
+        local _, __, channel, replyChannel, msg = os.pullEvent("modem_message")
+
+        if type(msg) == "table" and msg.type then
+            if msg.type == "breed" then
+                breed()
             elseif msg.type == "update" then
-                shell.run("update turtle")
+                shell.run("update breeder")
             end
         end
     end
 end
 
+turtle.select(1)
 modemLoop()
