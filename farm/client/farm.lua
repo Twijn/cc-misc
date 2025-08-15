@@ -3,8 +3,6 @@ local tables = require("lib/tables")
 
 local turtleId = s.number("farm.id", 1, 99)
 
-local modem = s.peripheral("modem.side", "modem", true)
-
 local modemSend = s.number("modem.send", 0, 65535, 69)
 local modemBroadcast = s.number("modem.broadcast", 0, 65535, 70)
 local modemReceive = tonumber(1000 .. turtleId)
@@ -19,6 +17,9 @@ if not blockFound or block.name ~= "minecraft:chest" then
     while turtle.back() do end
     while turtle.down() do end
 end
+
+-- Check for modem after home
+local modem = s.peripheral("modem.side", "modem", true)
 
 local crops = nil
 local crop = nil
