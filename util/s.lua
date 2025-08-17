@@ -125,4 +125,27 @@ function module.number(name, from, to, default)
     return value
 end
 
+function module.string(name, default)
+    local value = settings.get(name)
+
+    if not value then
+        print(string.format("Enter value for %s", name))
+        if default then
+            print(string.format("Leave blank for default (%d)", default))
+        end
+
+        local strVal = read()
+
+        if #strVal == 0 and default then
+            value = default
+        else
+            value = strVal
+        end
+        settings.set(name, value)
+        settings.save()
+    end
+
+    return value
+end
+
 return module
