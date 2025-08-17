@@ -131,7 +131,7 @@ function module.string(name, default)
     if not value then
         print(string.format("Enter value for %s", name))
         if default then
-            print(string.format("Leave blank for default (%d)", default))
+            print(string.format("Leave blank for default (%s)", default))
         end
 
         local strVal = read()
