@@ -148,4 +148,16 @@ function module.string(name, default)
     return value
 end
 
+function module.boolean(name)
+    local value = settings.get(name)
+
+    if type(value) ~= "boolean" then
+        value = selectMenu("Set boolean value", "Set a value for " .. name, {"true", "false"}) == "true"
+        settings.set(name, value)
+        settings.save()
+    end
+
+    return value
+end
+
 return module
