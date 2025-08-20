@@ -18,7 +18,7 @@ local files = {
     ["snowmaker.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/snowmaker/snowmaker.lua"
 }
 local installFiles = {
-    "lib/s.lua", "lib/tables.lua", "lib/persist.lua",
+    "lib/s.lua", "lib/tables.lua", "lib/persist.lua", "update.lua"
 }
 
 if fs.exists("lib/config.lua") then
@@ -44,4 +44,4 @@ for _, fileName in pairs(installFiles) do
     shell.run("wget", url, fileName)
 end
 
-
+os.reboot()
