@@ -1,6 +1,6 @@
 local module = {}
 
-local tables = require("lib/tables")
+local tables = require("/lib/tables")
 
 local sides = {"top","bottom","front","back","left","right"}
 
@@ -111,7 +111,7 @@ function module.number(name, from, to, default)
                 break
             end
 
-            value = tonumber(value)
+            value = tonumber(strVal)
             if value and (not from or value >= from) and (not to or value <= to) then
                 break
             end
