@@ -14,6 +14,7 @@ local files = {
     ["lib/snowmakercomms.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/server/lib/snowmakercomms.lua",
     ["tools/buildPlatform.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/server/tools/buildPlatform.lua",
     ["tools/scannerTest.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/server/tools/scannerTest.lua",
+    ["tools/updateAll.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/server/tools/updateAll.lua",
     -- Snowmaker files
     ["snowmaker.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/snowmaker/snowmaker.lua"
 }
@@ -31,6 +32,7 @@ if args[1] == "server" then
     table.insert(installFiles, "lib/snowmakercomms.lua")
     table.insert(installFiles, "tools/buildPlatform.lua")
     table.insert(installFiles, "tools/scannerTest.lua")
+    table.insert(installFiles, "tools/updateAll.lua")
 elseif args[1] == "snowmaker" then
     table.insert(installFiles, "snowmaker.lua")
 end
