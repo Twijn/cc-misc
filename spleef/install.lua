@@ -15,7 +15,7 @@ local files = {
     ["tools/buildPlatform.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/server/tools/buildPlatform.lua",
     ["tools/scannerTest.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/server/tools/scannerTest.lua",
     -- Snowmaker files
-    ["snowmaker.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/snowmaker/snowmaker.lua"
+    ["snowmaker.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/spleef/snowmaker/snowmaker.lua"
 }
 local installFiles = {
     "lib/s.lua", "lib/tables.lua", "lib/persist.lua",
