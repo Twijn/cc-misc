@@ -35,6 +35,12 @@ if args[1] == "server" then
     table.insert(installFiles, "tools/updateAll.lua")
 elseif args[1] == "snowmaker" then
     table.insert(installFiles, "snowmaker.lua")
+
+    if not fs.exists("startup.lua") then
+        local f = fs.open("startup.lua", "w");
+        f.write('shell.run("snowmaker")')
+        f.close()
+    end
 end
 
 for _, fileName in pairs(installFiles) do
