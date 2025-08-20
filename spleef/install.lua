@@ -41,7 +41,7 @@ for _, fileName in pairs(installFiles) do
     if fs.exists(fileName) then
         fs.delete(fileName)
     end
-    shell.run({"wget", url, fileName})
+    shell.run("wget", url, fileName)
 end
 
 
