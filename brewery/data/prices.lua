@@ -67,4 +67,16 @@ return {
         name = "minecraft:ghast_tear",
         cost = 0.05,
     },
+    {
+        name = "minecraft:glistering_melon_slice",
+        cost = 0.01,
+    },
+    {
+        name = "minecraft:blaze_powder",
+        cost = 0.01,
+    },
+    {
+        name = "minecraft:phantom_membrane",
+        cost = 0.10,
+    },
 }
