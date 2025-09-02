@@ -87,7 +87,8 @@ function module.getRelativeTime(sec)
         local val = math.floor(sec / 6) / 10
         return val .. " minute" .. (val == 1 and "" or "s")
     else
-        return sec .. " second" .. (sec == 1 and "" or "s")
+        local val = math.floor(sec)
+        return val .. " second" .. (val == 1 and "" or "s")
     end
 end
 
