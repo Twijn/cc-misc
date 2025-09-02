@@ -268,7 +268,7 @@ return {
         displayName = "Healing II",
     },
     {
-        basePotionId = "water",
+        basePotionId = "healing",
         potionType = "normal",
         potion = "minecraft:harming",
         splash = false,
