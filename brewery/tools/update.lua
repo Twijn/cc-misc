@@ -1,4 +1,7 @@
 local files = {
+    ["/lib/persist.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/persist.lua",
+    ["/lib/s.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/s.lua",
+    ["/lib/tables.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/tables.lua",
     ["/data/prices.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/brewery/data/prices.lua",
     ["/data/recipes.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/brewery/data/recipes.lua",
     ["/tools/check.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/brewery/tools/check.lua",
@@ -6,6 +9,7 @@ local files = {
     ["/brewery.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/brewery/brewery.lua",
 }
 
+fs.makeDir("/lib")
 fs.makeDir("/data")
 fs.makeDir("/tools")
 
