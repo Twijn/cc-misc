@@ -21,6 +21,12 @@ return function(fileName)
         save()
     end
 
+    persistModule.setDefault = function(key, defaultValue)
+        if not object[key] then
+            object[key] = defaultValue
+        end
+    end
+
     persistModule.set = function(key, value)
         object[key] = value
         save()
