@@ -818,7 +818,7 @@ return {
         displayName = "Slow Falling+",
     },
     {
-        basePotionId = "water",
+        basePotionId = "water_splash",
         potion = "minecraft:water",
         splash = false,
         id = "water_lingering",
@@ -828,7 +828,7 @@ return {
         displayName = "Water Bottle",
     },
     {
-        basePotionId = "mundane",
+        basePotionId = "mundane_splash",
         potion = "minecraft:mundane",
         splash = false,
         id = "mundane_lingering",
@@ -838,7 +838,7 @@ return {
         displayName = "Mundane Potion",
     },
     {
-        basePotionId = "thick",
+        basePotionId = "thick_splash",
         potion = "minecraft:thick",
         splash = false,
         id = "thick_lingering",
@@ -848,7 +848,7 @@ return {
         displayName = "Thick Potion",
     },
     {
-        basePotionId = "awkward",
+        basePotionId = "awkward_splash",
         potion = "minecraft:awkward",
         splash = false,
         id = "awkward_lingering",
@@ -858,7 +858,7 @@ return {
         displayName = "Awkward Potion",
     },
     {
-        basePotionId = "night_vision",
+        basePotionId = "night_vision_splash",
         potion = "minecraft:night_vision",
         splash = false,
         id = "night_vision_lingering",
@@ -868,7 +868,7 @@ return {
         displayName = "Night Vision",
     },
     {
-        basePotionId = "long_night_vision",
+        basePotionId = "long_night_vision_splash",
         potion = "minecraft:long_night_vision",
         splash = false,
         id = "long_night_vision_lingering",
@@ -878,7 +878,7 @@ return {
         displayName = "Night Vision+",
     },
     {
-        basePotionId = "invisibility",
+        basePotionId = "invisibility_splash",
         potion = "minecraft:invisibility",
         splash = false,
         id = "invisibility_lingering",
@@ -888,7 +888,7 @@ return {
         displayName = "Invisibility",
     },
     {
-        basePotionId = "long_invisibility",
+        basePotionId = "long_invisibility_splash",
         potion = "minecraft:long_invisibility",
         splash = false,
         id = "long_invisibility_lingering",
@@ -898,7 +898,7 @@ return {
         displayName = "Invisibility+",
     },
     {
-        basePotionId = "leaping",
+        basePotionId = "leaping_splash",
         potion = "minecraft:leaping",
         splash = false,
         id = "leaping_lingering",
@@ -908,7 +908,7 @@ return {
         displayName = "Leaping",
     },
     {
-        basePotionId = "long_leaping",
+        basePotionId = "long_leaping_splash",
         potion = "minecraft:long_leaping",
         splash = false,
         id = "long_leaping_lingering",
@@ -918,7 +918,7 @@ return {
         displayName = "Leaping+",
     },
     {
-        basePotionId = "strong_leaping",
+        basePotionId = "strong_leaping_splash",
         potion = "minecraft:strong_leaping",
         splash = false,
         id = "strong_leaping_lingering",
@@ -928,7 +928,7 @@ return {
         displayName = "Leaping II",
     },
     {
-        basePotionId = "fire_resistance",
+        basePotionId = "fire_resistance_splash",
         potion = "minecraft:fire_resistance",
         splash = false,
         id = "fire_resistance_lingering",
@@ -938,7 +938,7 @@ return {
         displayName = "Fire Resistance",
     },
     {
-        basePotionId = "long_fire_resistance",
+        basePotionId = "long_fire_resistance_splash",
         potion = "minecraft:long_fire_resistance",
         splash = false,
         id = "long_fire_resistance_lingering",
@@ -948,7 +948,7 @@ return {
         displayName = "Fire Resistance+",
     },
     {
-        basePotionId = "swiftness",
+        basePotionId = "swiftness_splash",
         potion = "minecraft:swiftness",
         splash = false,
         id = "swiftness_lingering",
@@ -958,7 +958,7 @@ return {
         displayName = "Swiftness",
     },
     {
-        basePotionId = "long_swiftness",
+        basePotionId = "long_swiftness_splash",
         potion = "minecraft:long_swiftness",
         splash = false,
         id = "long_swiftness_lingering",
@@ -968,7 +968,7 @@ return {
         displayName = "Swiftness+",
     },
     {
-        basePotionId = "strong_swiftness",
+        basePotionId = "strong_swiftness_splash",
         potion = "minecraft:strong_swiftness",
         splash = false,
         id = "strong_swiftness_lingering",
@@ -978,7 +978,7 @@ return {
         displayName = "Swiftness II",
     },
     {
-        basePotionId = "slowness",
+        basePotionId = "slowness_splash",
         potion = "minecraft:slowness",
         splash = false,
         id = "slowness_lingering",
@@ -988,7 +988,7 @@ return {
         displayName = "Slowness",
     },
     {
-        basePotionId = "long_slowness",
+        basePotionId = "long_slowness_splash",
         potion = "minecraft:long_slowness",
         splash = false,
         id = "long_slowness_lingering",
@@ -998,7 +998,7 @@ return {
         displayName = "Slowness+",
     },
     {
-        basePotionId = "strong_slowness",
+        basePotionId = "strong_slowness_splash",
         potion = "minecraft:strong_slowness",
         splash = false,
         id = "strong_slowness_lingering",
@@ -1008,7 +1008,7 @@ return {
         displayName = "Slowness IV",
     },
     {
-        basePotionId = "turtle_master",
+        basePotionId = "turtle_master_splash",
         potion = "minecraft:turtle_master",
         splash = false,
         id = "turtle_master_lingering",
@@ -1018,7 +1018,7 @@ return {
         displayName = "Turtle Master",
     },
     {
-        basePotionId = "long_turtle_master",
+        basePotionId = "long_turtle_master_splash",
         potion = "minecraft:long_turtle_master",
         splash = false,
         id = "long_turtle_master_lingering",
@@ -1028,7 +1028,7 @@ return {
         displayName = "Turtle Master+",
     },
     {
-        basePotionId = "strong_turtle_master",
+        basePotionId = "strong_turtle_master_splash",
         potion = "minecraft:strong_turtle_master",
         splash = false,
         id = "strong_turtle_master_lingering",
@@ -1038,7 +1038,7 @@ return {
         displayName = "Turtle Master II",
     },
     {
-        basePotionId = "water_breathing",
+        basePotionId = "water_breathing_splash",
         potion = "minecraft:water_breathing",
         splash = false,
         id = "water_breathing_lingering",
@@ -1048,7 +1048,7 @@ return {
         displayName = "Water Breathing",
     },
     {
-        basePotionId = "long_water_breathing",
+        basePotionId = "long_water_breathing_splash",
         potion = "minecraft:long_water_breathing",
         splash = false,
         id = "long_water_breathing_lingering",
@@ -1058,7 +1058,7 @@ return {
         displayName = "Water Breathing+",
     },
     {
-        basePotionId = "healing",
+        basePotionId = "healing_splash",
         potion = "minecraft:healing",
         splash = false,
         id = "healing_lingering",
@@ -1068,7 +1068,7 @@ return {
         displayName = "Healing",
     },
     {
-        basePotionId = "strong_healing",
+        basePotionId = "strong_healing_splash",
         potion = "minecraft:strong_healing",
         splash = false,
         id = "strong_healing_lingering",
@@ -1078,7 +1078,7 @@ return {
         displayName = "Healing II",
     },
     {
-        basePotionId = "harming",
+        basePotionId = "harming_splash",
         potion = "minecraft:harming",
         splash = false,
         id = "harming_lingering",
@@ -1088,7 +1088,7 @@ return {
         displayName = "Harming",
     },
     {
-        basePotionId = "strong_harming",
+        basePotionId = "strong_harming_splash",
         potion = "minecraft:strong_harming",
         splash = false,
         id = "strong_harming_lingering",
@@ -1098,7 +1098,7 @@ return {
         displayName = "Harming II",
     },
     {
-        basePotionId = "poison",
+        basePotionId = "poison_splash",
         potion = "minecraft:poison",
         splash = false,
         id = "poison_lingering",
@@ -1108,7 +1108,7 @@ return {
         displayName = "Poison",
     },
     {
-        basePotionId = "long_poison",
+        basePotionId = "long_poison_splash",
         potion = "minecraft:long_poison",
         splash = false,
         id = "long_poison_lingering",
@@ -1118,7 +1118,7 @@ return {
         displayName = "Poison+",
     },
     {
-        basePotionId = "strong_poison",
+        basePotionId = "strong_poison_splash",
         potion = "minecraft:strong_poison",
         splash = false,
         id = "strong_poison_lingering",
@@ -1128,7 +1128,7 @@ return {
         displayName = "Poison II",
     },
     {
-        basePotionId = "regeneration",
+        basePotionId = "regeneration_splash",
         potion = "minecraft:regeneration",
         splash = false,
         id = "regeneration_lingering",
@@ -1138,7 +1138,7 @@ return {
         displayName = "Regeneration",
     },
     {
-        basePotionId = "long_regeneration",
+        basePotionId = "long_regeneration_splash",
         potion = "minecraft:long_regeneration",
         splash = false,
         id = "long_regeneration_lingering",
@@ -1148,7 +1148,7 @@ return {
         displayName = "Regeneration+",
     },
     {
-        basePotionId = "strong_regeneration",
+        basePotionId = "strong_regeneration_splash",
         potion = "minecraft:strong_regeneration",
         splash = false,
         id = "strong_regeneration_lingering",
@@ -1158,7 +1158,7 @@ return {
         displayName = "Regeneration II",
     },
     {
-        basePotionId = "strength",
+        basePotionId = "strength_splash",
         potion = "minecraft:strength",
         splash = false,
         id = "strength_lingering",
@@ -1168,7 +1168,7 @@ return {
         displayName = "Strength",
     },
     {
-        basePotionId = "long_strength",
+        basePotionId = "long_strength_splash",
         potion = "minecraft:long_strength",
         splash = false,
         id = "long_strength_lingering",
@@ -1178,7 +1178,7 @@ return {
         displayName = "Strength+",
     },
     {
-        basePotionId = "strong_strength",
+        basePotionId = "strong_strength_splash",
         potion = "minecraft:strong_strength",
         splash = false,
         id = "strong_strength_lingering",
@@ -1188,7 +1188,7 @@ return {
         displayName = "Strength II",
     },
     {
-        basePotionId = "weakness",
+        basePotionId = "weakness_splash",
         potion = "minecraft:weakness",
         splash = false,
         id = "weakness_lingering",
@@ -1198,7 +1198,7 @@ return {
         displayName = "Weakness",
     },
     {
-        basePotionId = "long_weakness",
+        basePotionId = "long_weakness_splash",
         potion = "minecraft:long_weakness",
         splash = false,
         id = "long_weakness_lingering",
@@ -1208,7 +1208,7 @@ return {
         displayName = "Weakness+",
     },
     {
-        basePotionId = "slow_falling",
+        basePotionId = "slow_falling_splash",
         potion = "minecraft:slow_falling",
         splash = false,
         id = "slow_falling_lingering",
@@ -1218,7 +1218,7 @@ return {
         displayName = "Slow Falling",
     },
     {
-        basePotionId = "long_slow_falling",
+        basePotionId = "long_slow_falling_splash",
         potion = "minecraft:long_slow_falling",
         splash = false,
         id = "long_slow_falling_lingering",
