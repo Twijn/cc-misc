@@ -66,6 +66,74 @@ function module.every(cb, intervalTime, fileName)
     return interval
 end
 
+function module.everyLoaded(cb, intervalTime, fileName)
+    local interval = {
+        cb = cb,
+        intervalTime = intervalTime, -- seconds
+        fileName = fileName,
+        elapsed = 0,
+        lastTick = os.clock(),
+    }
+
+    -- Load saved elapsed time
+    if fs.exists(fileName) then
+        local f = fs.open(fileName, "r")
+        local saved = tonumber(f.readAll())
+        f.close()
+        if saved then
+            interval.elapsed = saved
+        end
+    end
+
+    local function saveElapsed()
+        local f = fs.open(fileName, "w")
+        f.write(tostring(interval.elapsed))
+        f.close()
+    end
+
+    interval.getTimeSinceRun = function(pretty)
+        if pretty then
+            return module.getRelativeTime(interval.elapsed)
+        else
+            return interval.elapsed
+        end
+    end
+
+    interval.getTimeUntilRun = function(pretty)
+        local time = math.max(intervalTime - interval.elapsed, 0)
+        if pretty then
+            return module.getRelativeTime(time)
+        else
+            return time
+        end
+    end
+
+    interval.forceExecute = function()
+        interval.cb()
+        interval.elapsed = 0
+        saveElapsed()
+    end
+
+    interval.execute = function()
+        local nowClock = os.clock()
+        local dt = nowClock - interval.lastTick
+        interval.lastTick = nowClock
+
+        interval.elapsed = interval.elapsed + dt
+        if interval.elapsed >= intervalTime then
+            interval.forceExecute()
+            return true
+        else
+            saveElapsed()
+        end
+        return false
+    end
+
+    table.insert(intervals, interval)
+
+    return interval
+end
+
 function module.run()
     print("Starting timeutil tick")
     while true do
