@@ -2,6 +2,7 @@ local libs = {
     ["lib/s.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/s.lua",
     ["lib/tables.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/tables.lua",
     ["lib/log.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/log.lua",
+    ["update.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/signshop/install.lua"
 }
 
 local args = {...}
