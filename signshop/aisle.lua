@@ -47,6 +47,13 @@ local function transmit(rChnl, msg)
     modem.transmit(rChnl, privateChannel, msg)
 end
 
+local sides = {"top", "bottom", "left", "right", "front", "back"}
+local function setRedstone(status)
+    for _, side in pairs(sides) do
+        redstone.setOutput(side, status)
+    end
+end
+
 local function modemLoop()
     modem.open(broadcastChannel)
     modem.open(privateChannel)
@@ -55,6 +62,9 @@ local function modemLoop()
 
         if type(msg) == "table" and msg.type then
             if msg.type == "ping" then
+                if type(msg.redstone) == "boolean" then
+                    setRedstone(msg.redstone)
+                end
                 transmit(rChnl, {
                     type = "pong",
                     aisle = aisleName,
