@@ -70,6 +70,9 @@ local function modemLoop()
                     aisle = aisleName,
                     self = modem.getNameLocal(),
                 })
+            elseif msg.type == "update" then
+                shell.run("update")
+                os.reboot()
             end
         end
     end
