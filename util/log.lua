@@ -20,7 +20,11 @@ local function log(level, msg)
         term.setTextColor(colors.red)
     elseif level == "warn" then
         term.setTextColor(colors.yellow)
+    elseif level == "info" then
+        term.setTextColor(colors.blue)
     end
+    write("["..level.."] ")
+    term.setTextColor(colors.white)
     print(msg)
     writeLog(level, msg)
 end
