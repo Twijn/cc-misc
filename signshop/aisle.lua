@@ -12,7 +12,7 @@ local modem = s.peripheral("modem.side", "modem", true)
 local broadcastChannel = s.number("modem.broadcast", 0, 65535, 8698)
 local privateChannel = s.number("modem.private", 0, 65535, os.getComputerID())
 
-local aisleName = s.string("modem.name")
+local aisleName = s.string("aisle.name")
 
 os.setComputerLabel("aisle-"..aisleName)
 
