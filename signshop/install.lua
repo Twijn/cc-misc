@@ -8,6 +8,12 @@ local libs = {
 local args = {...}
 local type = #args >= 1 and args[1]:lower() or ""
 
+if fs.exists("server.lua") then
+    type = "server"
+elseif fs.exists("aisle.lua") then
+    type = "aisle"
+end
+
 if type == "server" then
     libs["lib/shopk.lua"] = "https://raw.githubusercontent.com/Twijn/cc-misc/refs/heads/main/util/shopk/shopk.lua"
 elseif type == "aisle" then
