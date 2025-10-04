@@ -154,6 +154,12 @@ return function(options)
         end
     end
 
+    function module.me(cb)
+        request({
+            type = "me"
+        }, cb)
+    end
+
     function module.send(data, cb)
         if not ws then
             error("WS has not been initialized yet! Make sure you try to send data after shopk.on(\"ready\") has been called.")
