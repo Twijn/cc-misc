@@ -174,9 +174,9 @@ return function(options)
             error("You must either supply a private key when starting shopk.lua or in your #.send() request!")
         end
 
-        if type(to) ~= "string" then error("You must supply a to address (string)!") end
-        if type(amount) ~= "number" then error("You must supply an amount (number)!") end
-        if type(metadata) ~= "nil" and type(metadata) ~= "string" then error("Metadata must be a string or nil!") end
+        assert(type(to) == "string", "You must supply a to address (string)!")
+        assert(type(amount) == "number", "You must supply an amount (number)!")
+        assert(type(metadata) == "nil" or type(metadata) == "string", "Metadata must be a string or nil!")
 
         request({
             type = "make_transaction",
