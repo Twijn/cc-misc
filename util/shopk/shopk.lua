@@ -1,8 +1,8 @@
 -- shopk.lua --
---  v0.0.1   --
+--  v0.0.2   --
 -- by Twijn  --
 
-local v = "0.0.1"
+local v = "0.0.2"
 local DEFAULT_SYNCNODE = "https://kromer.reconnected.cc/api/krist/"
 local DEFAULT_WS_START = "ws/start"
 
@@ -15,7 +15,9 @@ return function(options)
         options.wsStart = DEFAULT_WS_START
     end
 
-    local module = {}
+    local module = {
+        _v = v,
+    }
 
     local readyListeners = {}
     local transactionListeners = {}
@@ -60,6 +62,10 @@ return function(options)
     end
 
     local function request(data, cb)
+        if not ws then
+            error("WS has not been initialized yet! Make sure you try to send data after shopk.on(\"ready\") has been called.")
+        end
+
         data.id = nextId
         ws.send(textutils.serializeJSON(data))
         if cb then
@@ -161,10 +167,6 @@ return function(options)
     end
 
     function module.send(data, cb)
-        if not ws then
-            error("WS has not been initialized yet! Make sure you try to send data after shopk.on(\"ready\") has been called.")
-        end
-
         local privatekey = data.privatekey and data.privatekey or options.privatekey
         local to = data.to
         local amount = data.amount
