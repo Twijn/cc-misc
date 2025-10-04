@@ -1,8 +1,8 @@
 -- shopk.lua --
---  v0.0.2   --
+--  v0.0.3   --
 -- by Twijn  --
 
-local v = "0.0.2"
+local v = "0.0.3"
 local DEFAULT_SYNCNODE = "https://kromer.reconnected.cc/api/krist/"
 local DEFAULT_WS_START = "ws/start"
 
@@ -44,7 +44,9 @@ return function(options)
         end
 
         local uri = options.syncNode .. options.wsStart
-        local getWS, err = http.post(uri, body)
+        local getWS, err = http.post(uri, body, {
+            ["Content-Type"] = "application/json"
+        })
 
         if not getWS or getWS.getResponseCode() ~= 200 then
             if not err then err = "Unknown Error" end
