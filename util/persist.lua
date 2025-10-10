@@ -1,7 +1,7 @@
 local dataDir = "data/"
 fs.makeDir(dataDir)
 
-return function(fileName)
+return function(fileName, useSerialize)
     fileName = dataDir .. fileName
 
     local persistModule = {}
@@ -9,13 +9,13 @@ return function(fileName)
 
     local function save()
         local f = fs.open(fileName, "w")
-        f.write(textutils.serializeJSON(object))
+        f.write(textutils[useSerialize and "serialize" or "serializeJSON"](object))
         f.close()
     end
 
     if fs.exists(fileName) then
         local f = fs.open(fileName, "r")
-        object = textutils.unserializeJSON(f.readAll())
+        object = textutils[useSerialize and "unserialize" or "unserializeJSON"](f.readAll())
         f.close()
     else
         save()
