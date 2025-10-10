@@ -27,6 +27,11 @@ return function(fileName, useSerialize)
         end
     end
 
+    persistModule.push = function(value)
+        table.insert(object, value)
+        save()
+    end
+
     persistModule.set = function(key, value)
         object[key] = value
         save()
