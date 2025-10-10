@@ -1,8 +1,8 @@
 -- shopk.lua --
---  v0.0.3   --
+--  v0.0.4   --
 -- by Twijn  --
 
-local v = "0.0.3"
+local v = "0.0.4"
 local DEFAULT_SYNCNODE = "https://kromer.reconnected.cc/api/krist/"
 local DEFAULT_WS_START = "ws/start"
 
@@ -119,7 +119,7 @@ return function(options)
 
     function module.run()
         connect()
-        while true do
+        while reconnect do
             local e, url, msg = os.pullEvent()
 
             if url and url == wsUri then
