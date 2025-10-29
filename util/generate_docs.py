@@ -46,9 +46,14 @@ class LuaDocGenerator:
         
         # Extract functions with their documentation
         # Match both standalone functions and methods (function name.method or name:method)
-        func_pattern = r'((?:---.*?\n)+)(?:local\s+)?function\s+([\w.:]+)\s*\((.*?)\)'
+        # Also match module.function patterns, including indented ones
+        func_pattern = r'((?:[ \t]*---.*?\n)+)[ \t]*(local\s+)?function\s+([\w.:]+)\s*\((.*?)\)'
         for match in re.finditer(func_pattern, content, re.MULTILINE):
-            doc_block, func_name, params = match.groups()
+            doc_block, is_local, func_name, params = match.groups()
+            
+            # Skip local functions that don't have a module/class prefix
+            if is_local and '.' not in func_name and ':' not in func_name:
+                continue
             
             func_info = {
                 'name': func_name,
@@ -77,6 +82,7 @@ class LuaDocGenerator:
                         desc_lines.append(line)
             
             func_info['description'] = ' '.join(desc_lines)
+            # Only add functions that have documentation
             if func_info['description'] or func_info['params'] or func_info['returns']:
                 module['functions'].append(func_info)
         

@@ -5,7 +5,7 @@
 --- string input with default values, boolean selection with menu interface, automatic settings persistence,
 --- peripheral availability checking and recovery, and side-only peripheral filtering.
 ---
---- @module s
+-- @module s
 
 local module = {}
 

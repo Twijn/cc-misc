@@ -5,7 +5,7 @@
 --- automatic daily log file creation and rotation, persistent log storage in log/ directory,
 --- and timestamped log entries.
 ---
---- @module log
+-- @module log
 
 local module = {}
 
