@@ -1,6 +1,6 @@
 # timeutil
 
-A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop. @module timeutil
+A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop.
 
 ## Functions
 
