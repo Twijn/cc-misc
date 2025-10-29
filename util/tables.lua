@@ -1,24 +1,11 @@
----@class TablesModule
----A utility module for table operations in ComputerCraft providing common table manipulation
----functions like searching, counting, copying, and comparison operations.
+--- A utility module for table operations in ComputerCraft providing common table manipulation
+--- functions like searching, counting, copying, and comparison operations.
 ---
----Features:
---- - Element existence checking with includes()
---- - Table size counting for any table type
---- - Deep recursive copying with nested table support
---- - Deep recursive equality comparison
---- - Works with both array-like and associative tables
+--- Features: Element existence checking with includes(), table size counting for any table type,
+--- deep recursive copying with nested table support, deep recursive equality comparison,
+--- and works with both array-like and associative tables.
 ---
----@usage
----local tables = require("tables")
----
----local myTable = {1, 2, 3, nested = {a = 1, b = 2}}
----
----print(tables.includes(myTable, 2)) -- true
----print(tables.count(myTable)) -- 4 (includes nested table)
----
----local copy = tables.recursiveCopy(myTable)
----print(tables.recursiveEquals(myTable, copy)) -- true
+--- @module tables
 
 local module = {}
 

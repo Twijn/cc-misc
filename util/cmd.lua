@@ -1,29 +1,11 @@
----@class CmdModule
----A command-line interface module for ComputerCraft that provides a REPL-style command processor
----with support for custom commands, autocompletion, and command history.
+--- Command-line interface module for ComputerCraft that provides a REPL-style command processor
+--- with support for custom commands, autocompletion, and command history.
 ---
----This module provides:
---- - Built-in commands: clear, exit, help
---- - Command history navigation
---- - Tab autocompletion for commands and arguments
---- - Colored output for different message types
---- - Table pretty-printing functionality
---- - String utility functions (split, startsWith)
+--- Features: Built-in commands (clear, exit, help), command history navigation,
+--- tab autocompletion for commands and arguments, colored output for different message types,
+--- table pretty-printing functionality, and string utility functions (split, startsWith).
 ---
----@usage
----local cmd = require("cmd")
----
----local customCommands = {
----  hello = {
----    description = "Say hello to someone",
----    execute = function(args, context)
----      local name = args[1] or "World"
----      context.succ("Hello, " .. name .. "!")
----    end
----  }
----}
----
----cmd("MyApp", "1.0.0", customCommands)
+-- @module cmd
 
 local history = {}
 local running = true

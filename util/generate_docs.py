@@ -30,14 +30,23 @@ class LuaDocGenerator:
             'fields': []
         }
         
-        # Extract module description (first block of comments)
-        module_desc = re.search(r'^(---.*?\n)+', content, re.MULTILINE)
+        # Extract module description (first block of comments before any code)
+        # Stop at first non-comment line or @tag
+        module_desc = re.search(r'^(---[^@].*?\n)+', content, re.MULTILINE)
         if module_desc:
-            desc_lines = [line.strip('- \n') for line in module_desc.group().split('\n') if line.startswith('---')]
-            module['description'] = '\n'.join(desc_lines)
+            desc_lines = []
+            for line in module_desc.group().split('\n'):
+                if line.startswith('---'):
+                    # Clean the line and skip code blocks/examples
+                    cleaned = line[3:].strip()
+                    # Skip lines that look like code (contain 'local', 'function', '=', etc in context)
+                    if cleaned and not any(x in cleaned for x in ['```lua', '```']):
+                        desc_lines.append(cleaned)
+            module['description'] = ' '.join(desc_lines)
         
         # Extract functions with their documentation
-        func_pattern = r'((?:---.*?\n)+)(?:local\s+)?function\s+(\w+(?:\.\w+)*)\s*\((.*?)\)'
+        # Match both standalone functions and methods (function name.method or name:method)
+        func_pattern = r'((?:---.*?\n)+)(?:local\s+)?function\s+([\w.:]+)\s*\((.*?)\)'
         for match in re.finditer(func_pattern, content, re.MULTILINE):
             doc_block, func_name, params = match.groups()
             
@@ -49,23 +58,27 @@ class LuaDocGenerator:
             }
             
             # Parse documentation block
+            desc_lines = []
             for line in doc_block.split('\n'):
-                line = line.strip('- \n')
-                if not line.startswith('@'):
-                    func_info['description'] += line + ' '
-                elif line.startswith('@param'):
-                    param_match = re.match(r'@param\s+(\w+\??)\s+(\S+)(?:\s+(.+))?', line)
-                    if param_match:
-                        func_info['params'].append({
-                            'name': param_match.group(1),
-                            'type': param_match.group(2),
-                            'description': param_match.group(3) or ''
-                        })
-                elif line.startswith('@return'):
-                    func_info['returns'] = line.replace('@return', '').strip()
+                line = line.strip()
+                if line.startswith('---'):
+                    line = line[3:].strip()
+                    if line.startswith('@param'):
+                        param_match = re.match(r'@param\s+(\w+\??)\s+(\S+)(?:\s+(.+))?', line)
+                        if param_match:
+                            func_info['params'].append({
+                                'name': param_match.group(1),
+                                'type': param_match.group(2),
+                                'description': param_match.group(3) or ''
+                            })
+                    elif line.startswith('@return'):
+                        func_info['returns'] = line.replace('@return', '').strip()
+                    elif not line.startswith('@'):
+                        desc_lines.append(line)
             
-            func_info['description'] = func_info['description'].strip()
-            module['functions'].append(func_info)
+            func_info['description'] = ' '.join(desc_lines)
+            if func_info['description'] or func_info['params'] or func_info['returns']:
+                module['functions'].append(func_info)
         
         # Extract classes
         class_pattern = r'((?:---.*?\n)+)---@class\s+(\w+)'
@@ -78,21 +91,25 @@ class LuaDocGenerator:
                 'fields': []
             }
             
+            desc_lines = []
             for line in doc_block.split('\n'):
-                line = line.strip('- \n')
-                if line.startswith('@field'):
-                    field_match = re.match(r'@field\s+(\w+\??)\s+(\S+)(?:\s+(.+))?', line)
-                    if field_match:
-                        class_info['fields'].append({
-                            'name': field_match.group(1),
-                            'type': field_match.group(2),
-                            'description': field_match.group(3) or ''
-                        })
-                elif not line.startswith('@'):
-                    class_info['description'] += line + ' '
+                line = line.strip()
+                if line.startswith('---'):
+                    line = line[3:].strip()
+                    if line.startswith('@field'):
+                        field_match = re.match(r'@field\s+(\w+\??)\s+(\S+)(?:\s+(.+))?', line)
+                        if field_match:
+                            class_info['fields'].append({
+                                'name': field_match.group(1),
+                                'type': field_match.group(2),
+                                'description': field_match.group(3) or ''
+                            })
+                    elif not line.startswith('@'):
+                        desc_lines.append(line)
             
-            class_info['description'] = class_info['description'].strip()
-            module['classes'].append(class_info)
+            class_info['description'] = ' '.join(desc_lines)
+            if class_info['description'] or class_info['fields']:
+                module['classes'].append(class_info)
         
         return module
     
@@ -252,6 +269,9 @@ class LuaDocGenerator:
     
     def generate_html_module(self, module: Dict[str, Any]) -> str:
         """Generate HTML documentation for a module"""
+        # Escape HTML in description
+        description = module['description'].replace('<', '&lt;').replace('>', '&gt;')
+        
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -291,27 +311,36 @@ class LuaDocGenerator:
         }}
         .header {{
             border-bottom: 2px solid var(--border);
-            padding-bottom: 1rem;
+            padding-bottom: 1.5rem;
             margin-bottom: 2rem;
         }}
-        h1 {{
-            margin-bottom: 0.5rem;
+        .header h1 {{
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }}
+        .header p {{
+            font-size: 1.1rem;
+            line-height: 1.8;
+            opacity: 0.9;
         }}
         h2 {{
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border);
+            font-size: 1.8rem;
         }}
         h3 {{
             margin-top: 1.5rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
         }}
         code {{
             background: var(--code-bg);
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
             font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
         }}
         pre {{
             background: var(--code-bg);
@@ -321,16 +350,31 @@ class LuaDocGenerator:
             margin: 1rem 0;
         }}
         .function {{
-            margin: 1.5rem 0;
-            padding: 1rem;
+            margin: 2rem 0;
+            padding: 1.5rem;
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
+            background: var(--bg);
+        }}
+        .function h3 {{
+            margin-top: 0;
+        }}
+        .function > p {{
+            margin: 1rem 0;
+            line-height: 1.7;
         }}
         .params, .returns {{
-            margin-top: 0.5rem;
+            margin-top: 1rem;
+        }}
+        .params ul, .returns ul {{
+            list-style: none;
+            padding-left: 0;
         }}
         .params li, .returns li {{
-            padding: 0.25rem 0;
+            padding: 0.5rem 0;
+            padding-left: 1rem;
+            border-left: 3px solid var(--border);
+            margin: 0.25rem 0;
         }}
         a {{
             color: var(--link);
@@ -340,7 +384,8 @@ class LuaDocGenerator:
             text-decoration: underline;
         }}
         .back-link {{
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
         }}
     </style>
 </head>
@@ -348,7 +393,7 @@ class LuaDocGenerator:
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
         <h1>{module['name']}</h1>
-        <p>{module['description']}</p>
+        <p>{description}</p>
     </div>
 """
         
