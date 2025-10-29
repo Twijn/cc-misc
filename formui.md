@@ -4,37 +4,6 @@ A dynamic form user interface library for ComputerCraft that provides interactiv
 
 ## Functions
 
-### `centerText(y, text, termW)`
-
-Center text horizontally on the terminal at a specific line
-
-**Parameters:**
-
-- `y` (number): The line number to write on
-- `text` (string): The text to center
-- `termW` (number): The terminal width
-
-### `truncate(text, width)`
-
-Truncate text to fit within a specified width
-
-**Parameters:**
-
-- `text` (string): The text to truncate
-- `width` (number): Maximum width
-
-**Returns:** string # Truncated text with "..." if needed
-
-### `findPeripheralsOfType(pType?)`
-
-Find all peripherals of a specific type
-
-**Parameters:**
-
-- `pType?` (string): The peripheral type to filter by (nil for all)
-
-**Returns:** string[] # Array of peripheral names
-
 ### `FormUI.new(title?)`
 
 Create a new FormUI instance

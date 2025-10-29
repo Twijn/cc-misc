@@ -123,47 +123,6 @@
     </div>
     <h2>Functions</h2>
     <div class='function'>
-        <h3><code>err(txt)</code></h3>
-        <p>Print an error message in red color</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>txt</code> (string): The error message to display</li>
-            </ul>
-        </div>
-    </div>
-    <div class='function'>
-        <h3><code>mess(txt)</code></h3>
-        <p>Print an informational message in light blue color</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>txt</code> (string): The message to display</li>
-            </ul>
-        </div>
-    </div>
-    <div class='function'>
-        <h3><code>succ(txt)</code></h3>
-        <p>Print a success message in green color</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>txt</code> (string): The success message to display</li>
-            </ul>
-        </div>
-    </div>
-    <div class='function'>
-        <h3><code>printTable(tbl, iteration?)</code></h3>
-        <p>Pretty-print a table with proper indentation and color formatting</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>tbl</code> (table): The table to print</li>
-                <li><code>iteration?</code> (number): The current indentation level (used for recursion)</li>
-            </ul>
-        </div>
-    </div>
-    <div class='function'>
         <h3><code>string.split(self, sep?, plain?)</code></h3>
         <p>Split a string into an array of substrings based on a separator</p>
         <div class='params'>
@@ -188,28 +147,6 @@
             </ul>
         </div>
         <div class='returns'><strong>Returns:</strong> boolean # True if the string starts with the target</div>
-    </div>
-    <div class='function'>
-        <h3><code>isolateCommands(str)</code></h3>
-        <p>Parse a command string into command name and arguments</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>str</code> (string): The input command string</li>
-            </ul>
-        </div>
-        <div class='returns'><strong>Returns:</strong> string[] args The remaining arguments</div>
-    </div>
-    <div class='function'>
-        <h3><code>complete(commands)</code></h3>
-        <p>Create an autocompletion function for the given commands</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>commands</code> (table<string,): CommandDefinition> The available commands</li>
-            </ul>
-        </div>
-        <div class='returns'><strong>Returns:</strong> fun(line: string): string[] # Autocompletion function that returns suggestions</div>
     </div>
 </body>
 </html>

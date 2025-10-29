@@ -4,12 +4,6 @@ A timing utility module for ComputerCraft that provides persistent interval mana
 
 ## Functions
 
-### `now()`
-
-Get current UTC timestamp in milliseconds
-
-**Returns:** number # Current timestamp in milliseconds
-
 ### `module.every(cb, intervalTime, fileName)`
 
 Create an absolute time-based interval that runs based on system time This type of interval will "catch up" if the computer was offline, running immediately if the interval time has passed since the last recorded execution.

@@ -1,33 +1,8 @@
 # s
 
-A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, and side-only peripheral filtering. @module s
+A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, and side-only peripheral filtering.
 
 ## Functions
-
-### `selectMenu(title, subtitle, options, selected?)`
-
-Display an interactive menu for selecting from a list of options
-
-**Parameters:**
-
-- `title` (string): The main title to display
-- `subtitle` (string): The subtitle/description to display
-- `options` (string[]): Array of selectable options
-- `selected?` (number): Currently selected option index (defaults to 1)
-
-**Returns:** string # The selected option string
-
-### `requestPeripheral(name, type, sideOnly?)`
-
-Interactively request user to select a peripheral of a specific type
-
-**Parameters:**
-
-- `name` (string): The setting name to store the selection
-- `type` (string): The peripheral type to filter for
-- `sideOnly?` (boolean): If true, only show peripherals attached to computer sides
-
-**Returns:** string # The selected peripheral name
 
 ### `module.peripheral(name, type, sideOnly?)`
 

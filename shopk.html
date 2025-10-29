@@ -121,5 +121,46 @@
         <h1>shopk</h1>
         <p>A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.</p>
     </div>
+    <h2>Functions</h2>
+    <div class='function'>
+        <h3><code>module.on(event, listener)</code></h3>
+        <p>Register an event listener</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>event</code> ("ready"|"transaction"|"transactions"): Event type to listen for</li>
+                <li><code>listener</code> (function): Function to call when event occurs</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>module.run()</code></h3>
+        <p>Start the WebSocket connection and enter the main event loop This function blocks until the connection is closed</p>
+    </div>
+    <div class='function'>
+        <h3><code>module.close()</code></h3>
+        <p>Close the WebSocket connection and stop reconnecting</p>
+    </div>
+    <div class='function'>
+        <h3><code>module.me(cb?)</code></h3>
+        <p>Get information about the current wallet</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>cb?</code> (function): Optional callback to receive wallet data</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>module.send(data, cb?)</code></h3>
+        <p>Send a Kromer transaction</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>data</code> (ShopkSendData): Transaction details</li>
+                <li><code>cb?</code> (function): Optional callback to receive transaction result</li>
+            </ul>
+        </div>
+    </div>
 </body>
 </html>
