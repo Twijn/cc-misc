@@ -20,7 +20,6 @@ examples = {'../examples'}
 
 -- Custom tags
 custom_tags = {
-    {'example', title='Usage Example', format='code'},
     {'note', title='Note'},
     {'warning', title='Warning'}
 }

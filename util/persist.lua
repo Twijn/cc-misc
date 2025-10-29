@@ -10,8 +10,7 @@
 --- - Array and object manipulation methods
 --- - Automatic saving on data changes
 ---
----@example
----```lua
+---@usage
 ---local persist = require("persist")
 ---local config = persist("config.json", false) -- Use JSON format
 ---
@@ -22,7 +21,6 @@
 ---local history = persist("history.lua", true) -- Use Lua serialization
 ---history.push("command1")
 ---history.push("command2")
----```
 
 local dataDir = "data/"
 fs.makeDir(dataDir)

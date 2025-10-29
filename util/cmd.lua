@@ -10,8 +10,7 @@
 --- - Table pretty-printing functionality
 --- - String utility functions (split, startsWith)
 ---
----@example
----```lua
+---@usage
 ---local cmd = require("cmd")
 ---
 ---local customCommands = {
@@ -25,7 +24,6 @@
 ---}
 ---
 ---cmd("MyApp", "1.0.0", customCommands)
----```
 
 local history = {}
 local running = true

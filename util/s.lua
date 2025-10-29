@@ -11,15 +11,13 @@
 --- - Peripheral availability checking and recovery
 --- - Side-only peripheral filtering
 ---
----@example
----```lua
+---@usage
 ---local s = require("s")
 ---
 ---local modem = s.peripheral("modem", "modem", true) -- Side-attached modems only
 ---local port = s.number("port", 1, 65535, 8080) -- Port 1-65535, default 8080
 ---local name = s.string("server_name", "MyServer") -- String with default
 ---local enabled = s.boolean("enabled") -- Boolean selection
----```
 
 local module = {}
 

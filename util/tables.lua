@@ -9,8 +9,7 @@
 --- - Deep recursive equality comparison
 --- - Works with both array-like and associative tables
 ---
----@example
----```lua
+---@usage
 ---local tables = require("tables")
 ---
 ---local myTable = {1, 2, 3, nested = {a = 1, b = 2}}
@@ -20,7 +19,6 @@
 ---
 ---local copy = tables.recursiveCopy(myTable)
 ---print(tables.recursiveEquals(myTable, copy)) -- true
----```
 
 local module = {}
 

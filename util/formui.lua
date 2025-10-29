@@ -12,8 +12,7 @@
 --- - Keyboard navigation with arrow keys
 --- - Form submission and cancellation
 ---
----@example
----```lua
+---@usage
 ---local FormUI = require("formui")
 ---local form = FormUI.new("Configuration")
 ---
@@ -27,7 +26,6 @@
 ---    print("Name:", nameField())
 ---    print("Port:", portField())
 ---end
----```
 
 ---@class FormField
 ---@field type string The field type: "text", "number", "select", "peripheral", "label", "button"

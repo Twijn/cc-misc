@@ -10,8 +10,7 @@
 --- - Manual execution control
 --- - Automatic interval management with run loop
 ---
----@example
----```lua
+---@usage
 ---local timeutil = require("timeutil")
 ---
 ----- Create an absolute time interval (runs every 10 minutes regardless of downtime)
@@ -26,7 +25,6 @@
 ---
 ----- Start the interval manager
 ---timeutil.run()
----```
 
 ---@class TimeutilInterval
 ---@field cb function Callback function to execute

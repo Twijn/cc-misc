@@ -47,8 +47,7 @@
 --- - Metadata parsing for structured data
 --- - Event-driven architecture
 ---
----@example
----```lua
+---@usage
 ---local shopk = require("shopk")
 ---
 ---local client = shopk({
@@ -70,7 +69,6 @@
 ---end)
 ---
 ---client.run()
----```
 
 local v = "0.0.4"
 local DEFAULT_SYNCNODE = "https://kromer.reconnected.cc/api/krist/"
