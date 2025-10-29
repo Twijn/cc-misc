@@ -54,8 +54,12 @@ class LuaDocGenerator:
             example_lines = []
             for line in example_block.split('\n'):
                 if line.startswith('---'):
-                    cleaned = line[3:].strip()
-                    if not cleaned.startswith('@'):
+                    # Remove the --- prefix and exactly one space after it (if present)
+                    cleaned = line[3:]
+                    if cleaned.startswith(' '):
+                        cleaned = cleaned[1:]
+                    # Skip empty lines and lines starting with @ tags
+                    if cleaned and not cleaned.lstrip().startswith('@'):
                         example_lines.append(cleaned)
             if example_lines:
                 module['examples'].append('\n'.join(example_lines))
@@ -308,6 +312,7 @@ class LuaDocGenerator:
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{module['name']} - CC-Misc Utilities</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {{
             --bg: #ffffff;
@@ -373,18 +378,22 @@ class LuaDocGenerator:
             font-size: 0.9em;
         }}
         pre {{
-            background: var(--code-bg);
             padding: 1rem;
             border-radius: 4px;
             overflow-x: auto;
             margin: 1rem 0;
+            border: 1px solid var(--border);
         }}
-        .function {{
+        pre code {{
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }}
+        .function:not(.token) {{
             margin: 2rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
-            background: var(--bg);
         }}
         .function h3 {{
             margin-top: 0;
@@ -485,6 +494,8 @@ class LuaDocGenerator:
                 html += "    </div>\n"
         
         html += """</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
 </html>
 """
         return html
