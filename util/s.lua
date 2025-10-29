@@ -1,9 +1,38 @@
+---@class SettingsModule
+---A settings management module for ComputerCraft that provides interactive configuration
+---with automatic validation, peripheral detection, and persistent storage using CC settings.
+---
+---Features:
+--- - Interactive peripheral selection with type filtering
+--- - Number input with range validation
+--- - String input with default values
+--- - Boolean selection with menu interface
+--- - Automatic settings persistence
+--- - Peripheral availability checking and recovery
+--- - Side-only peripheral filtering
+---
+---@example
+---```lua
+---local s = require("s")
+---
+---local modem = s.peripheral("modem", "modem", true) -- Side-attached modems only
+---local port = s.number("port", 1, 65535, 8080) -- Port 1-65535, default 8080
+---local name = s.string("server_name", "MyServer") -- String with default
+---local enabled = s.boolean("enabled") -- Boolean selection
+---```
+
 local module = {}
 
 local tables = require("/lib/tables")
 
 local sides = {"top","bottom","front","back","left","right"}
 
+---Display an interactive menu for selecting from a list of options
+---@param title string The main title to display
+---@param subtitle string The subtitle/description to display
+---@param options string[] Array of selectable options
+---@param selected? number Currently selected option index (defaults to 1)
+---@return string # The selected option string
 local function selectMenu(title, subtitle, options, selected)
     if not selected then selected = 1 end
 
@@ -36,6 +65,11 @@ local function selectMenu(title, subtitle, options, selected)
     end
 end
 
+---Interactively request user to select a peripheral of a specific type
+---@param name string The setting name to store the selection
+---@param type string The peripheral type to filter for
+---@param sideOnly? boolean If true, only show peripherals attached to computer sides
+---@return string # The selected peripheral name
 local function requestPeripheral(name, type, sideOnly)
     local filteredNames
     while true do
@@ -63,6 +97,11 @@ local function requestPeripheral(name, type, sideOnly)
     return peripName
 end
 
+---Get or configure a peripheral setting with automatic validation and recovery
+---@param name string The setting name to store/retrieve
+---@param type string The required peripheral type (e.g., "modem", "monitor")
+---@param sideOnly? boolean If true, only allow peripherals attached to computer sides
+---@return table # The wrapped peripheral object
 function module.peripheral(name, type, sideOnly)
     local value = settings.get(name)
 
@@ -88,6 +127,12 @@ function module.peripheral(name, type, sideOnly)
     end
 end
 
+---Get or configure a number setting with range validation
+---@param name string The setting name to store/retrieve
+---@param from? number Minimum allowed value (nil for no minimum)
+---@param to? number Maximum allowed value (nil for no maximum)
+---@param default? number Default value if user provides empty input
+---@return number # The configured number value
 function module.number(name, from, to, default)
     local value = settings.get(name)
 
@@ -119,6 +164,10 @@ function module.number(name, from, to, default)
     return value
 end
 
+---Get or configure a string setting with optional default value
+---@param name string The setting name to store/retrieve
+---@param default? string Default value if user provides empty input
+---@return string # The configured string value
 function module.string(name, default)
     local value = settings.get(name)
 
@@ -142,6 +191,9 @@ function module.string(name, default)
     return value
 end
 
+---Get or configure a boolean setting using an interactive menu
+---@param name string The setting name to store/retrieve
+---@return boolean # The configured boolean value
 function module.boolean(name)
     local value = settings.get(name)
 
@@ -153,5 +205,11 @@ function module.boolean(name)
 
     return value
 end
+
+---@class SettingsModule
+---@field peripheral fun(name: string, type: string, sideOnly?: boolean): table
+---@field number fun(name: string, from?: number, to?: number, default?: number): number
+---@field string fun(name: string, default?: string): string
+---@field boolean fun(name: string): boolean
 
 return module

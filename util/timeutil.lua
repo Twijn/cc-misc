@@ -1,11 +1,62 @@
+---@class TimeutilModule
+---A timing utility module for ComputerCraft that provides persistent interval management
+---with two different timing modes: absolute time-based and accumulated runtime-based.
+---
+---Features:
+--- - Absolute time intervals (based on system time)
+--- - Accumulated time intervals (based on actual runtime)
+--- - Persistent state across computer restarts
+--- - Pretty-printed time formatting
+--- - Manual execution control
+--- - Automatic interval management with run loop
+---
+---@example
+---```lua
+---local timeutil = require("timeutil")
+---
+----- Create an absolute time interval (runs every 10 minutes regardless of downtime)
+---local backup = timeutil.every(function()
+---    print("Running backup...")
+---end, 600, "backup_last_run")
+---
+----- Create a runtime-based interval (accumulates only when running)
+---local heartbeat = timeutil.everyLoaded(function()
+---    print("Heartbeat")
+---end, 30, "heartbeat_elapsed")
+---
+----- Start the interval manager
+---timeutil.run()
+---```
+
+---@class TimeutilInterval
+---@field cb function Callback function to execute
+---@field intervalTime number Interval duration in seconds
+---@field fileName string File to persist timing data
+---@field lastRun number Last execution timestamp (for absolute intervals)
+---@field elapsed number Accumulated elapsed time (for loaded intervals)
+---@field lastTick number Last tick timestamp (for loaded intervals)
+---@field getTimeSinceRun fun(pretty?: boolean): number|string Get time since last execution
+---@field getTimeUntilRun fun(pretty?: boolean): number|string Get time until next execution
+---@field forceExecute fun(): nil Force immediate execution
+---@field execute fun(): boolean Execute if interval has elapsed
+
 local module = {}
 
 local intervals = {}
 
+---Get current UTC timestamp in milliseconds
+---@return number # Current timestamp in milliseconds
 local function now()
     return os.epoch("utc")
 end
 
+---Create an absolute time-based interval that runs based on system time
+---This type of interval will "catch up" if the computer was offline, running immediately
+---if the interval time has passed since the last recorded execution.
+---@param cb function Callback function to execute when interval triggers
+---@param intervalTime number Interval duration in seconds
+---@param fileName string File path to persist the last run timestamp
+---@return TimeutilInterval # Interval object with control methods
 function module.every(cb, intervalTime, fileName)
     local interval = {
         cb = cb,
@@ -66,6 +117,13 @@ function module.every(cb, intervalTime, fileName)
     return interval
 end
 
+---Create a runtime-based interval that accumulates time only when the program is running
+---This type of interval will NOT catch up after downtime, only counting actual runtime.
+---Useful for operations that should happen after X seconds of actual program execution.
+---@param cb function Callback function to execute when interval triggers
+---@param intervalTime number Interval duration in seconds of actual runtime
+---@param fileName string File path to persist the accumulated elapsed time
+---@return TimeutilInterval # Interval object with control methods
 function module.everyLoaded(cb, intervalTime, fileName)
     local interval = {
         cb = cb,
@@ -134,6 +192,9 @@ function module.everyLoaded(cb, intervalTime, fileName)
     return interval
 end
 
+---Start the main interval management loop
+---This function blocks and continuously checks all registered intervals,
+---executing them when their time has elapsed. Runs indefinitely until terminated.
 function module.run()
     print("Starting timeutil tick")
     while true do
@@ -144,6 +205,9 @@ function module.run()
     end
 end
 
+---Format a duration in seconds into a human-readable relative time string
+---@param sec number Duration in seconds
+---@return string # Formatted time string (e.g., "5.2 minutes", "1 day", "30 seconds")
 function module.getRelativeTime(sec)
     if sec >= 86400 then
         local val = math.floor(sec / 8640) / 10
@@ -159,5 +223,11 @@ function module.getRelativeTime(sec)
         return val .. " second" .. (val == 1 and "" or "s")
     end
 end
+
+---@class TimeutilModule
+---@field every fun(cb: function, intervalTime: number, fileName: string): TimeutilInterval Create absolute time interval
+---@field everyLoaded fun(cb: function, intervalTime: number, fileName: string): TimeutilInterval Create runtime-based interval
+---@field run fun(): nil Start the interval management loop
+---@field getRelativeTime fun(sec: number): string Format seconds into human-readable time
 
 return module
