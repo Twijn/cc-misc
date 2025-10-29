@@ -4,12 +4,6 @@ local tables = require("/lib/tables")
 
 local sides = {"top","bottom","front","back","left","right"}
 
-local function err(message)
-    term.setTextColor(colors.red)
-    print(message)
-    term.setTextColor(colors.white)
-end
-
 local function selectMenu(title, subtitle, options, selected)
     if not selected then selected = 1 end
 

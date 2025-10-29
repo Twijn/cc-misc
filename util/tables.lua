@@ -32,7 +32,7 @@ function module.recursiveEquals(t1, t2)
         local v2 = t2[i]
         if type(v1) == "table" then
             if type(v2) == "table" then
-                if not table.equals(v, v2) then
+                if not table.equals(v1, v2) then
                     return false
                 end
             else
