@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>persist - CC-Misc Utilities</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+        h2 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        pre {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        .function {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .params, .returns {
+            margin-top: 0.5rem;
+        }
+        .params li, .returns li {
+            padding: 0.25rem 0;
+        }
+        a {
+            color: var(--link);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>persist</h1>
+        <p>@class PersistModule
+A persistence module for ComputerCraft that provides automatic data serialization
+and storage to files with support for both Lua serialization and JSON formats.
+
+Features:
+Automatic file creation and loading
+Deep copy functionality to handle circular references
+Support for both Lua serialize and JSON formats
+Error handling with fallback mechanisms
+Array and object manipulation methods
+Automatic saving on data changes
+
+@usage
+local persist = require("persist")
+local config = persist("config.json", false) -- Use JSON format
+
+config.setDefault("port", 8080)
+config.set("name", "MyServer")
+print(config.get("port")) -- 8080
+
+local history = persist("history.lua", true) -- Use Lua serialization
+history.push("command1")
+history.push("command2")</p>
+    </div>
+</body>
+</html>

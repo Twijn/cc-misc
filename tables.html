@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>tables - CC-Misc Utilities</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+        h2 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        pre {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        .function {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .params, .returns {
+            margin-top: 0.5rem;
+        }
+        .params li, .returns li {
+            padding: 0.25rem 0;
+        }
+        a {
+            color: var(--link);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>tables</h1>
+        <p>@class TablesModule
+A utility module for table operations in ComputerCraft providing common table manipulation
+functions like searching, counting, copying, and comparison operations.
+
+Features:
+Element existence checking with includes()
+Table size counting for any table type
+Deep recursive copying with nested table support
+Deep recursive equality comparison
+Works with both array-like and associative tables
+
+@usage
+local tables = require("tables")
+
+local myTable = {1, 2, 3, nested = {a = 1, b = 2}}
+
+print(tables.includes(myTable, 2)) -- true
+print(tables.count(myTable)) -- 4 (includes nested table)
+
+local copy = tables.recursiveCopy(myTable)
+print(tables.recursiveEquals(myTable, copy)) -- true</p>
+    </div>
+    <h2>Functions</h2>
+    <div class='function'>
+        <h3><code>module.includes(table, object)</code></h3>
+        <p>Check if a table contains a specific value</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>table</code> (table): The table to search in</li>
+                <li><code>object</code> (any): The value to search for</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean # True if the object is found in the table</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.count(table)</code></h3>
+        <p>Count the number of elements in a table (works with both arrays and associative tables)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>table</code> (table): The table to count elements in</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> number # The number of key-value pairs in the table</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.recursiveCopy(table)</code></h3>
+        <p>Create a deep copy of a table, recursively copying all nested tables</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>table</code> (table): The table to copy</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table # A new table with all values copied (nested tables are also copied)</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.recursiveEquals(t1, t2)</code></h3>
+        <p>Compare two tables for deep equality, recursively checking nested tables</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>t1</code> (table): The first table to compare</li>
+                <li><code>t2</code> (table): The second table to compare</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean # True if both tables have the same structure and values</div>
+    </div>
+</body>
+</html>

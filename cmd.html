@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>cmd - CC-Misc Utilities</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+        h2 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        pre {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        .function {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .params, .returns {
+            margin-top: 0.5rem;
+        }
+        .params li, .returns li {
+            padding: 0.25rem 0;
+        }
+        a {
+            color: var(--link);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>cmd</h1>
+        <p>@class CmdModule
+A command-line interface module for ComputerCraft that provides a REPL-style command processor
+with support for custom commands, autocompletion, and command history.
+
+This module provides:
+Built-in commands: clear, exit, help
+Command history navigation
+Tab autocompletion for commands and arguments
+Colored output for different message types
+Table pretty-printing functionality
+String utility functions (split, startsWith)
+
+@usage
+local cmd = require("cmd")
+
+local customCommands = {
+hello = {
+description = "Say hello to someone",
+execute = function(args, context)
+local name = args[1] or "World"
+context.succ("Hello, " .. name .. "!")
+end
+}
+}
+
+cmd("MyApp", "1.0.0", customCommands)</p>
+    </div>
+    <h2>Functions</h2>
+    <div class='function'>
+        <h3><code>err(txt)</code></h3>
+        <p>Print an error message in red color</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>txt</code> (string): The error message to display</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>mess(txt)</code></h3>
+        <p>Print an informational message in light blue color</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>txt</code> (string): The message to display</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>succ(txt)</code></h3>
+        <p>Print a success message in green color</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>txt</code> (string): The success message to display</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>printTable(tbl, iteration?)</code></h3>
+        <p>Pretty-print a table with proper indentation and color formatting</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>tbl</code> (table): The table to print</li>
+                <li><code>iteration?</code> (number): The current indentation level (used for recursion)</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>string.split(self, sep?, plain?)</code></h3>
+        <p>Split a string into an array of substrings based on a separator</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>self</code> (string): The string to split</li>
+                <li><code>sep?</code> (string): The separator to split on (defaults to each character)</li>
+                <li><code>plain?</code> (boolean): Whether to treat separator as plain text (no pattern matching)</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> string[] # Array of split substrings</div>
+    </div>
+    <div class='function'>
+        <h3><code>string.startsWith(self, target, caseSensitive?)</code></h3>
+        <p>Check if a string starts with a target substring</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>self</code> (string): The string to check</li>
+                <li><code>target</code> (string): The substring to look for at the beginning</li>
+                <li><code>caseSensitive?</code> (boolean): Whether the comparison should be case-sensitive (defaults to false)</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean # True if the string starts with the target</div>
+    </div>
+    <div class='function'>
+        <h3><code>isolateCommands(str)</code></h3>
+        <p>Parse a command string into command name and arguments</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>str</code> (string): The input command string</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> string[] args The remaining arguments</div>
+    </div>
+    <div class='function'>
+        <h3><code>complete(commands)</code></h3>
+        <p>Create an autocompletion function for the given commands</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>commands</code> (table<string,): CommandDefinition> The available commands</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(line: string): string[] # Autocompletion function that returns suggestions</div>
+    </div>
+</body>
+</html>

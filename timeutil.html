@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>timeutil - CC-Misc Utilities</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+        h1 {
+            margin-bottom: 0.5rem;
+        }
+        h2 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+        h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+        pre {
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        .function {
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .params, .returns {
+            margin-top: 0.5rem;
+        }
+        .params li, .returns li {
+            padding: 0.25rem 0;
+        }
+        a {
+            color: var(--link);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            margin-bottom: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>timeutil</h1>
+        <p>@class TimeutilModule
+A timing utility module for ComputerCraft that provides persistent interval management
+with two different timing modes: absolute time-based and accumulated runtime-based.
+
+Features:
+Absolute time intervals (based on system time)
+Accumulated time intervals (based on actual runtime)
+Persistent state across computer restarts
+Pretty-printed time formatting
+Manual execution control
+Automatic interval management with run loop
+
+@usage
+local timeutil = require("timeutil")
+
+Create an absolute time interval (runs every 10 minutes regardless of downtime)
+local backup = timeutil.every(function()
+print("Running backup...")
+end, 600, "backup_last_run")
+
+Create a runtime-based interval (accumulates only when running)
+local heartbeat = timeutil.everyLoaded(function()
+print("Heartbeat")
+end, 30, "heartbeat_elapsed")
+
+Start the interval manager
+timeutil.run()</p>
+    </div>
+    <h2>Functions</h2>
+    <div class='function'>
+        <h3><code>now()</code></h3>
+        <p>Get current UTC timestamp in milliseconds</p>
+        <div class='returns'><strong>Returns:</strong> number # Current timestamp in milliseconds</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.every(cb, intervalTime, fileName)</code></h3>
+        <p>Create an absolute time-based interval that runs based on system time This type of interval will "catch up" if the computer was offline, running immediately if the interval time has passed since the last recorded execution.</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>cb</code> (function): Callback function to execute when interval triggers</li>
+                <li><code>intervalTime</code> (number): Interval duration in seconds</li>
+                <li><code>fileName</code> (string): File path to persist the last run timestamp</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> TimeutilInterval # Interval object with control methods</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.everyLoaded(cb, intervalTime, fileName)</code></h3>
+        <p>Create a runtime-based interval that accumulates time only when the program is running This type of interval will NOT catch up after downtime, only counting actual runtime. Useful for operations that should happen after X seconds of actual program execution.</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>cb</code> (function): Callback function to execute when interval triggers</li>
+                <li><code>intervalTime</code> (number): Interval duration in seconds of actual runtime</li>
+                <li><code>fileName</code> (string): File path to persist the accumulated elapsed time</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> TimeutilInterval # Interval object with control methods</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.run()</code></h3>
+        <p>Start the main interval management loop This function blocks and continuously checks all registered intervals, executing them when their time has elapsed. Runs indefinitely until terminated.</p>
+    </div>
+    <div class='function'>
+        <h3><code>module.getRelativeTime(sec)</code></h3>
+        <p>Format a duration in seconds into a human-readable relative time string</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>sec</code> (number): Duration in seconds</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> string # Formatted time string (e.g., "5.2 minutes", "1 day", "30 seconds")</div>
+    </div>
+</body>
+</html>
