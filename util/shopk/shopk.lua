@@ -2,6 +2,15 @@
 --  v0.0.4   --
 -- by Twijn  --
 
+--- A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction
+--- monitoring and wallet operations through WebSocket connections.
+---
+--- Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss,
+--- transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data,
+--- and event-driven architecture.
+---
+-- @module shopk
+
 ---@class ShopkOptions
 ---@field syncNode? string The Kromer API endpoint URL (defaults to official endpoint)
 ---@field wsStart? string WebSocket start path (defaults to "ws/start")
@@ -34,41 +43,6 @@
 ---@field close fun(): nil Close the connection and stop reconnecting
 ---@field me fun(cb?: function): nil Get current wallet information
 ---@field send fun(data: ShopkSendData, cb?: function): nil Send a transaction
-
----@class ShopkClient
----A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction
----monitoring and wallet operations through WebSocket connections.
----
----Features:
---- - Real-time transaction monitoring via WebSocket
---- - Automatic reconnection on connection loss
---- - Transaction sending with metadata support
---- - Wallet information retrieval
---- - Metadata parsing for structured data
---- - Event-driven architecture
----
----@usage
----local shopk = require("shopk")
----
----local client = shopk({
----    privatekey = "your_private_key_here"
----})
----
----client.on("ready", function()
----    print("Connected to Kromer network!")
----    client.me(function(data)
----        print("Balance:", data.balance)
----    end)
----end)
----
----client.on("transaction", function(tx)
----    print("Received:", tx.value, "from", tx.from)
----    if tx.meta.keys.item then
----        print("Item purchased:", tx.meta.keys.item)
----    end
----end)
----
----client.run()
 
 local v = "0.0.4"
 local DEFAULT_SYNCNODE = "https://kromer.reconnected.cc/api/krist/"
