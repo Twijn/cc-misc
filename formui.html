@@ -37,27 +37,36 @@
         }
         .header {
             border-bottom: 2px solid var(--border);
-            padding-bottom: 1rem;
+            padding-bottom: 1.5rem;
             margin-bottom: 2rem;
         }
-        h1 {
-            margin-bottom: 0.5rem;
+        .header h1 {
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        .header p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            opacity: 0.9;
         }
         h2 {
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border);
+            font-size: 1.8rem;
         }
         h3 {
             margin-top: 1.5rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
         }
         code {
             background: var(--code-bg);
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
             font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
         }
         pre {
             background: var(--code-bg);
@@ -67,16 +76,31 @@
             margin: 1rem 0;
         }
         .function {
-            margin: 1.5rem 0;
-            padding: 1rem;
+            margin: 2rem 0;
+            padding: 1.5rem;
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
+            background: var(--bg);
+        }
+        .function h3 {
+            margin-top: 0;
+        }
+        .function > p {
+            margin: 1rem 0;
+            line-height: 1.7;
         }
         .params, .returns {
-            margin-top: 0.5rem;
+            margin-top: 1rem;
+        }
+        .params ul, .returns ul {
+            list-style: none;
+            padding-left: 0;
         }
         .params li, .returns li {
-            padding: 0.25rem 0;
+            padding: 0.5rem 0;
+            padding-left: 1rem;
+            border-left: 3px solid var(--border);
+            margin: 0.25rem 0;
         }
         a {
             color: var(--link);
@@ -86,7 +110,8 @@
             text-decoration: underline;
         }
         .back-link {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
         }
     </style>
 </head>
@@ -94,33 +119,7 @@
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
         <h1>formui</h1>
-        <p>@class FormUI
-A dynamic form user interface library for ComputerCraft that provides interactive forms
-with various field types, validation, and peripheral detection.
-
-Features:
-Text and number input fields
-Select dropdowns and peripheral selection
-Built-in validation system
-Labels and buttons
-Real-time peripheral detection
-Keyboard navigation with arrow keys
-Form submission and cancellation
-
-@usage
-local FormUI = require("formui")
-local form = FormUI.new("Configuration")
-
-local nameField = form:text("Name", "default")
-local portField = form:number("Port", 8080)
-local modemField = form:peripheral("Modem", "modem")
-
-form:addSubmitCancel()
-local result = form:run()
-if result then
-print("Name:", nameField())
-print("Port:", portField())
-end</p>
+        <p>A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.</p>
     </div>
     <h2>Functions</h2>
     <div class='function'>
@@ -168,6 +167,167 @@ end</p>
             </ul>
         </div>
         <div class='returns'><strong>Returns:</strong> FormUI # New FormUI instance</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:addField(field)</code></h3>
+        <p>Add a field to the form and return a getter function</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>field</code> (FormField): The field definition to add</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(): any # Function that returns the field's final value after form submission</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:text(label, default?, validator?)</code></h3>
+        <p>Add a text input field</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>label</code> (string): The field label</li>
+                <li><code>default?</code> (string): Default value</li>
+                <li><code>validator?</code> (ValidationFunction): Custom validation function</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(): string # Function to get the field value after submission</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:number(label, default?, validator?)</code></h3>
+        <p>Add a number input field</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>label</code> (string): The field label</li>
+                <li><code>default?</code> (number): Default value</li>
+                <li><code>validator?</code> (ValidationFunction): Custom validation function</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(): number # Function to get the field value after submission</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:select(label, options?, defaultIndex?, validator?)</code></h3>
+        <p>Add a select dropdown field</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>label</code> (string): The field label</li>
+                <li><code>options?</code> (string[]): Available options</li>
+                <li><code>defaultIndex?</code> (number): Index of default selection (1-based)</li>
+                <li><code>validator?</code> (ValidationFunction): Custom validation function</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(): string # Function to get the selected option after submission</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:peripheral(label, filterType?, validator?, defaultValue?)</code></h3>
+        <p>Add a peripheral selector field that automatically detects peripherals</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>label</code> (string): The field label</li>
+                <li><code>filterType?</code> (string): Peripheral type to filter by (e.g., "modem", "monitor")</li>
+                <li><code>validator?</code> (ValidationFunction): Custom validation function</li>
+                <li><code>defaultValue?</code> (string|number): Default peripheral (name or index)</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(): string # Function to get the selected peripheral name after submission</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:label(text)</code></h3>
+        <p>Add a non-interactive label for display purposes</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>text</code> (string): The label text to display</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(): string # Function to get the label text (always returns the same text)</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:button(text, action?)</code></h3>
+        <p>Add a button that can trigger actions</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>text</code> (string): The button text</li>
+                <li><code>action?</code> (string): Action identifier (defaults to lowercase text)</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> fun(): string # Function to get the button text</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:addSubmitCancel()</code></h3>
+        <p>Add standard Submit and Cancel buttons to the form</p>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:validateField(i)</code></h3>
+        <p>Validate a specific field by index</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>i</code> (number): The field index to validate</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> string? error Error message if validation failed</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:isValid()</code></h3>
+        <p>Validate all fields in the form</p>
+        <div class='returns'><strong>Returns:</strong> boolean # True if all fields are valid</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:get(label)</code></h3>
+        <p>Get the current value of a field by label</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>label</code> (string): The field label</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> any # The field's current value, or nil if not found</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:draw()</code></h3>
+        <p>Draw the form to the terminal</p>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:edit(index)</code></h3>
+        <p>Edit a field at the specified index</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>index</code> (number): The field index to edit</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> string? action Action identifier if a button was pressed</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:nextSelectableField(from)</code></h3>
+        <p>Find the next selectable field index (skips labels)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>from</code> (number): Starting field index</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> number # Next selectable field index (wraps around)</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:prevSelectableField(from)</code></h3>
+        <p>Find the previous selectable field index (skips labels)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>from</code> (number): Starting field index</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> number # Previous selectable field index (wraps around)</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:run()</code></h3>
+        <p>Run the form's main input loop</p>
+        <div class='returns'><strong>Returns:</strong> FormResult? result Table of field values indexed by label, or nil if cancelled</div>
     </div>
 </body>
 </html>

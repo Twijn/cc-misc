@@ -1,32 +1,6 @@
 # timeutil
 
-@class TimeutilModule
-A timing utility module for ComputerCraft that provides persistent interval management
-with two different timing modes: absolute time-based and accumulated runtime-based.
-
-Features:
-Absolute time intervals (based on system time)
-Accumulated time intervals (based on actual runtime)
-Persistent state across computer restarts
-Pretty-printed time formatting
-Manual execution control
-Automatic interval management with run loop
-
-@usage
-local timeutil = require("timeutil")
-
-Create an absolute time interval (runs every 10 minutes regardless of downtime)
-local backup = timeutil.every(function()
-print("Running backup...")
-end, 600, "backup_last_run")
-
-Create a runtime-based interval (accumulates only when running)
-local heartbeat = timeutil.everyLoaded(function()
-print("Heartbeat")
-end, 30, "heartbeat_elapsed")
-
-Start the interval manager
-timeutil.run()
+A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop. @module timeutil
 
 ## Functions
 

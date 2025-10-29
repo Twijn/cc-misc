@@ -37,27 +37,36 @@
         }
         .header {
             border-bottom: 2px solid var(--border);
-            padding-bottom: 1rem;
+            padding-bottom: 1.5rem;
             margin-bottom: 2rem;
         }
-        h1 {
-            margin-bottom: 0.5rem;
+        .header h1 {
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        .header p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            opacity: 0.9;
         }
         h2 {
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border);
+            font-size: 1.8rem;
         }
         h3 {
             margin-top: 1.5rem;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
         }
         code {
             background: var(--code-bg);
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
             font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
         }
         pre {
             background: var(--code-bg);
@@ -67,16 +76,31 @@
             margin: 1rem 0;
         }
         .function {
-            margin: 1.5rem 0;
-            padding: 1rem;
+            margin: 2rem 0;
+            padding: 1.5rem;
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
+            background: var(--bg);
+        }
+        .function h3 {
+            margin-top: 0;
+        }
+        .function > p {
+            margin: 1rem 0;
+            line-height: 1.7;
         }
         .params, .returns {
-            margin-top: 0.5rem;
+            margin-top: 1rem;
+        }
+        .params ul, .returns ul {
+            list-style: none;
+            padding-left: 0;
         }
         .params li, .returns li {
-            padding: 0.25rem 0;
+            padding: 0.5rem 0;
+            padding-left: 1rem;
+            border-left: 3px solid var(--border);
+            margin: 0.25rem 0;
         }
         a {
             color: var(--link);
@@ -86,7 +110,8 @@
             text-decoration: underline;
         }
         .back-link {
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
         }
     </style>
 </head>
@@ -94,27 +119,7 @@
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
         <h1>tables</h1>
-        <p>@class TablesModule
-A utility module for table operations in ComputerCraft providing common table manipulation
-functions like searching, counting, copying, and comparison operations.
-
-Features:
-Element existence checking with includes()
-Table size counting for any table type
-Deep recursive copying with nested table support
-Deep recursive equality comparison
-Works with both array-like and associative tables
-
-@usage
-local tables = require("tables")
-
-local myTable = {1, 2, 3, nested = {a = 1, b = 2}}
-
-print(tables.includes(myTable, 2)) -- true
-print(tables.count(myTable)) -- 4 (includes nested table)
-
-local copy = tables.recursiveCopy(myTable)
-print(tables.recursiveEquals(myTable, copy)) -- true</p>
+        <p>A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking with includes(), table size counting for any table type, deep recursive copying with nested table support, deep recursive equality comparison, and works with both array-like and associative tables. @module tables</p>
     </div>
     <h2>Functions</h2>
     <div class='function'>
