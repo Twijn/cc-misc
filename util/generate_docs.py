@@ -1,0 +1,445 @@
+#!/usr/bin/env python3
+"""
+Simple EmmyLua documentation generator
+Parses EmmyLua annotations and generates clean HTML/Markdown documentation
+"""
+
+import re
+import os
+import json
+from pathlib import Path
+from typing import List, Dict, Any
+
+class LuaDocGenerator:
+    def __init__(self, input_dir: str, output_dir: str):
+        self.input_dir = Path(input_dir)
+        self.output_dir = Path(output_dir)
+        self.modules = []
+        
+    def parse_file(self, filepath: Path) -> Dict[str, Any]:
+        """Parse a Lua file and extract documentation"""
+        with open(filepath, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        module = {
+            'name': filepath.stem,
+            'path': str(filepath.relative_to(self.input_dir)),
+            'description': '',
+            'functions': [],
+            'classes': [],
+            'fields': []
+        }
+        
+        # Extract module description (first block of comments)
+        module_desc = re.search(r'^(---.*?\n)+', content, re.MULTILINE)
+        if module_desc:
+            desc_lines = [line.strip('- \n') for line in module_desc.group().split('\n') if line.startswith('---')]
+            module['description'] = '\n'.join(desc_lines)
+        
+        # Extract functions with their documentation
+        func_pattern = r'((?:---.*?\n)+)(?:local\s+)?function\s+(\w+(?:\.\w+)*)\s*\((.*?)\)'
+        for match in re.finditer(func_pattern, content, re.MULTILINE):
+            doc_block, func_name, params = match.groups()
+            
+            func_info = {
+                'name': func_name,
+                'params': [],
+                'returns': '',
+                'description': ''
+            }
+            
+            # Parse documentation block
+            for line in doc_block.split('\n'):
+                line = line.strip('- \n')
+                if not line.startswith('@'):
+                    func_info['description'] += line + ' '
+                elif line.startswith('@param'):
+                    param_match = re.match(r'@param\s+(\w+\??)\s+(\S+)(?:\s+(.+))?', line)
+                    if param_match:
+                        func_info['params'].append({
+                            'name': param_match.group(1),
+                            'type': param_match.group(2),
+                            'description': param_match.group(3) or ''
+                        })
+                elif line.startswith('@return'):
+                    func_info['returns'] = line.replace('@return', '').strip()
+            
+            func_info['description'] = func_info['description'].strip()
+            module['functions'].append(func_info)
+        
+        # Extract classes
+        class_pattern = r'((?:---.*?\n)+)---@class\s+(\w+)'
+        for match in re.finditer(class_pattern, content, re.MULTILINE):
+            doc_block, class_name = match.groups()
+            
+            class_info = {
+                'name': class_name,
+                'description': '',
+                'fields': []
+            }
+            
+            for line in doc_block.split('\n'):
+                line = line.strip('- \n')
+                if line.startswith('@field'):
+                    field_match = re.match(r'@field\s+(\w+\??)\s+(\S+)(?:\s+(.+))?', line)
+                    if field_match:
+                        class_info['fields'].append({
+                            'name': field_match.group(1),
+                            'type': field_match.group(2),
+                            'description': field_match.group(3) or ''
+                        })
+                elif not line.startswith('@'):
+                    class_info['description'] += line + ' '
+            
+            class_info['description'] = class_info['description'].strip()
+            module['classes'].append(class_info)
+        
+        return module
+    
+    def generate_markdown(self, module: Dict[str, Any]) -> str:
+        """Generate Markdown documentation for a module"""
+        md = f"# {module['name']}\n\n"
+        
+        if module['description']:
+            md += f"{module['description']}\n\n"
+        
+        # Classes
+        if module['classes']:
+            md += "## Classes\n\n"
+            for cls in module['classes']:
+                md += f"### {cls['name']}\n\n"
+                if cls['description']:
+                    md += f"{cls['description']}\n\n"
+                
+                if cls['fields']:
+                    md += "**Fields:**\n\n"
+                    for field in cls['fields']:
+                        md += f"- `{field['name']}` ({field['type']})"
+                        if field['description']:
+                            md += f": {field['description']}"
+                        md += "\n"
+                    md += "\n"
+        
+        # Functions
+        if module['functions']:
+            md += "## Functions\n\n"
+            for func in module['functions']:
+                # Function signature
+                params_str = ', '.join([p['name'] for p in func['params']])
+                md += f"### `{func['name']}({params_str})`\n\n"
+                
+                if func['description']:
+                    md += f"{func['description']}\n\n"
+                
+                # Parameters
+                if func['params']:
+                    md += "**Parameters:**\n\n"
+                    for param in func['params']:
+                        md += f"- `{param['name']}` ({param['type']})"
+                        if param['description']:
+                            md += f": {param['description']}"
+                        md += "\n"
+                    md += "\n"
+                
+                # Returns
+                if func['returns']:
+                    md += f"**Returns:** {func['returns']}\n\n"
+        
+        return md
+    
+    def generate_html_index(self, modules: List[Dict[str, Any]]) -> str:
+        """Generate HTML index page"""
+        html = """<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CC-Misc Utilities Documentation</title>
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+        }
+        h2 {
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+        ul {
+            list-style: none;
+        }
+        li {
+            padding: 0.5rem 0;
+        }
+        a {
+            color: var(--link);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .module {
+            padding: 1rem;
+            margin: 0.5rem 0;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+        .module h3 {
+            margin: 0 0 0.5rem 0;
+        }
+        .module p {
+            color: var(--text);
+            opacity: 0.8;
+        }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>CC-Misc Utilities Documentation</h1>
+    <p>A collection of utility modules for ComputerCraft development</p>
+    
+    <h2>Modules</h2>
+    <div class="modules">
+"""
+        
+        for module in modules:
+            html += f"""        <div class="module">
+            <h3><a href="{module['name']}.html">{module['name']}</a></h3>
+            <p>{module['description'][:200]}{'...' if len(module['description']) > 200 else ''}</p>
+        </div>
+"""
+        
+        html += """    </div>
+</body>
+</html>
+"""
+        return html
+    
+    def generate_html_module(self, module: Dict[str, Any]) -> str:
+        """Generate HTML documentation for a module"""
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{module['name']} - CC-Misc Utilities</title>
+    <style>
+        :root {{
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }}
+        @media (prefers-color-scheme: dark) {{
+            :root {{
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }}
+        }}
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }}
+        .header {{
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }}
+        h1 {{
+            margin-bottom: 0.5rem;
+        }}
+        h2 {{
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }}
+        h3 {{
+            margin-top: 1.5rem;
+            margin-bottom: 0.5rem;
+        }}
+        code {{
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+        }}
+        pre {{
+            background: var(--code-bg);
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }}
+        .function {{
+            margin: 1.5rem 0;
+            padding: 1rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }}
+        .params, .returns {{
+            margin-top: 0.5rem;
+        }}
+        .params li, .returns li {{
+            padding: 0.25rem 0;
+        }}
+        a {{
+            color: var(--link);
+            text-decoration: none;
+        }}
+        a:hover {{
+            text-decoration: underline;
+        }}
+        .back-link {{
+            margin-bottom: 1rem;
+        }}
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>{module['name']}</h1>
+        <p>{module['description']}</p>
+    </div>
+"""
+        
+        # Classes
+        if module['classes']:
+            html += "    <h2>Classes</h2>\n"
+            for cls in module['classes']:
+                html += f"    <div class='function'>\n"
+                html += f"        <h3>{cls['name']}</h3>\n"
+                if cls['description']:
+                    html += f"        <p>{cls['description']}</p>\n"
+                
+                if cls['fields']:
+                    html += "        <div class='params'>\n"
+                    html += "            <strong>Fields:</strong>\n"
+                    html += "            <ul>\n"
+                    for field in cls['fields']:
+                        html += f"                <li><code>{field['name']}</code> ({field['type']})"
+                        if field['description']:
+                            html += f": {field['description']}"
+                        html += "</li>\n"
+                    html += "            </ul>\n"
+                    html += "        </div>\n"
+                html += "    </div>\n"
+        
+        # Functions
+        if module['functions']:
+            html += "    <h2>Functions</h2>\n"
+            for func in module['functions']:
+                html += "    <div class='function'>\n"
+                params_str = ', '.join([p['name'] for p in func['params']])
+                html += f"        <h3><code>{func['name']}({params_str})</code></h3>\n"
+                
+                if func['description']:
+                    html += f"        <p>{func['description']}</p>\n"
+                
+                if func['params']:
+                    html += "        <div class='params'>\n"
+                    html += "            <strong>Parameters:</strong>\n"
+                    html += "            <ul>\n"
+                    for param in func['params']:
+                        html += f"                <li><code>{param['name']}</code> ({param['type']})"
+                        if param['description']:
+                            html += f": {param['description']}"
+                        html += "</li>\n"
+                    html += "            </ul>\n"
+                    html += "        </div>\n"
+                
+                if func['returns']:
+                    html += f"        <div class='returns'><strong>Returns:</strong> {func['returns']}</div>\n"
+                
+                html += "    </div>\n"
+        
+        html += """</body>
+</html>
+"""
+        return html
+    
+    def generate(self):
+        """Generate documentation for all Lua files"""
+        # Create output directory
+        self.output_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Find all Lua files
+        lua_files = list(self.input_dir.rglob('*.lua'))
+        
+        # Parse each file
+        for lua_file in lua_files:
+            module = self.parse_file(lua_file)
+            self.modules.append(module)
+            
+            # Generate Markdown
+            md_content = self.generate_markdown(module)
+            md_path = self.output_dir / f"{module['name']}.md"
+            with open(md_path, 'w', encoding='utf-8') as f:
+                f.write(md_content)
+            
+            # Generate HTML
+            html_content = self.generate_html_module(module)
+            html_path = self.output_dir / f"{module['name']}.html"
+            with open(html_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+        
+        # Generate index
+        index_html = self.generate_html_index(self.modules)
+        with open(self.output_dir / 'index.html', 'w', encoding='utf-8') as f:
+            f.write(index_html)
+        
+        print(f"Generated documentation for {len(self.modules)} modules")
+        print(f"Output directory: {self.output_dir}")
+
+if __name__ == '__main__':
+    generator = LuaDocGenerator('.', '../docs')
+    generator.generate()

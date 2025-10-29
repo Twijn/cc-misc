@@ -11,19 +11,15 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Setup Lua
-      uses: leafo/gh-actions-lua@v10
-      
-    - name: Setup LuaRocks
-      uses: leafo/gh-actions-luarocks@v4
-      
-    - name: Install LDoc
-      run: luarocks install ldoc
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.x'
       
     - name: Generate Documentation
       run: |
         cd util
-        ldoc -d ../docs .
+        python3 generate_docs.py
         
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
