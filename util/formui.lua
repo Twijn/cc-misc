@@ -324,7 +324,52 @@ function FormUI:draw()
     term.clear()
     centerText(1, "> " .. self.title .. " <", w)
 
-    term.setCursorPos(1, 4)
+    -- Calculate available space for fields (accounting for header and footer)
+    local headerLines = 3  -- Title and spacing
+    local footerLines = 3  -- Help text
+    local availableLines = h - headerLines - footerLines
+    
+    -- Initialize scroll offset if not set
+    if not self.scrollOffset then
+        self.scrollOffset = 0
+    end
+    
+    -- Calculate how many lines each field takes
+    local fieldLines = {}
+    local totalLines = 0
+    for i, f in ipairs(self.fields) do
+        local lines = 1  -- Base field line
+        if self.errors[f.label] then
+            lines = lines + 1  -- Error message line
+        end
+        fieldLines[i] = lines
+        totalLines = totalLines + lines
+    end
+    
+    -- Adjust scroll offset to keep selected field visible
+    local selectedLineStart = 0
+    for i = 1, self.selected - 1 do
+        selectedLineStart = selectedLineStart + fieldLines[i]
+    end
+    local selectedLineEnd = selectedLineStart + fieldLines[self.selected]
+    
+    -- Scroll up if selected field is above visible area
+    if selectedLineStart < self.scrollOffset then
+        self.scrollOffset = selectedLineStart
+    end
+    
+    -- Scroll down if selected field is below visible area
+    if selectedLineEnd > self.scrollOffset + availableLines then
+        self.scrollOffset = selectedLineEnd - availableLines
+    end
+    
+    -- Clamp scroll offset
+    self.scrollOffset = math.max(0, math.min(self.scrollOffset, math.max(0, totalLines - availableLines)))
+    
+    -- Draw fields with scrolling
+    term.setCursorPos(1, headerLines + 1)
+    local currentLine = 0
+    
     for i, f in ipairs(self.fields) do
         local prefix = (i == self.selected) and "> " or "  "
         local display = ""
@@ -339,45 +384,70 @@ function FormUI:draw()
         elseif f.type == "button" then
             display = ""  -- Buttons don't show a value, just the text
         end
-
-        if f.type == "label" then
-            -- Labels are shown in light gray and not selectable
-            term.setTextColor(colors.lightGray)
-            print("  " .. f.text)
-        elseif f.type == "button" then
-            -- Buttons are shown with special styling
-            if i == self.selected then
-                term.setTextColor(colors.black)
-                term.setBackgroundColor(colors.white)
-                write("[ " .. f.text .. " ]")
-                term.setBackgroundColor(colors.gray)
-            else
-                term.setTextColor(colors.lightBlue)
-                write("[ " .. f.text .. " ]")
-            end
-            print()
-        else
-            if self.errors[f.label] then
-                term.setTextColor(colors.red)
-            elseif i == self.selected then
-                term.setTextColor(colors.yellow)
-            else
-                term.setTextColor(colors.white)
-            end
-            write(prefix .. f.label .. ": " .. display)
-
-            if display == "" then
-                if term.getTextColor() == colors.white then
-                    term.setTextColor(colors.lightGray)
+        
+        -- Check if this field is in the visible area
+        if currentLine >= self.scrollOffset and currentLine < self.scrollOffset + availableLines then
+            local y = headerLines + 1 + (currentLine - self.scrollOffset)
+            term.setCursorPos(1, y)
+            
+            if f.type == "label" then
+                -- Labels are shown in light gray and not selectable
+                term.setTextColor(colors.lightGray)
+                print("  " .. f.text)
+            elseif f.type == "button" then
+                -- Buttons are shown with special styling
+                if i == self.selected then
+                    term.setTextColor(colors.black)
+                    term.setBackgroundColor(colors.white)
+                    write("[ " .. f.text .. " ]")
+                    term.setBackgroundColor(colors.gray)
+                else
+                    term.setTextColor(colors.lightBlue)
+                    write("[ " .. f.text .. " ]")
                 end
-                print("< no value >")
-            else print() end
-        end
+                print()
+            else
+                if self.errors[f.label] then
+                    term.setTextColor(colors.red)
+                elseif i == self.selected then
+                    term.setTextColor(colors.yellow)
+                else
+                    term.setTextColor(colors.white)
+                end
+                write(prefix .. f.label .. ": " .. display)
 
-        if self.errors[f.label] then
-            term.setTextColor(colors.red)
-            print("! " .. self.errors[f.label])
+                if display == "" then
+                    if term.getTextColor() == colors.white then
+                        term.setTextColor(colors.lightGray)
+                    end
+                    print("< no value >")
+                else print() end
+            end
         end
+        currentLine = currentLine + 1
+        
+        -- Draw error message if visible
+        if self.errors[f.label] then
+            if currentLine >= self.scrollOffset and currentLine < self.scrollOffset + availableLines then
+                local y = headerLines + 1 + (currentLine - self.scrollOffset)
+                term.setCursorPos(1, y)
+                term.setTextColor(colors.red)
+                print("! " .. self.errors[f.label])
+            end
+            currentLine = currentLine + 1
+        end
+    end
+    
+    -- Draw scroll indicators
+    if self.scrollOffset > 0 then
+        term.setCursorPos(w, headerLines + 1)
+        term.setTextColor(colors.white)
+        term.write("^")
+    end
+    if self.scrollOffset + availableLines < totalLines then
+        term.setCursorPos(w, h - footerLines)
+        term.setTextColor(colors.white)
+        term.write("v")
     end
 
     term.setCursorPos(1, h - 2)
