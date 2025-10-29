@@ -5,7 +5,7 @@
 --- deep recursive copying with nested table support, deep recursive equality comparison,
 --- and works with both array-like and associative tables.
 ---
---- @module tables
+-- @module tables
 
 local module = {}
 

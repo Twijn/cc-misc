@@ -5,7 +5,7 @@
 --- persistent state across computer restarts, pretty-printed time formatting, manual execution control,
 --- and automatic interval management with run loop.
 ---
---- @module timeutil
+-- @module timeutil
 
 ---@class TimeutilInterval
 ---@field cb function Callback function to execute

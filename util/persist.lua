@@ -5,7 +5,7 @@
 --- support for both Lua serialize and JSON formats, error handling with fallback mechanisms,
 --- array and object manipulation methods, and automatic saving on data changes.
 ---
---- @module persist
+-- @module persist
 
 local dataDir = "data/"
 fs.makeDir(dataDir)

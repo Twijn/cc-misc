@@ -1,23 +1,11 @@
----@class SettingsModule
----A settings management module for ComputerCraft that provides interactive configuration
----with automatic validation, peripheral detection, and persistent storage using CC settings.
+--- A settings management module for ComputerCraft that provides interactive configuration
+--- with automatic validation, peripheral detection, and persistent storage using CC settings.
 ---
----Features:
---- - Interactive peripheral selection with type filtering
---- - Number input with range validation
---- - String input with default values
---- - Boolean selection with menu interface
---- - Automatic settings persistence
---- - Peripheral availability checking and recovery
---- - Side-only peripheral filtering
+--- Features: Interactive peripheral selection with type filtering, number input with range validation,
+--- string input with default values, boolean selection with menu interface, automatic settings persistence,
+--- peripheral availability checking and recovery, and side-only peripheral filtering.
 ---
----@usage
----local s = require("s")
----
----local modem = s.peripheral("modem", "modem", true) -- Side-attached modems only
----local port = s.number("port", 1, 65535, 8080) -- Port 1-65535, default 8080
----local name = s.string("server_name", "MyServer") -- String with default
----local enabled = s.boolean("enabled") -- Boolean selection
+--- @module s
 
 local module = {}
 
@@ -203,11 +191,5 @@ function module.boolean(name)
 
     return value
 end
-
----@class SettingsModule
----@field peripheral fun(name: string, type: string, sideOnly?: boolean): table
----@field number fun(name: string, from?: number, to?: number, default?: number): number
----@field string fun(name: string, default?: string): string
----@field boolean fun(name: string): boolean
 
 return module
