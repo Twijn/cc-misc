@@ -1,0 +1,32 @@
+name: Generate Documentation
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'util/**' ]
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Lua
+      uses: leafo/gh-actions-lua@v10
+      
+    - name: Setup LuaRocks
+      uses: leafo/gh-actions-luarocks@v4
+      
+    - name: Install LDoc
+      run: luarocks install ldoc
+      
+    - name: Generate Documentation
+      run: |
+        cd util
+        ldoc -d ../docs .
+        
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./docs
