@@ -81,20 +81,6 @@ local function printTable(tbl, iteration)
   end
 end
 
----Autocompletion function for product-related commands
----@param args string[] The command arguments
----@return string[] # List of completion suggestions
-local function productComplete(args)
-  if #args == 1 then
-    local result = {}
-    for meta in pairs(productManager.getAll()) do
-      table.insert(result, meta)
-    end
-    return result
-  end
-  return {}
-end
-
 ---@class CommandDefinition
 ---@field description string A description of what the command does
 ---@field execute fun(args: string[], context: CommandContext) The function to execute when the command is called
