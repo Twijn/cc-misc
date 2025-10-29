@@ -25,24 +25,40 @@ class LuaDocGenerator:
             'name': filepath.stem,
             'path': str(filepath.relative_to(self.input_dir)),
             'description': '',
+            'examples': [],
             'functions': [],
             'classes': [],
             'fields': []
         }
         
         # Extract module description (first block of comments before any code)
-        # Stop at first non-comment line or @tag
-        module_desc = re.search(r'^(---[^@].*?\n)+', content, re.MULTILINE)
-        if module_desc:
-            desc_lines = []
-            for line in module_desc.group().split('\n'):
+        # Stop at @usage or other tags
+        desc_lines = []
+        in_description = False
+        for line in content.split('\n'):
+            if line.startswith('---'):
+                cleaned = line[3:].strip()
+                if cleaned.startswith('@'):
+                    break  # Stop at first @ tag
+                if cleaned:
+                    desc_lines.append(cleaned)
+                    in_description = True
+            elif in_description:
+                break  # Stop at first non-comment line
+        module['description'] = ' '.join(desc_lines)
+        
+        # Extract examples from @usage blocks
+        example_pattern = r'---@usage\s*\n((?:---[^@].*?\n)+)'
+        for match in re.finditer(example_pattern, content, re.MULTILINE):
+            example_block = match.group(1)
+            example_lines = []
+            for line in example_block.split('\n'):
                 if line.startswith('---'):
-                    # Clean the line and skip code blocks/examples
                     cleaned = line[3:].strip()
-                    # Skip lines that look like code (contain 'local', 'function', '=', etc in context)
-                    if cleaned and not any(x in cleaned for x in ['```lua', '```']):
-                        desc_lines.append(cleaned)
-            module['description'] = ' '.join(desc_lines)
+                    if not cleaned.startswith('@'):
+                        example_lines.append(cleaned)
+            if example_lines:
+                module['examples'].append('\n'.join(example_lines))
         
         # Extract functions with their documentation
         # Match both standalone functions and methods (function name.method or name:method)
@@ -125,6 +141,14 @@ class LuaDocGenerator:
         
         if module['description']:
             md += f"{module['description']}\n\n"
+        
+        # Examples
+        if module['examples']:
+            md += "## Examples\n\n"
+            for example in module['examples']:
+                md += "```lua\n"
+                md += example + "\n"
+                md += "```\n\n"
         
         # Classes
         if module['classes']:
@@ -403,6 +427,13 @@ class LuaDocGenerator:
     </div>
 """
         
+        # Examples
+        if module['examples']:
+            html += "    <h2>Examples</h2>\n"
+            for example in module['examples']:
+                escaped_example = example.replace('<', '&lt;').replace('>', '&gt;')
+                html += f"""    <pre><code class="language-lua">{escaped_example}</code></pre>\n"""
+        
         # Classes
         if module['classes']:
             html += "    <h2>Classes</h2>\n"
@@ -463,8 +494,8 @@ class LuaDocGenerator:
         # Create output directory
         self.output_dir.mkdir(exist_ok=True, parents=True)
         
-        # Find all Lua files
-        lua_files = list(self.input_dir.rglob('*.lua'))
+        # Find all Lua files in the util directory (excluding subdirectories)
+        lua_files = list(self.input_dir.glob('*.lua'))
         
         # Parse each file
         for lua_file in lua_files:

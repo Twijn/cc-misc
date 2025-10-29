@@ -5,6 +5,15 @@
 --- deep recursive copying with nested table support, deep recursive equality comparison,
 --- and works with both array-like and associative tables.
 ---
+---@usage
+---local tables = require("tables")
+---
+---local myTable = {1, 2, 3, nested = {a = 1}}
+---print(tables.includes(myTable, 2)) -- true
+---
+---local copy = tables.recursiveCopy(myTable)
+---print(tables.recursiveEquals(myTable, copy)) -- true
+---
 -- @module tables
 
 local module = {}

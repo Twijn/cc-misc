@@ -5,6 +5,14 @@
 --- support for both Lua serialize and JSON formats, error handling with fallback mechanisms,
 --- array and object manipulation methods, and automatic saving on data changes.
 ---
+---@usage
+---local persist = require("persist")
+---local config = persist("config.json", false)
+---
+---config.setDefault("port", 8080)
+---config.set("name", "MyServer")
+---print(config.get("port")) -- 8080
+---
 -- @module persist
 
 local dataDir = "data/"

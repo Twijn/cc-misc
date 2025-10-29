@@ -5,6 +5,19 @@
 --- persistent state across computer restarts, pretty-printed time formatting, manual execution control,
 --- and automatic interval management with run loop.
 ---
+---@usage
+---local timeutil = require("timeutil")
+---
+---timeutil.every(function()
+---  print("Running backup...")
+---end, 600, "backup_last_run")
+---
+---timeutil.everyLoaded(function()
+---  print("Heartbeat")
+---end, 30, "heartbeat_elapsed")
+---
+---timeutil.run()
+---
 -- @module timeutil
 
 ---@class TimeutilInterval

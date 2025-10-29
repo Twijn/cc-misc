@@ -2,10 +2,6 @@
 --  v0.0.4   --
 -- by Twijn  --
 
---- **DEPRECATED**: This location is deprecated. Please use `require("shopk")` instead of `require("shopk.shopk")`.
---- The file has been moved to `/util/shopk.lua` for easier access.
---- This file will be removed in a future version.
----
 --- A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction
 --- monitoring and wallet operations through WebSocket connections.
 ---

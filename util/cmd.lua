@@ -5,6 +5,21 @@
 --- tab autocompletion for commands and arguments, colored output for different message types,
 --- table pretty-printing functionality, and string utility functions (split, startsWith).
 ---
+---@usage
+---local cmd = require("cmd")
+---
+---local customCommands = {
+---  hello = {
+---    description = "Say hello to someone",
+---    execute = function(args, context)
+---      local name = args[1] or "World"
+---      context.succ("Hello, " .. name .. "!")
+---    end
+---  }
+---}
+---
+---cmd("MyApp", "1.0.0", customCommands)
+---
 -- @module cmd
 
 local history = {}

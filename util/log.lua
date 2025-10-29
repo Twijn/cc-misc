@@ -5,6 +5,13 @@
 --- automatic daily log file creation and rotation, persistent log storage in log/ directory,
 --- and timestamped log entries.
 ---
+---@usage
+---local log = require("log")
+---
+---log.info("Server started")
+---log.warn("High memory usage detected")
+---log.error("Failed to connect to database")
+---
 -- @module log
 
 local module = {}
