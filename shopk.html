@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>shopk - CC-Misc Utilities</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
             --bg: #ffffff;
@@ -69,18 +70,22 @@
             font-size: 0.9em;
         }
         pre {
-            background: var(--code-bg);
             padding: 1rem;
             border-radius: 4px;
             overflow-x: auto;
             margin: 1rem 0;
+            border: 1px solid var(--border);
         }
-        .function {
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        .function:not(.token) {
             margin: 2rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
-            background: var(--bg);
         }
         .function h3 {
             margin-top: 0;
@@ -121,6 +126,19 @@
         <h1>shopk</h1>
         <p>A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.</p>
     </div>
+    <h2>Examples</h2>
+    <pre><code class="language-lua">local shopk = require("shopk")
+local client = shopk({ privatekey = "your_key" })
+client.on("ready", function()
+ print("Connected!")
+ client.me(function(data)
+   print("Balance:", data.balance)
+ end)
+end)
+client.on("transaction", function(tx)
+ print("Received:", tx.value, "from", tx.from)
+end)
+client.run()</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.on(event, listener)</code></h3>
@@ -163,4 +181,6 @@
         </div>
     </div>
 </body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
 </html>

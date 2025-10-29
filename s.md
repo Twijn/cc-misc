@@ -2,6 +2,16 @@
 
 A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, and side-only peripheral filtering.
 
+## Examples
+
+```lua
+local s = require("s")
+local modem = s.peripheral("modem", "modem", true)
+local port = s.number("port", 1, 65535, 8080)
+local name = s.string("server_name", "MyServer")
+local enabled = s.boolean("enabled")
+```
+
 ## Functions
 
 ### `module.peripheral(name, type, sideOnly?)`

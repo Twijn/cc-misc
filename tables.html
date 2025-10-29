@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>tables - CC-Misc Utilities</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
             --bg: #ffffff;
@@ -69,18 +70,22 @@
             font-size: 0.9em;
         }
         pre {
-            background: var(--code-bg);
             padding: 1rem;
             border-radius: 4px;
             overflow-x: auto;
             margin: 1rem 0;
+            border: 1px solid var(--border);
         }
-        .function {
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        .function:not(.token) {
             margin: 2rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
-            background: var(--bg);
         }
         .function h3 {
             margin-top: 0;
@@ -121,6 +126,12 @@
         <h1>tables</h1>
         <p>A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking with includes(), table size counting for any table type, deep recursive copying with nested table support, deep recursive equality comparison, and works with both array-like and associative tables.</p>
     </div>
+    <h2>Examples</h2>
+    <pre><code class="language-lua">local tables = require("tables")
+local myTable = {1, 2, 3, nested = {a = 1}}
+print(tables.includes(myTable, 2)) -- true
+local copy = tables.recursiveCopy(myTable)
+print(tables.recursiveEquals(myTable, copy)) -- true</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.includes(table, object)</code></h3>
@@ -169,4 +180,6 @@
         <div class='returns'><strong>Returns:</strong> boolean # True if both tables have the same structure and values</div>
     </div>
 </body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
 </html>

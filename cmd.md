@@ -2,6 +2,22 @@
 
 Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, and string utility functions (split, startsWith).
 
+## Examples
+
+```lua
+local cmd = require("cmd")
+local customCommands = {
+ hello = {
+   description = "Say hello to someone",
+   execute = function(args, context)
+     local name = args[1] or "World"
+     context.succ("Hello, " .. name .. "!")
+   end
+ }
+}
+cmd("MyApp", "1.0.0", customCommands)
+```
+
 ## Functions
 
 ### `string.split(self, sep?, plain?)`

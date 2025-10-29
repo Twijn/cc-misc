@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>log - CC-Misc Utilities</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
             --bg: #ffffff;
@@ -69,18 +70,22 @@
             font-size: 0.9em;
         }
         pre {
-            background: var(--code-bg);
             padding: 1rem;
             border-radius: 4px;
             overflow-x: auto;
             margin: 1rem 0;
+            border: 1px solid var(--border);
         }
-        .function {
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        .function:not(.token) {
             margin: 2rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
-            background: var(--bg);
         }
         .function h3 {
             margin-top: 0;
@@ -121,6 +126,11 @@
         <h1>log</h1>
         <p>A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, and timestamped log entries.</p>
     </div>
+    <h2>Examples</h2>
+    <pre><code class="language-lua">local log = require("log")
+log.info("Server started")
+log.warn("High memory usage detected")
+log.error("Failed to connect to database")</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.info(msg)</code></h3>
@@ -153,4 +163,6 @@
         </div>
     </div>
 </body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
 </html>

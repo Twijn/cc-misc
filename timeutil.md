@@ -2,6 +2,19 @@
 
 A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop.
 
+## Examples
+
+```lua
+local timeutil = require("timeutil")
+timeutil.every(function()
+ print("Running backup...")
+end, 600, "backup_last_run")
+timeutil.everyLoaded(function()
+ print("Heartbeat")
+end, 30, "heartbeat_elapsed")
+timeutil.run()
+```
+
 ## Functions
 
 ### `module.every(cb, intervalTime, fileName)`

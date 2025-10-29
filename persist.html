@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>persist - CC-Misc Utilities</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
             --bg: #ffffff;
@@ -69,18 +70,22 @@
             font-size: 0.9em;
         }
         pre {
-            background: var(--code-bg);
             padding: 1rem;
             border-radius: 4px;
             overflow-x: auto;
             margin: 1rem 0;
+            border: 1px solid var(--border);
         }
-        .function {
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        .function:not(.token) {
             margin: 2rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
-            background: var(--bg);
         }
         .function h3 {
             margin-top: 0;
@@ -121,5 +126,13 @@
         <h1>persist</h1>
         <p>A persistence module for ComputerCraft that provides automatic data serialization and storage to files with support for both Lua serialization and JSON formats. Features: Automatic file creation and loading, deep copy functionality to handle circular references, support for both Lua serialize and JSON formats, error handling with fallback mechanisms, array and object manipulation methods, and automatic saving on data changes.</p>
     </div>
+    <h2>Examples</h2>
+    <pre><code class="language-lua">local persist = require("persist")
+local config = persist("config.json", false)
+config.setDefault("port", 8080)
+config.set("name", "MyServer")
+print(config.get("port")) -- 8080</code></pre>
 </body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
 </html>

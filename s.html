@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>s - CC-Misc Utilities</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
             --bg: #ffffff;
@@ -69,18 +70,22 @@
             font-size: 0.9em;
         }
         pre {
-            background: var(--code-bg);
             padding: 1rem;
             border-radius: 4px;
             overflow-x: auto;
             margin: 1rem 0;
+            border: 1px solid var(--border);
         }
-        .function {
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        .function:not(.token) {
             margin: 2rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
-            background: var(--bg);
         }
         .function h3 {
             margin-top: 0;
@@ -121,6 +126,12 @@
         <h1>s</h1>
         <p>A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, and side-only peripheral filtering.</p>
     </div>
+    <h2>Examples</h2>
+    <pre><code class="language-lua">local s = require("s")
+local modem = s.peripheral("modem", "modem", true)
+local port = s.number("port", 1, 65535, 8080)
+local name = s.string("server_name", "MyServer")
+local enabled = s.boolean("enabled")</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.peripheral(name, type, sideOnly?)</code></h3>
@@ -173,4 +184,6 @@
         <div class='returns'><strong>Returns:</strong> boolean # The configured boolean value</div>
     </div>
 </body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
 </html>
