@@ -219,6 +219,7 @@ local function chooseAction()
         elseif key == keys.enter then
             return options[cursor].key
         elseif key == keys.q then
+            sleep()
             return nil
         end
     end
