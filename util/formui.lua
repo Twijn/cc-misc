@@ -339,7 +339,7 @@ function FormUI:draw()
     local totalLines = 0
     for i, f in ipairs(self.fields) do
         local lines = 1  -- Base field line
-        if self.errors[f.label] then
+        if f.label and self.errors[f.label] then
             lines = lines + 1  -- Error message line
         end
         fieldLines[i] = lines
@@ -407,7 +407,7 @@ function FormUI:draw()
                 end
                 print()
             else
-                if self.errors[f.label] then
+                if f.label and self.errors[f.label] then
                     term.setTextColor(colors.red)
                 elseif i == self.selected then
                     term.setTextColor(colors.yellow)
@@ -427,7 +427,7 @@ function FormUI:draw()
         currentLine = currentLine + 1
         
         -- Draw error message if visible
-        if self.errors[f.label] then
+        if f.label and self.errors[f.label] then
             if currentLine >= self.scrollOffset and currentLine < self.scrollOffset + availableLines then
                 local y = headerLines + 1 + (currentLine - self.scrollOffset)
                 term.setCursorPos(1, y)
