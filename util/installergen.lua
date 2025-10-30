@@ -11,7 +11,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.3.0"
+local VERSION = "1.3.1"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
@@ -390,74 +390,17 @@ local function checkLibraryStatus(libraries)
     return status
 end
 
----Show update confirmation screen
----@param status table Library status map
----@return boolean True to proceed, false to cancel
-local function confirmUpdates(status)
-    local hasUpdates = false
-    local hasNew = false
-    
-    for _, info in pairs(status) do
-        if info.exists then
-            hasUpdates = true
-        else
-            hasNew = true
-        end
-    end
-    
-    if not hasUpdates then
-        return true -- No existing libraries, just install
-    end
-    
-    clearScreen()
-    
-    term.setTextColor(colors.yellow)
-    print("Update/Install Confirmation")
-    term.setTextColor(colors.white)
-    print()
-    
-    if hasUpdates then
-        term.setTextColor(colors.yellow)
-        print("The following will be UPDATED:")
-        term.setTextColor(colors.white)
-        for lib, info in pairs(status) do
-            if info.exists then
-                term.setTextColor(colors.lightGray)
-                print("  " .. lib .. " (v" .. info.version .. ") at " .. info.path)
-            end
-        end
-        print()
-    end
-    
-    if hasNew then
-        term.setTextColor(colors.green)
-        print("The following will be INSTALLED:")
-        term.setTextColor(colors.white)
-        for lib, info in pairs(status) do
-            if not info.exists then
-                term.setTextColor(colors.lightGray)
-                print("  " .. lib)
-            end
-        end
-        print()
-    end
-    
-    term.setTextColor(colors.yellow)
-    write("Continue? (Y/N): ")
-    term.setTextColor(colors.white)
-    
-    local response = read()
-    return response:lower() == "y" or response:lower() == "yes"
-end
-
 ---Install libraries immediately
 ---@param libraries table List of library names
 ---@param installDir string Installation directory
-local function installLibraries(libraries, installDir)
+---@param skipClear boolean? Skip clearing screen (for when deletions happened first)
+local function installLibraries(libraries, installDir, skipClear)
     -- Check existing libraries
     local status = checkLibraryStatus(libraries)
     
-    clearScreen()
+    if not skipClear then
+        clearScreen()
+    end
     
     term.setTextColor(colors.yellow)
     print("Installing/Updating Libraries")
@@ -694,6 +637,9 @@ local function main()
     local installDir = getInstallDir()
     
     if action == "install" then
+        -- Clear screen before operations
+        clearScreen()
+        
         -- Delete libraries first
         if toDelete and #toDelete > 0 then
             deleteLibraries(toDelete)
@@ -701,7 +647,7 @@ local function main()
         
         -- Then install/update selected libraries
         if #selected > 0 then
-            installLibraries(selected, installDir)
+            installLibraries(selected, installDir, toDelete and #toDelete > 0)
         end
         
         -- Final summary
