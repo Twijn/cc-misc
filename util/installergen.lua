@@ -11,7 +11,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.2.0"
+local VERSION = "1.3.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
@@ -63,6 +63,7 @@ end
 
 ---Display library selection menu with scrolling support
 ---@return table|nil Selected library names
+---@return table|nil Libraries to delete
 local function selectLibraries()
     local selected = {}
     local cursor = 1
@@ -88,7 +89,7 @@ local function selectLibraries()
         term.setTextColor(colors.yellow)
         print("CC-Misc Installer v" .. VERSION)
         term.setTextColor(colors.lightGray)
-        print("Up/Down: Move | Space: Toggle | Enter: Continue | Q: Quit")
+        print("Up/Down: Move | Space: Toggle | D: Delete | Enter: Continue | Q: Quit")
         term.setTextColor(colors.white)
         print()
         
@@ -103,16 +104,28 @@ local function selectLibraries()
         -- Display items
         for i = startIdx, endIdx do
             local lib = LIBRARIES[i]
-            local marker = selected[lib.name] and "[X]" or "[ ]"
-            local isCursor = (i == cursor)
             local isExisting = findExistingLibrary(lib.name) ~= nil
+            local isCursor = (i == cursor)
+            local willDelete = isExisting and not selected[lib.name]
+            
+            -- Determine marker
+            local marker
+            if willDelete then
+                marker = "[D]" -- Marked for deletion
+            elseif selected[lib.name] then
+                marker = "[X]"
+            else
+                marker = "[ ]"
+            end
             
             if isCursor then
                 term.setTextColor(colors.black)
                 term.setBackgroundColor(colors.white)
             else
                 -- Color based on status
-                if isExisting then
+                if willDelete then
+                    term.setTextColor(colors.red) -- Marked for deletion
+                elseif isExisting then
                     term.setTextColor(colors.yellow) -- Existing library (update)
                 elseif selected[lib.name] then
                     term.setTextColor(colors.green) -- New library to install
@@ -135,12 +148,28 @@ local function selectLibraries()
         term.setTextColor(colors.white)
         term.setBackgroundColor(colors.black)
         
-        -- Footer
+        -- Footer - count selected, installed, and to delete
         local selectedCount = 0
+        local installedCount = 0
+        local deleteCount = 0
         for _ in pairs(selected) do selectedCount = selectedCount + 1 end
+        for _, lib in ipairs(LIBRARIES) do
+            local existing = findExistingLibrary(lib.name)
+            if existing then
+                installedCount = installedCount + 1
+                if not selected[lib.name] then
+                    deleteCount = deleteCount + 1
+                end
+            end
+        end
+        
         term.setCursorPos(1, h)
         term.setTextColor(colors.lightGray)
-        write(string.format("Selected: %d/%d", selectedCount, totalItems))
+        local statusText = string.format("Selected: %d/%d | Installed: %d/%d", selectedCount, totalItems, installedCount, totalItems)
+        if deleteCount > 0 then
+            statusText = statusText .. string.format(" | To Delete: %d", deleteCount)
+        end
+        write(statusText)
         term.setTextColor(colors.white)
         
         -- Handle input
@@ -150,7 +179,7 @@ local function selectLibraries()
             cursor = math.max(1, cursor - 1)
         elseif key == keys.down then
             cursor = math.min(totalItems, cursor + 1)
-        elseif key == keys.space then
+        elseif key == keys.space or key == keys.d then
             local lib = LIBRARIES[cursor]
             if selected[lib.name] then
                 selected[lib.name] = nil
@@ -158,12 +187,11 @@ local function selectLibraries()
                 selected[lib.name] = true
             end
         elseif key == keys.enter then
-            if selectedCount > 0 then
+            if selectedCount > 0 or deleteCount > 0 then
                 break
             end
         elseif key == keys.q then
-            sleep()
-            return nil
+            return nil, nil
         end
     end
     
@@ -174,7 +202,17 @@ local function selectLibraries()
     end
     table.sort(selectedList)
     
-    return selectedList
+    -- Build delete list (installed but not selected)
+    local deleteList = {}
+    for _, lib in ipairs(LIBRARIES) do
+        local existing = findExistingLibrary(lib.name)
+        if existing and not selected[lib.name] then
+            table.insert(deleteList, lib.name)
+        end
+    end
+    table.sort(deleteList)
+    
+    return selectedList, deleteList
 end
 
 ---Get installation directory from user
@@ -470,6 +508,61 @@ local function installLibraries(libraries, installDir)
     term.setTextColor(colors.white)
 end
 
+---Delete libraries
+---@param libraries table List of library names to delete
+local function deleteLibraries(libraries)
+    if #libraries == 0 then
+        return
+    end
+    
+    print()
+    term.setTextColor(colors.red)
+    print("Deleting Libraries")
+    term.setTextColor(colors.white)
+    print()
+    
+    local success = 0
+    local failed = 0
+    
+    for _, lib in ipairs(libraries) do
+        local path = findExistingLibrary(lib)
+        if path then
+            term.setTextColor(colors.red)
+            write("Deleting " .. lib .. " from " .. path .. "... ")
+            
+            local ok, err = pcall(function()
+                fs.delete(path)
+            end)
+            
+            if ok then
+                term.setTextColor(colors.green)
+                print("OK")
+                success = success + 1
+            else
+                term.setTextColor(colors.red)
+                print("FAILED: " .. tostring(err))
+                failed = failed + 1
+            end
+        else
+            term.setTextColor(colors.yellow)
+            print("Skipping " .. lib .. " (not found)")
+        end
+    end
+    
+    term.setTextColor(colors.white)
+    print()
+    
+    if failed == 0 and success > 0 then
+        term.setTextColor(colors.green)
+        print("All libraries deleted successfully!")
+    elseif success > 0 then
+        term.setTextColor(colors.yellow)
+        print(string.format("Delete complete: %d succeeded, %d failed", success, failed))
+    end
+    
+    term.setTextColor(colors.white)
+end
+
 ---Generate installer script content
 ---@param libraries table List of library names
 ---@param installDir string Installation directory
@@ -582,7 +675,7 @@ local function main()
     end
     
     -- Select libraries
-    local selected = selectLibraries()
+    local selected, toDelete = selectLibraries()
     if not selected then
         clearScreen()
         printColored("Cancelled.", colors.yellow)
@@ -601,8 +694,21 @@ local function main()
     local installDir = getInstallDir()
     
     if action == "install" then
-        -- Install immediately
-        installLibraries(selected, installDir)
+        -- Delete libraries first
+        if toDelete and #toDelete > 0 then
+            deleteLibraries(toDelete)
+        end
+        
+        -- Then install/update selected libraries
+        if #selected > 0 then
+            installLibraries(selected, installDir)
+        end
+        
+        -- Final summary
+        if (not toDelete or #toDelete == 0) and #selected == 0 then
+            clearScreen()
+            printColored("No changes to make.", colors.yellow)
+        end
     else
         -- Generate installer script
         clearScreen()
