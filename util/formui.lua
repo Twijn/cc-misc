@@ -501,7 +501,12 @@ function FormUI:edit(index)
             print("No options available.")
             sleep(1)
         else
+            -- Ensure sel is valid (between 1 and #opts)
             local sel = f.value
+            if sel < 1 or sel > #opts then
+                sel = 1
+            end
+            
             while true do
                 term.clear()
                 local w, _ = term.getSize()
@@ -512,7 +517,7 @@ function FormUI:edit(index)
                 for i, v in ipairs(opts) do
                     term.setCursorPos(4, 3 + i)
                     term.setTextColor(i == sel and colors.yellow or colors.white)
-                    term.write(v)
+                    term.write(tostring(v))
                 end
                 local e, k = os.pullEvent("key")
                 if k == keys.up then sel = (sel > 1) and sel - 1 or #opts
