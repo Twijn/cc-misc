@@ -11,7 +11,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.1.0"
+local VERSION = "1.2.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
@@ -41,12 +41,40 @@ local function printColored(text, color)
     term.setTextColor(colors.white)
 end
 
+---Find existing library installation
+---@param libName string Library name
+---@return string|nil Path to existing file or nil
+local function findExistingLibrary(libName)
+    local searchPaths = {
+        "disk/lib/" .. libName .. ".lua",
+        "/lib/" .. libName .. ".lua",
+        libName .. ".lua",
+        "disk/" .. libName .. ".lua"
+    }
+    
+    for _, path in ipairs(searchPaths) do
+        if fs.exists(path) then
+            return path
+        end
+    end
+    
+    return nil
+end
+
 ---Display library selection menu with scrolling support
 ---@return table|nil Selected library names
 local function selectLibraries()
     local selected = {}
     local cursor = 1
     local w, h = term.getSize()
+    
+    -- Pre-select existing libraries
+    for _, lib in ipairs(LIBRARIES) do
+        local existing = findExistingLibrary(lib.name)
+        if existing then
+            selected[lib.name] = true
+        end
+    end
     
     -- Calculate how many items can fit on screen
     local headerLines = 3
@@ -77,15 +105,19 @@ local function selectLibraries()
             local lib = LIBRARIES[i]
             local marker = selected[lib.name] and "[X]" or "[ ]"
             local isCursor = (i == cursor)
+            local isExisting = findExistingLibrary(lib.name) ~= nil
             
             if isCursor then
                 term.setTextColor(colors.black)
                 term.setBackgroundColor(colors.white)
             else
-                if selected[lib.name] then
-                    term.setTextColor(colors.green)
+                -- Color based on status
+                if isExisting then
+                    term.setTextColor(colors.yellow) -- Existing library (update)
+                elseif selected[lib.name] then
+                    term.setTextColor(colors.green) -- New library to install
                 else
-                    term.setTextColor(colors.white)
+                    term.setTextColor(colors.white) -- Not selected
                 end
                 term.setBackgroundColor(colors.black)
             end
@@ -292,26 +324,6 @@ local function parseVersion(filepath)
     return version
 end
 
----Find existing library installation
----@param libName string Library name
----@return string|nil Path to existing file or nil
-local function findExistingLibrary(libName)
-    local searchPaths = {
-        "disk/lib/" .. libName .. ".lua",
-        "/lib/" .. libName .. ".lua",
-        libName .. ".lua",
-        "disk/" .. libName .. ".lua"
-    }
-    
-    for _, path in ipairs(searchPaths) do
-        if fs.exists(path) then
-            return path
-        end
-    end
-    
-    return nil
-end
-
 ---Check which libraries need updates
 ---@param libraries table List of library names
 ---@return table Map of library name to {exists: bool, path: string, version: string}
@@ -325,7 +337,7 @@ local function checkLibraryStatus(libraries)
             status[lib] = {
                 exists = true,
                 path = existing,
-                version = version or "unknown"
+                version = version or "ersion unknown"
             }
         else
             status[lib] = {
@@ -405,13 +417,6 @@ end
 local function installLibraries(libraries, installDir)
     -- Check existing libraries
     local status = checkLibraryStatus(libraries)
-    
-    -- Show confirmation
-    if not confirmUpdates(status) then
-        clearScreen()
-        printColored("Cancelled.", colors.yellow)
-        return
-    end
     
     clearScreen()
     
