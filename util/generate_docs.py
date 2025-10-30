@@ -75,11 +75,15 @@ class LuaDocGenerator:
             if is_local and '.' not in func_name and ':' not in func_name:
                 continue
             
+            # Calculate line number
+            line_num = content[:match.start()].count('\n') + 1
+            
             func_info = {
                 'name': func_name,
                 'params': [],
                 'returns': '',
-                'description': ''
+                'description': '',
+                'line': line_num
             }
             
             # Parse documentation block
@@ -306,6 +310,10 @@ class LuaDocGenerator:
         # Escape HTML in description
         description = module['description'].replace('<', '&lt;').replace('>', '&gt;')
         
+        # GitHub raw URL for installation
+        github_raw_url = f"https://raw.githubusercontent.com/Twijn/cc-misc/main/util/{module['name']}.lua"
+        github_repo_url = f"https://github.com/Twijn/cc-misc/blob/main/util/{module['name']}.lua"
+        
         html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -426,6 +434,80 @@ class LuaDocGenerator:
             margin-bottom: 1.5rem;
             font-size: 0.95rem;
         }}
+        .install-section {{
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }}
+        .install-section h2 {{
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            border-bottom: none;
+        }}
+        .install-cmd {{
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 0.5rem 0;
+            word-break: break-all;
+        }}
+        .github-link {{
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--link);
+            color: white;
+            border: 1px solid var(--link);
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+        }}
+        .github-link:hover {{
+            opacity: 0.85;
+            text-decoration: none;
+        }}
+        .install-controls {{
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }}
+        .copy-btn {{
+            display: inline-block;
+            background: transparent;
+            color: var(--link);
+            border: 1px solid var(--link);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+            text-decoration: none;
+        }}
+        .copy-btn:hover {{
+            background: var(--link);
+            color: white;
+        }}
+        .copy-btn.copied {{
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }}
     </style>
 </head>
 <body>
@@ -434,6 +516,37 @@ class LuaDocGenerator:
         <h1>{module['name']}</h1>
         <p>{description}</p>
     </div>
+    
+    <div class="install-section">
+        <h2>Installation</h2>
+        <p>Quick install via wget:</p>
+        <div class="install-cmd" id="install-cmd">wget {github_raw_url} {module['name']}.lua</div>
+        <div class="install-controls">
+            <button class="copy-btn" onclick="copyInstallCommand(this)">Copy Command</button>
+            <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
+        </div>
+    </div>
+    
+    <script>
+        function copyInstallCommand(btn) {{
+            const cmd = document.getElementById('install-cmd').textContent;
+            navigator.clipboard.writeText(cmd).then(() => {{
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {{
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy:', err);
+                btn.textContent = '✗ Failed';
+                setTimeout(() => {{
+                    btn.textContent = 'Copy Command';
+                }}, 2000);
+            }});
+        }}
+    </script>
 """
         
         # Examples
@@ -472,6 +585,10 @@ class LuaDocGenerator:
                 html += "    <div class='function'>\n"
                 params_str = ', '.join([p['name'] for p in func['params']])
                 html += f"        <h3><code>{func['name']}({params_str})</code></h3>\n"
+                
+                # Add GitHub link for this function with line number
+                func_github_url = f"{github_repo_url}#L{func.get('line', 1)}"
+                html += f"        <a href='{func_github_url}' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>\n"
                 
                 if func['description']:
                     html += f"        <p>{func['description']}</p>\n"
