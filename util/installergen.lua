@@ -11,7 +11,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
@@ -58,9 +58,9 @@ local function selectLibraries()
         
         -- Header
         term.setTextColor(colors.yellow)
-        print("Installer Generator v" .. VERSION)
+        print("CC-Misc Installer v" .. VERSION)
         term.setTextColor(colors.lightGray)
-        print("↑/↓: Move | Space: Toggle | Enter: Continue | Q: Quit")
+        print("Up/Down: Move | Space: Toggle | Enter: Continue | Q: Quit")
         term.setTextColor(colors.white)
         print()
         
@@ -144,7 +144,6 @@ end
 ---@return string The installation directory
 local function getInstallDir()
     clearScreen()
-    local w, h = term.getSize()
     
     -- Compact header
     term.setTextColor(colors.yellow)
@@ -168,6 +167,140 @@ local function getInstallDir()
     end
     
     return dir
+end
+
+---Choose installation action
+---@return string|nil "install" or "generate" or nil for cancel
+local function chooseAction()
+    local cursor = 1
+    local options = {
+        {key = "install", label = "Install Now", desc = "Download and install libraries immediately"},
+        {key = "generate", label = "Generate Installer", desc = "Create installer.lua script for later use"}
+    }
+    
+    while true do
+        clearScreen()
+        
+        term.setTextColor(colors.yellow)
+        print("Choose Action")
+        term.setTextColor(colors.lightGray)
+        print("Up/Down: Move | Enter: Select | Q: Cancel")
+        term.setTextColor(colors.white)
+        print()
+        
+        for i, opt in ipairs(options) do
+            if i == cursor then
+                term.setTextColor(colors.black)
+                term.setBackgroundColor(colors.white)
+            else
+                term.setTextColor(colors.white)
+                term.setBackgroundColor(colors.black)
+            end
+            
+            local w = term.getSize()
+            local line = opt.label
+            line = line .. string.rep(" ", w - #line)
+            print(line)
+            
+            term.setTextColor(colors.lightGray)
+            term.setBackgroundColor(colors.black)
+            print("  " .. opt.desc)
+            term.setTextColor(colors.white)
+        end
+        
+        term.setBackgroundColor(colors.black)
+        
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            cursor = math.max(1, cursor - 1)
+        elseif key == keys.down then
+            cursor = math.min(#options, cursor + 1)
+        elseif key == keys.enter then
+            return options[cursor].key
+        elseif key == keys.q then
+            return nil
+        end
+    end
+end
+
+---Download and install a file
+---@param url string The URL to download from
+---@param filepath string The local file path to save to
+---@return boolean Success
+local function downloadFile(url, filepath)
+    local response = http.get(url)
+    if not response then
+        return false
+    end
+    
+    local content = response.readAll()
+    response.close()
+    
+    -- Create directory if needed
+    local dir = fs.getDir(filepath)
+    if dir ~= "" and not fs.exists(dir) then
+        fs.makeDir(dir)
+    end
+    
+    local file = fs.open(filepath, "w")
+    if not file then
+        return false
+    end
+    
+    file.write(content)
+    file.close()
+    
+    return true
+end
+
+---Install libraries immediately
+---@param libraries table List of library names
+---@param installDir string Installation directory
+local function installLibraries(libraries, installDir)
+    clearScreen()
+    
+    term.setTextColor(colors.yellow)
+    print("Installing Libraries")
+    term.setTextColor(colors.white)
+    print()
+    
+    local success = 0
+    local failed = 0
+    
+    for _, lib in ipairs(libraries) do
+        local url = GITHUB_RAW_BASE .. lib .. ".lua"
+        local filepath = installDir == "." and (lib .. ".lua") or (installDir .. "/" .. lib .. ".lua")
+        
+        term.setTextColor(colors.lightGray)
+        write("Downloading " .. lib .. "... ")
+        
+        if downloadFile(url, filepath) then
+            term.setTextColor(colors.green)
+            print("OK")
+            success = success + 1
+        else
+            term.setTextColor(colors.red)
+            print("FAILED")
+            failed = failed + 1
+        end
+    end
+    
+    term.setTextColor(colors.white)
+    print()
+    
+    if failed == 0 then
+        term.setTextColor(colors.green)
+        print("All libraries installed successfully!")
+    else
+        term.setTextColor(colors.yellow)
+        print(string.format("Installation complete: %d succeeded, %d failed", success, failed))
+    end
+    
+    term.setTextColor(colors.white)
+    if installDir ~= "." then
+        print("Installed to: " .. installDir)
+    end
 end
 
 ---Generate installer script content
@@ -285,54 +418,67 @@ local function main()
     local selected = selectLibraries()
     if not selected then
         clearScreen()
-        printColored("Installation cancelled.", colors.yellow)
+        printColored("Cancelled.", colors.yellow)
+        return
+    end
+    
+    -- Choose action
+    local action = chooseAction()
+    if not action then
+        clearScreen()
+        printColored("Cancelled.", colors.yellow)
         return
     end
     
     -- Get installation directory
     local installDir = getInstallDir()
     
-    -- Generate installer
-    clearScreen()
-    
-    term.setTextColor(colors.yellow)
-    print("Generating Installer")
-    term.setTextColor(colors.white)
-    print()
-    
-    term.setTextColor(colors.lightGray)
-    print("Selected: " .. #selected .. " libraries")
-    print("Directory: " .. installDir)
-    term.setTextColor(colors.white)
-    print()
-    
-    for _, lib in ipairs(selected) do
-        term.setTextColor(colors.green)
-        print("  • " .. lib)
-    end
-    
-    term.setTextColor(colors.white)
-    print()
-    
-    local installerContent = generateInstaller(selected, installDir)
-    
-    -- Save installer
-    local file = fs.open("installer.lua", "w")
-    if not file then
-        term.setTextColor(colors.red)
-        print("Failed to create installer.lua!")
+    if action == "install" then
+        -- Install immediately
+        installLibraries(selected, installDir)
+    else
+        -- Generate installer script
+        clearScreen()
+        
+        term.setTextColor(colors.yellow)
+        print("Generating Installer")
         term.setTextColor(colors.white)
-        return
+        print()
+        
+        term.setTextColor(colors.lightGray)
+        print("Selected: " .. #selected .. " libraries")
+        print("Directory: " .. installDir)
+        term.setTextColor(colors.white)
+        print()
+        
+        for _, lib in ipairs(selected) do
+            term.setTextColor(colors.green)
+            print("  * " .. lib)
+        end
+        
+        term.setTextColor(colors.white)
+        print()
+        
+        local installerContent = generateInstaller(selected, installDir)
+        
+        -- Save installer
+        local file = fs.open("installer.lua", "w")
+        if not file then
+            term.setTextColor(colors.red)
+            print("Failed to create installer.lua!")
+            term.setTextColor(colors.white)
+            return
+        end
+        
+        file.write(installerContent)
+        file.close()
+        
+        term.setTextColor(colors.green)
+        print("Success!")
+        term.setTextColor(colors.white)
+        print()
+        print("Run: lua installer.lua")
     end
-    
-    file.write(installerContent)
-    file.close()
-    
-    term.setTextColor(colors.green)
-    print("✓ Success!")
-    term.setTextColor(colors.white)
-    print()
-    print("Run: lua installer.lua")
 end
 
 -- Run the main function
