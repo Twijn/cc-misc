@@ -38,7 +38,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local version = "0.0.4"
+local version = "0.0.5"
 local FormUI = { _v = version }
 FormUI.__index = FormUI
 
