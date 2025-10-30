@@ -51,30 +51,89 @@ local function printColored(text, color)
     term.setTextColor(colors.white)
 end
 
----Display library selection menu
+---Display library selection menu with scrolling support
 ---@return table|nil Selected library names
 local function selectLibraries()
     local selected = {}
+    local scroll = 0
+    local w, h = term.getSize()
+    
+    -- Calculate how many items can fit on screen
+    -- Account for: header (4 lines) + instructions (3 lines) + input line (1)
+    local headerLines = 4
+    local footerLines = 4
+    local linesPerItem = 2 -- Each library takes 2 lines (name + description)
+    local maxVisibleItems = math.floor((h - headerLines - footerLines) / linesPerItem)
     
     while true do
         clearScreen()
-        printHeader("CC-Misc Installer Generator")
         
-        print("Select libraries to include (space to toggle, enter to continue):\n")
+        -- Header
+        term.setTextColor(colors.yellow)
+        local header = "CC-Misc Installer Generator"
+        print(string.rep("=", w))
+        print(header)
+        print(string.rep("=", w))
+        term.setTextColor(colors.white)
         
-        for i, lib in ipairs(LIBRARIES) do
+        -- Instructions
+        term.setTextColor(colors.lightGray)
+        print("Toggle: <number> | Continue: Enter | Quit: Q")
+        term.setTextColor(colors.white)
+        
+        -- Calculate visible range
+        local totalItems = #LIBRARIES
+        local maxScroll = math.max(0, totalItems - maxVisibleItems)
+        scroll = math.max(0, math.min(scroll, maxScroll))
+        
+        local startIdx = scroll + 1
+        local endIdx = math.min(startIdx + maxVisibleItems - 1, totalItems)
+        
+        -- Show scroll indicator
+        if scroll > 0 then
+            term.setTextColor(colors.gray)
+            print("↑ More above")
+            term.setTextColor(colors.white)
+        else
+            print()
+        end
+        
+        -- Display visible items
+        for i = startIdx, endIdx do
+            local lib = LIBRARIES[i]
             local marker = selected[lib.name] and "[X]" or "[ ]"
             local color = selected[lib.name] and colors.green or colors.white
             
             term.setTextColor(color)
-            print(string.format("%d. %s %s", i, marker, lib.name))
+            local name = string.format("%d. %s %s", i, marker, lib.name)
+            -- Truncate if too long
+            if #name > w then
+                name = name:sub(1, w - 3) .. "..."
+            end
+            print(name)
+            
             term.setTextColor(colors.lightGray)
-            print(string.format("   %s", lib.description))
+            local desc = "   " .. lib.description
+            if #desc > w then
+                desc = desc:sub(1, w - 3) .. "..."
+            end
+            print(desc)
             term.setTextColor(colors.white)
         end
         
-        print("\nQ. Quit")
-        print("\nEnter number to toggle, or press Enter to continue:")
+        -- Show scroll indicator
+        if endIdx < totalItems then
+            term.setTextColor(colors.gray)
+            print("↓ More below")
+            term.setTextColor(colors.white)
+        end
+        
+        -- Move cursor to bottom for input
+        local _, cy = term.getCursorPos()
+        term.setCursorPos(1, h)
+        term.setTextColor(colors.yellow)
+        write("Input: ")
+        term.setTextColor(colors.white)
         
         local input = read()
         
@@ -86,16 +145,31 @@ local function selectLibraries()
             if count > 0 then
                 break
             else
-                printColored("\nPlease select at least one library!", colors.red)
+                term.setCursorPos(1, h)
+                term.clearLine()
+                term.setTextColor(colors.red)
+                write("Please select at least one library! ")
+                term.setTextColor(colors.white)
                 sleep(2)
             end
         elseif input:lower() == "q" then
             return nil
+        elseif input:lower() == "u" or input:lower() == "up" then
+            scroll = math.max(0, scroll - 1)
+        elseif input:lower() == "d" or input:lower() == "down" then
+            scroll = math.min(maxScroll, scroll + 1)
         else
             local num = tonumber(input)
             if num and num >= 1 and num <= #LIBRARIES then
                 local lib = LIBRARIES[num]
                 selected[lib.name] = not selected[lib.name]
+                
+                -- Auto-scroll to show the selected item
+                if num < startIdx then
+                    scroll = num - 1
+                elseif num > endIdx then
+                    scroll = num - maxVisibleItems
+                end
             end
         end
     end
@@ -114,20 +188,34 @@ end
 ---@return string The installation directory
 local function getInstallDir()
     clearScreen()
-    printHeader("Installation Directory")
+    local w, h = term.getSize()
     
-    print("Enter the directory where libraries should be installed:")
-    print("(Leave empty for current directory)")
+    -- Compact header for small screens
+    term.setTextColor(colors.yellow)
+    print(string.rep("=", w))
+    print("Installation Directory")
+    print(string.rep("=", w))
+    term.setTextColor(colors.white)
     print()
     
-    local dir = read()
-    if dir == "" then
-        dir = "."
-    end
+    term.setTextColor(colors.lightGray)
+    print("Where should libraries be installed?")
+    print("Leave empty for current directory")
+    term.setTextColor(colors.white)
+    print()
     
-    -- Remove trailing slash if present
-    if dir:sub(-1) == "/" then
-        dir = dir:sub(1, -2)
+    term.setTextColor(colors.yellow)
+    write("Directory: ")
+    term.setTextColor(colors.white)
+    
+    local dir = read()
+    if dir == "" or dir == "." then
+        dir = "."
+    else
+        -- Remove trailing slash if present
+        if dir:sub(-1) == "/" then
+            dir = dir:sub(1, -2)
+        end
     end
     
     return dir
@@ -257,14 +345,40 @@ local function main()
     
     -- Generate installer
     clearScreen()
-    printHeader("Generating Installer")
+    local w, h = term.getSize()
     
-    print("Selected libraries:")
-    for _, lib in ipairs(selected) do
-        printColored("  • " .. lib, colors.green)
-    end
+    term.setTextColor(colors.yellow)
+    print(string.rep("=", w))
+    print("Generating Installer")
+    print(string.rep("=", w))
+    term.setTextColor(colors.white)
     print()
-    print("Installation directory: " .. installDir)
+    
+    term.setTextColor(colors.lightGray)
+    print("Selected libraries:")
+    term.setTextColor(colors.white)
+    
+    -- Show libraries in a compact format for small screens
+    local maxToShow = h - 12
+    local shown = 0
+    for _, lib in ipairs(selected) do
+        if shown < maxToShow then
+            term.setTextColor(colors.green)
+            print("  • " .. lib)
+            shown = shown + 1
+        end
+    end
+    
+    if #selected > maxToShow then
+        term.setTextColor(colors.gray)
+        print("  ... and " .. (#selected - maxToShow) .. " more")
+    end
+    
+    term.setTextColor(colors.white)
+    print()
+    term.setTextColor(colors.lightGray)
+    print("Directory: " .. installDir)
+    term.setTextColor(colors.white)
     print()
     
     local installerContent = generateInstaller(selected, installDir)
@@ -272,16 +386,24 @@ local function main()
     -- Save installer
     local file = fs.open("installer.lua", "w")
     if not file then
-        printColored("Failed to create installer.lua!", colors.red)
+        term.setTextColor(colors.red)
+        print("Failed to create installer.lua!")
+        term.setTextColor(colors.white)
         return
     end
     
     file.write(installerContent)
     file.close()
     
-    printColored("\n✓ Installer generated successfully!", colors.green)
-    print("\nTo install the selected libraries, run:")
-    printColored("  lua installer.lua", colors.yellow)
+    term.setTextColor(colors.green)
+    print("✓ Installer generated successfully!")
+    term.setTextColor(colors.white)
+    print()
+    term.setTextColor(colors.lightGray)
+    print("To install, run:")
+    term.setTextColor(colors.yellow)
+    print("  lua installer.lua")
+    term.setTextColor(colors.white)
     print()
 end
 
