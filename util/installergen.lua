@@ -11,7 +11,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.0.2"
+local VERSION = "1.1.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
@@ -149,20 +149,26 @@ end
 local function getInstallDir()
     clearScreen()
     
+    -- Determine default directory
+    local defaultDir = "/lib"
+    if fs.exists("disk") and fs.isDir("disk") then
+        defaultDir = "disk/lib"
+    end
+    
     -- Compact header
     term.setTextColor(colors.yellow)
     print("Installation Directory")
     term.setTextColor(colors.lightGray)
     print("Where should libraries be installed?")
-    print("(Leave empty for current directory)")
+    print("(Leave empty for default: " .. defaultDir .. ")")
     term.setTextColor(colors.white)
     print()
     
     write("> ")
     
     local dir = read()
-    if dir == "" or dir == "." then
-        dir = "."
+    if dir == "" then
+        dir = defaultDir
     else
         -- Remove trailing slash if present
         if dir:sub(-1) == "/" then
@@ -259,14 +265,158 @@ local function downloadFile(url, filepath)
     return true
 end
 
+---Parse version from a Lua file
+---@param filepath string Path to the file
+---@return string|nil Version string or nil
+local function parseVersion(filepath)
+    if not fs.exists(filepath) then
+        return nil
+    end
+    
+    local file = fs.open(filepath, "r")
+    if not file then
+        return nil
+    end
+    
+    local content = file.readAll()
+    file.close()
+    
+    -- Look for VERSION = "x.x.x" pattern
+    local version = content:match('VERSION%s*=%s*["\']([%d%.]+)["\']')
+    if version then
+        return version
+    end
+    
+    -- Look for @version tag in comments
+    version = content:match('%-%-%-@version%s+([%d%.]+)')
+    return version
+end
+
+---Find existing library installation
+---@param libName string Library name
+---@return string|nil Path to existing file or nil
+local function findExistingLibrary(libName)
+    local searchPaths = {
+        "disk/lib/" .. libName .. ".lua",
+        "/lib/" .. libName .. ".lua",
+        libName .. ".lua",
+        "disk/" .. libName .. ".lua"
+    }
+    
+    for _, path in ipairs(searchPaths) do
+        if fs.exists(path) then
+            return path
+        end
+    end
+    
+    return nil
+end
+
+---Check which libraries need updates
+---@param libraries table List of library names
+---@return table Map of library name to {exists: bool, path: string, version: string}
+local function checkLibraryStatus(libraries)
+    local status = {}
+    
+    for _, lib in ipairs(libraries) do
+        local existing = findExistingLibrary(lib)
+        if existing then
+            local version = parseVersion(existing)
+            status[lib] = {
+                exists = true,
+                path = existing,
+                version = version or "unknown"
+            }
+        else
+            status[lib] = {
+                exists = false,
+                path = nil,
+                version = nil
+            }
+        end
+    end
+    
+    return status
+end
+
+---Show update confirmation screen
+---@param status table Library status map
+---@return boolean True to proceed, false to cancel
+local function confirmUpdates(status)
+    local hasUpdates = false
+    local hasNew = false
+    
+    for _, info in pairs(status) do
+        if info.exists then
+            hasUpdates = true
+        else
+            hasNew = true
+        end
+    end
+    
+    if not hasUpdates then
+        return true -- No existing libraries, just install
+    end
+    
+    clearScreen()
+    
+    term.setTextColor(colors.yellow)
+    print("Update/Install Confirmation")
+    term.setTextColor(colors.white)
+    print()
+    
+    if hasUpdates then
+        term.setTextColor(colors.yellow)
+        print("The following will be UPDATED:")
+        term.setTextColor(colors.white)
+        for lib, info in pairs(status) do
+            if info.exists then
+                term.setTextColor(colors.lightGray)
+                print("  " .. lib .. " (v" .. info.version .. ") at " .. info.path)
+            end
+        end
+        print()
+    end
+    
+    if hasNew then
+        term.setTextColor(colors.green)
+        print("The following will be INSTALLED:")
+        term.setTextColor(colors.white)
+        for lib, info in pairs(status) do
+            if not info.exists then
+                term.setTextColor(colors.lightGray)
+                print("  " .. lib)
+            end
+        end
+        print()
+    end
+    
+    term.setTextColor(colors.yellow)
+    write("Continue? (Y/N): ")
+    term.setTextColor(colors.white)
+    
+    local response = read()
+    return response:lower() == "y" or response:lower() == "yes"
+end
+
 ---Install libraries immediately
 ---@param libraries table List of library names
 ---@param installDir string Installation directory
 local function installLibraries(libraries, installDir)
+    -- Check existing libraries
+    local status = checkLibraryStatus(libraries)
+    
+    -- Show confirmation
+    if not confirmUpdates(status) then
+        clearScreen()
+        printColored("Cancelled.", colors.yellow)
+        return
+    end
+    
     clearScreen()
     
     term.setTextColor(colors.yellow)
-    print("Installing Libraries")
+    print("Installing/Updating Libraries")
     term.setTextColor(colors.white)
     print()
     
@@ -275,10 +425,19 @@ local function installLibraries(libraries, installDir)
     
     for _, lib in ipairs(libraries) do
         local url = GITHUB_RAW_BASE .. lib .. ".lua"
-        local filepath = installDir == "." and (lib .. ".lua") or (installDir .. "/" .. lib .. ".lua")
+        local info = status[lib]
         
-        term.setTextColor(colors.lightGray)
-        write("Downloading " .. lib .. "... ")
+        -- Determine target path
+        local filepath
+        if info.exists then
+            filepath = info.path -- Update in place
+            term.setTextColor(colors.yellow)
+            write("Updating " .. lib .. "... ")
+        else
+            filepath = installDir .. "/" .. lib .. ".lua"
+            term.setTextColor(colors.lightGray)
+            write("Installing " .. lib .. "... ")
+        end
         
         if downloadFile(url, filepath) then
             term.setTextColor(colors.green)
@@ -296,16 +455,13 @@ local function installLibraries(libraries, installDir)
     
     if failed == 0 then
         term.setTextColor(colors.green)
-        print("All libraries installed successfully!")
+        print("All libraries processed successfully!")
     else
         term.setTextColor(colors.yellow)
-        print(string.format("Installation complete: %d succeeded, %d failed", success, failed))
+        print(string.format("Complete: %d succeeded, %d failed", success, failed))
     end
     
     term.setTextColor(colors.white)
-    if installDir ~= "." then
-        print("Installed to: " .. installDir)
-    end
 end
 
 ---Generate installer script content
