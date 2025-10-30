@@ -120,7 +120,11 @@ local function selectLibraries()
             cursor = math.min(totalItems, cursor + 1)
         elseif key == keys.space then
             local lib = LIBRARIES[cursor]
-            selected[lib.name] = not selected[lib.name]
+            if selected[lib.name] then
+                selected[lib.name] = nil
+            else
+                selected[lib.name] = true
+            end
         elseif key == keys.enter then
             if selectedCount > 0 then
                 break
