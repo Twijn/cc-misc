@@ -11,7 +11,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.3.1"
+local VERSION = "1.3.2"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
@@ -89,7 +89,7 @@ local function selectLibraries()
         term.setTextColor(colors.yellow)
         print("CC-Misc Installer v" .. VERSION)
         term.setTextColor(colors.lightGray)
-        print("Up/Down: Move | Space: Toggle | D: Delete | Enter: Continue | Q: Quit")
+        print("Up/Down: Move | Space: Toggle | Enter: Continue | Q: Quit")
         term.setTextColor(colors.white)
         print()
         
@@ -111,7 +111,7 @@ local function selectLibraries()
             -- Determine marker
             local marker
             if willDelete then
-                marker = "[D]" -- Marked for deletion
+                marker = "[X]" -- Marked for uninstall (unchecked existing library)
             elseif selected[lib.name] then
                 marker = "[X]"
             else
@@ -124,7 +124,7 @@ local function selectLibraries()
             else
                 -- Color based on status
                 if willDelete then
-                    term.setTextColor(colors.red) -- Marked for deletion
+                    term.setTextColor(colors.red) -- Marked for uninstall
                 elseif isExisting then
                     term.setTextColor(colors.yellow) -- Existing library (update)
                 elseif selected[lib.name] then
@@ -167,7 +167,7 @@ local function selectLibraries()
         term.setTextColor(colors.lightGray)
         local statusText = string.format("Selected: %d/%d | Installed: %d/%d", selectedCount, totalItems, installedCount, totalItems)
         if deleteCount > 0 then
-            statusText = statusText .. string.format(" | To Delete: %d", deleteCount)
+            statusText = statusText .. string.format(" | To Uninstall: %d", deleteCount)
         end
         write(statusText)
         term.setTextColor(colors.white)
@@ -255,7 +255,7 @@ end
 local function chooseAction()
     local cursor = 1
     local options = {
-        {key = "install", label = "Install Now", desc = "Download and install libraries immediately"},
+        {key = "install", label = "Install/Uninstall Now", desc = "Download and install or uninstall libraries immediately"},
         {key = "generate", label = "Generate Installer", desc = "Create installer.lua script for later use"}
     }
     
@@ -451,8 +451,8 @@ local function installLibraries(libraries, installDir, skipClear)
     term.setTextColor(colors.white)
 end
 
----Delete libraries
----@param libraries table List of library names to delete
+---Uninstall libraries
+---@param libraries table List of library names to uninstall
 local function deleteLibraries(libraries)
     if #libraries == 0 then
         return
@@ -460,7 +460,7 @@ local function deleteLibraries(libraries)
     
     print()
     term.setTextColor(colors.red)
-    print("Deleting Libraries")
+    print("Uninstalling Libraries")
     term.setTextColor(colors.white)
     print()
     
@@ -471,7 +471,7 @@ local function deleteLibraries(libraries)
         local path = findExistingLibrary(lib)
         if path then
             term.setTextColor(colors.red)
-            write("Deleting " .. lib .. " from " .. path .. "... ")
+            write("Uninstalling " .. lib .. " from " .. path .. "... ")
             
             local ok, err = pcall(function()
                 fs.delete(path)
@@ -497,10 +497,10 @@ local function deleteLibraries(libraries)
     
     if failed == 0 and success > 0 then
         term.setTextColor(colors.green)
-        print("All libraries deleted successfully!")
+        print("All libraries uninstalled successfully!")
     elseif success > 0 then
         term.setTextColor(colors.yellow)
-        print(string.format("Delete complete: %d succeeded, %d failed", success, failed))
+        print(string.format("Uninstall complete: %d succeeded, %d failed", success, failed))
     end
     
     term.setTextColor(colors.white)
@@ -640,7 +640,7 @@ local function main()
         -- Clear screen before operations
         clearScreen()
         
-        -- Delete libraries first
+        -- Uninstall libraries first (unchecked existing libraries)
         if toDelete and #toDelete > 0 then
             deleteLibraries(toDelete)
         end
