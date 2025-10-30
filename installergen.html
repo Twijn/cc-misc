@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>s - CC-Misc Utilities</title>
+    <title>installergen - CC-Misc Utilities</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
@@ -197,17 +197,17 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>s</h1>
-        <p>A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, and side-only peripheral filtering.</p>
+        <h1>installergen</h1>
+        <p>Installer Generator for CC-Misc Utilities Interactive tool to generate custom installer scripts for ComputerCraft libraries This tool provides a user-friendly interface to select multiple libraries from the cc-misc repository and generates a single installer.lua file that will download all selected libraries to your ComputerCraft computer.</p>
     </div>
     
     <div class="install-section">
         <h2>Installation</h2>
         <p>Quick install via wget:</p>
-        <div class="install-cmd" id="install-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/s.lua s.lua</div>
+        <div class="install-cmd" id="install-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua installergen.lua</div>
         <div class="install-controls">
             <button class="copy-btn" onclick="copyInstallCommand(this)">Copy Command</button>
-            <a href="https://github.com/Twijn/cc-misc/blob/main/util/s.lua" class="github-link" target="_blank">View on GitHub →</a>
+            <a href="https://github.com/Twijn/cc-misc/blob/main/util/installergen.lua" class="github-link" target="_blank">View on GitHub →</a>
         </div>
     </div>
     
@@ -232,66 +232,8 @@
         }
     </script>
     <h2>Examples</h2>
-    <pre><code class="language-lua">local s = require("s")
-local modem = s.peripheral("modem", "modem", true)
-local port = s.number("port", 1, 65535, 8080)
-local name = s.string("server_name", "MyServer")
-local enabled = s.boolean("enabled")</code></pre>
-    <h2>Functions</h2>
-    <div class='function'>
-        <h3><code>module.peripheral(name, type, sideOnly?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L94' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
-        <p>Get or configure a peripheral setting with automatic validation and recovery</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>name</code> (string): The setting name to store/retrieve</li>
-                <li><code>type</code> (string): The required peripheral type (e.g., "modem", "monitor")</li>
-                <li><code>sideOnly?</code> (boolean): If true, only allow peripherals attached to computer sides</li>
-            </ul>
-        </div>
-        <div class='returns'><strong>Returns:</strong> table # The wrapped peripheral object</div>
-    </div>
-    <div class='function'>
-        <h3><code>module.number(name, from?, to?, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L124' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
-        <p>Get or configure a number setting with range validation</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>name</code> (string): The setting name to store/retrieve</li>
-                <li><code>from?</code> (number): Minimum allowed value (nil for no minimum)</li>
-                <li><code>to?</code> (number): Maximum allowed value (nil for no maximum)</li>
-                <li><code>default?</code> (number): Default value if user provides empty input</li>
-            </ul>
-        </div>
-        <div class='returns'><strong>Returns:</strong> number # The configured number value</div>
-    </div>
-    <div class='function'>
-        <h3><code>module.string(name, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L161' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
-        <p>Get or configure a string setting with optional default value</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>name</code> (string): The setting name to store/retrieve</li>
-                <li><code>default?</code> (string): Default value if user provides empty input</li>
-            </ul>
-        </div>
-        <div class='returns'><strong>Returns:</strong> string # The configured string value</div>
-    </div>
-    <div class='function'>
-        <h3><code>module.boolean(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L188' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
-        <p>Get or configure a boolean setting using an interactive menu</p>
-        <div class='params'>
-            <strong>Parameters:</strong>
-            <ul>
-                <li><code>name</code> (string): The setting name to store/retrieve</li>
-            </ul>
-        </div>
-        <div class='returns'><strong>Returns:</strong> boolean # The configured boolean value</div>
-    </div>
+    <pre><code class="language-lua">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua installergen.lua
+installergen.lua</code></pre>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
