@@ -38,7 +38,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local version = "0.0.6"
+local version = "0.1.0"
 local FormUI = { _v = version }
 FormUI.__index = FormUI
 
@@ -314,6 +314,37 @@ function FormUI:get(label)
         end
     end
     return nil
+end
+
+---Set the value of a field by label
+---@param label string The field label
+---@param value any The new value to set
+---@return boolean # True if field was found and updated, false otherwise
+function FormUI:setValue(label, value)
+    for _, f in ipairs(self.fields) do
+        if f.label == label then
+            if f.type == "select" or f.type == "peripheral" then
+                -- For select/peripheral fields, find the index of the option
+                if type(value) == "string" and f.options then
+                    for i, opt in ipairs(f.options) do
+                        if opt == value then
+                            f.value = i
+                            return true
+                        end
+                    end
+                elseif type(value) == "number" then
+                    -- Direct index setting
+                    f.value = value
+                    return true
+                end
+            else
+                -- For text, number, label, and button fields, set directly
+                f.value = value
+                return true
+            end
+        end
+    end
+    return false
 end
 
 ---Draw the form to the terminal
