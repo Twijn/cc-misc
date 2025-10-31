@@ -236,13 +236,13 @@
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
         <h1>s</h1>
-        <p>A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, and side-only peripheral filtering.</p>
+        <p>A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.</p>
     </div>
     
     <div class="install-section">
         <h2>Installation</h2>
         <div style="background: #3b362f; border: 1px solid #d89a3a; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
-            <strong>⚠️ Dependencies:</strong> This library requires: <code style="background: #3b362f; border: 1px solid #c6ac83;">tables</code>
+            <strong>⚠️ Dependencies:</strong> This library requires: <code style="background: #3b362f; border: 1px solid #c6ac83;">tables</code>, <code style="background: #3b362f; border: 1px solid #c6ac83;">formui</code>
             <br><em>Using installergen will automatically install all dependencies.</em>
         </div>
         <p><strong>Recommended:</strong> Install via installergen (handles dependencies automatically):</p>
@@ -362,10 +362,21 @@ local modem = s.peripheral("modem", "modem", true)
 local port = s.number("port", 1, 65535, 8080)
 local name = s.string("server_name", "MyServer")
 local enabled = s.boolean("enabled")</code></pre>
+    <pre><code class="language-lua">local s = require("s")
+local form = s.useForm("My App Configuration")
+local modem = form.peripheral("modem", "modem", true)
+local port = form.number("port", 1, 65535, 8080)
+local name = form.string("server_name", "MyServer")
+local enabled = form.boolean("enabled")
+if form.submit() then
+ print("Settings saved!")
+ print("Modem:", modem())
+ print("Port:", port())
+end</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.peripheral(name, type, sideOnly?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L94' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L97' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get or configure a peripheral setting with automatic validation and recovery</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -379,7 +390,7 @@ local enabled = s.boolean("enabled")</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.number(name, from?, to?, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L124' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L127' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get or configure a number setting with range validation</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -394,7 +405,7 @@ local enabled = s.boolean("enabled")</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.string(name, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L161' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L164' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get or configure a string setting with optional default value</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -407,7 +418,7 @@ local enabled = s.boolean("enabled")</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.boolean(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L188' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L191' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get or configure a boolean setting using an interactive menu</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -416,6 +427,78 @@ local enabled = s.boolean("enabled")</code></pre>
             </ul>
         </div>
         <div class='returns'><strong>Returns:</strong> boolean # The configured boolean value</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.useForm(title?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L206' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Create a form-based settings interface using formui.lua Requires formui.lua to be installed. Returns a table with form-based versions of all s.lua functions.  local s = require("s") local form = s.useForm("My App Configuration")  local modem = form.peripheral("modem", "modem", true) local port = form.number("port", 1, 65535, 8080) local name = form.string("server_name", "MyServer") local enabled = form.boolean("enabled")  if form.submit() then print("Settings saved!") print("Modem:", modem()) print("Port:", port()) end </p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>title?</code> (string): The form title (defaults to "Settings")</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table # Form interface with peripheral, number, string, boolean, and submit functions</div>
+    </div>
+    <div class='function'>
+        <h3><code>formInterface.peripheral(name, type, sideOnly?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L232' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add a peripheral field to the form</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): The setting name</li>
+                <li><code>type</code> (string): The peripheral type to filter for</li>
+                <li><code>sideOnly?</code> (boolean): If true, only show peripherals attached to computer sides</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> function # Getter function that returns the peripheral name</div>
+    </div>
+    <div class='function'>
+        <h3><code>formInterface.number(name, from?, to?, default?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L257' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add a number field to the form</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): The setting name</li>
+                <li><code>from?</code> (number): Minimum allowed value</li>
+                <li><code>to?</code> (number): Maximum allowed value</li>
+                <li><code>default?</code> (number): Default value</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> function # Getter function that returns the number value</div>
+    </div>
+    <div class='function'>
+        <h3><code>formInterface.string(name, default?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L279' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add a string field to the form</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): The setting name</li>
+                <li><code>default?</code> (string): Default value</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> function # Getter function that returns the string value</div>
+    </div>
+    <div class='function'>
+        <h3><code>formInterface.boolean(name)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L296' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add a boolean field to the form</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): The setting name</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> function # Getter function that returns the boolean value</div>
+    </div>
+    <div class='function'>
+        <h3><code>formInterface.submit()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L314' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add submit and cancel buttons, then run the form</p>
+        <div class='returns'><strong>Returns:</strong> boolean # True if submitted, false if cancelled</div>
     </div>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
