@@ -14,7 +14,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.4.0"
+local VERSION = "1.4.1"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
