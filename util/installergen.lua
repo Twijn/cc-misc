@@ -21,10 +21,11 @@ local LIBRARIES = {
     {name = "formui", description = "Form-based UI builder for creating interactive forms", deps = {}},
     {name = "log", description = "Logging utility with file and term output support", deps = {}},
     {name = "persist", description = "Data persistence utility for saving/loading Lua tables", deps = {}},
-    {name = "s", description = "String manipulation utilities and extensions", deps = {"tables"}},
+    {name = "s", description = "Settings management with interactive config", deps = {"tables"}},
     {name = "tables", description = "Table manipulation utilities (deep copy, merge, etc.)", deps = {}},
     {name = "timeutil", description = "Time formatting and manipulation utilities", deps = {}},
     {name = "shopk", description = "Kromer API client for shop integration", deps = {}},
+    {name = "updater", description = "Programmatic package updater and version manager", deps = {}},
 }
 
 ---Clear the terminal screen

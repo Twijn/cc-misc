@@ -836,8 +836,48 @@ local {module['name']} = require(libDir .. "{module['name']}")
         with open(self.output_dir / 'index.html', 'w', encoding='utf-8') as f:
             f.write(index_html)
         
+        # Generate JSON API
+        self.generate_api()
+        
         print(f"Generated documentation for {len(self.modules)} modules")
         print(f"Output directory: {self.output_dir}")
+    
+    def generate_api(self):
+        """Generate JSON API files for programmatic access"""
+        # Create api directory inside docs
+        api_dir = self.output_dir / 'api'
+        api_dir.mkdir(exist_ok=True)
+        
+        # Generate libraries.json with all module info
+        libraries = []
+        for module in self.modules:
+            lib_info = {
+                'name': module['name'],
+                'version': module.get('version'),
+                'description': module['description'],
+                'dependencies': module['dependencies'],
+                'download_url': f"https://raw.githubusercontent.com/Twijn/cc-misc/main/util/{module['name']}.lua",
+                'documentation_url': f"https://twijn.github.io/cc-misc/{module['name']}.html",
+                'functions': [f['name'] for f in module['functions']],
+                'classes': [c['name'] for c in module['classes']]
+            }
+            libraries.append(lib_info)
+            
+            # Generate individual library JSON files
+            lib_file = api_dir / f"{module['name']}.json"
+            with open(lib_file, 'w', encoding='utf-8') as f:
+                json.dump(lib_info, f, indent=2)
+        
+        # Generate main libraries.json
+        api_data = {
+            'libraries': libraries,
+            'updated': os.popen('date -u +"%Y-%m-%dT%H:%M:%SZ"').read().strip()
+        }
+        
+        with open(api_dir / 'libraries.json', 'w', encoding='utf-8') as f:
+            json.dump(api_data, f, indent=2)
+        
+        print(f"Generated API files in {api_dir}")
 
 if __name__ == '__main__':
     generator = LuaDocGenerator('.', '../docs')
