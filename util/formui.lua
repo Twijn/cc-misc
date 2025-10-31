@@ -3,6 +3,7 @@
 --- with various field types, validation, and peripheral detection.
 ---
 --- Features: Text and number input fields, select dropdowns and peripheral selection,
+--- checkbox/toggle fields, multi-select dropdowns, list fields with item management,
 --- built-in validation system, labels and buttons, real-time peripheral detection,
 --- keyboard navigation with arrow keys, and form submission and cancellation.
 ---
@@ -13,18 +14,23 @@
 ---local nameField = form:text("Name", "default")
 ---local portField = form:number("Port", 8080)
 ---local modemField = form:peripheral("Modem", "modem")
+---local enabledField = form:checkbox("Enabled", true)
+---local featuresField = form:multiselect("Features", {"feature1", "feature2", "feature3"})
+---local itemsField = form:list("Items", {"item1", "item2"}, "string")
 ---
 ---form:addSubmitCancel()
 ---local result = form:run()
 ---if result then
 ---  print("Name:", nameField())
 ---  print("Port:", portField())
+---  print("Enabled:", enabledField())
+---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
 -- @module formui
 
 ---@class FormField
----@field type string The field type: "text", "number", "select", "peripheral", "label", "button"
+---@field type string The field type: "text", "number", "select", "peripheral", "checkbox", "multiselect", "list", "label", "button"
 ---@field label string The field label/name
 ---@field value any The current field value
 ---@field validate? fun(value: any, field: FormField): boolean, string? Validation function
@@ -32,13 +38,14 @@
 ---@field filter? string Peripheral type filter for peripheral fields
 ---@field text? string Display text for labels and buttons
 ---@field action? string Action identifier for buttons
+---@field itemType? string Type of items in list fields ("string" or "number")
 
 ---@class FormResult
 ---@field [string] any Field values indexed by label
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.1.0"
+local VERSION = "0.2.0"
 local FormUI = { _v = VERSION }
 FormUI.__index = FormUI
 
@@ -270,6 +277,73 @@ function FormUI:button(text, action)
     })
 end
 
+---Add a checkbox/toggle field
+---@param label string The field label
+---@param default? boolean Default value (true/false)
+---@return fun(): boolean # Function to get the field value after submission
+function FormUI:checkbox(label, default)
+    return self:addField({
+        type = "checkbox",
+        label = label,
+        value = default == nil and false or default,
+        validate = function(v)
+            return type(v) == "boolean", "Must be true or false"
+        end
+    })
+end
+
+---Add a multi-select dropdown field
+---@param label string The field label
+---@param options string[] Available options
+---@param defaultIndices? number[] Indices of default selections (1-based)
+---@return fun(): string[] # Function to get selected options after submission
+function FormUI:multiselect(label, options, defaultIndices)
+    local selected = {}
+    if defaultIndices then
+        for _, idx in ipairs(defaultIndices) do
+            selected[idx] = true
+        end
+    end
+    return self:addField({
+        type = "multiselect",
+        label = label,
+        options = options or {},
+        value = selected,
+        validate = function(v, f)
+            local any = false
+            for i = 1, #(f.options or {}) do
+                if v[i] then any = true break end
+            end
+            return any, "Must select at least one option"
+        end
+    })
+end
+
+---Add a list field (string or number list, with item reordering)
+---@param label string The field label
+---@param default? table Default list value
+---@param itemType? string "string" or "number"
+---@return fun(): table # Function to get the list after submission
+function FormUI:list(label, default, itemType)
+    return self:addField({
+        type = "list",
+        label = label,
+        value = default or {},
+        itemType = itemType or "string",
+        validate = function(v, f)
+            if type(v) ~= "table" then return false, "List must be a table" end
+            for _, item in ipairs(v) do
+                if f.itemType == "number" and type(item) ~= "number" then
+                    return false, "All items must be numbers"
+                elseif f.itemType == "string" and type(item) ~= "string" then
+                    return false, "All items must be strings"
+                end
+            end
+            return true
+        end
+    })
+end
+
 ---Add standard Submit and Cancel buttons to the form
 function FormUI:addSubmitCancel()
     self:button("Submit", "submit")
@@ -310,7 +384,19 @@ end
 function FormUI:get(label)
     for _, f in ipairs(self.fields) do
         if f.label == label then
-            return (f.options and f.options[f.value]) or f.value
+            if f.type == "select" or f.type == "peripheral" then
+                return f.options[f.value]
+            elseif f.type == "multiselect" then
+                local selected = {}
+                for idx, isSelected in pairs(f.value) do
+                    if isSelected and f.options[idx] then
+                        table.insert(selected, f.options[idx])
+                    end
+                end
+                return selected
+            else
+                return f.value
+            end
         end
     end
     return nil
@@ -334,6 +420,22 @@ function FormUI:setValue(label, value)
                     end
                 elseif type(value) == "number" then
                     -- Direct index setting
+                    f.value = value
+                    return true
+                end
+            elseif f.type == "checkbox" then
+                -- For checkbox fields, set boolean value
+                f.value = not not value  -- Coerce to boolean
+                return true
+            elseif f.type == "multiselect" then
+                -- For multiselect fields, value should be a table of indices or a table of booleans
+                if type(value) == "table" then
+                    f.value = value
+                    return true
+                end
+            elseif f.type == "list" then
+                -- For list fields, set the table value directly
+                if type(value) == "table" then
                     f.value = value
                     return true
                 end
@@ -410,6 +512,17 @@ function FormUI:draw()
         elseif f.type == "select" or f.type == "peripheral" then
             local opts = f.options or {}
             display = (#opts > 0) and tostring(opts[f.value]) or "(none)"
+        elseif f.type == "checkbox" then
+            display = f.value and "[X]" or "[ ]"
+        elseif f.type == "multiselect" then
+            local opts = f.options or {}
+            local sel = {}
+            for idx, v in ipairs(opts) do
+                if f.value[idx] then table.insert(sel, v) end
+            end
+            display = (#sel > 0) and table.concat(sel, ", ") or "(none)"
+        elseif f.type == "list" then
+            display = (#f.value > 0) and ("[" .. table.concat(f.value, ", ") .. "]") or "(empty)"
         elseif f.type == "label" then
             display = ""  -- Labels don't show a value, just the text
         elseif f.type == "button" then
@@ -558,6 +671,142 @@ function FormUI:edit(index)
                 end
             end
         end
+    elseif f.type == "checkbox" then
+        -- Toggle the checkbox value
+        f.value = not f.value
+    elseif f.type == "multiselect" then
+        local opts = f.options or {}
+        if #opts == 0 then
+            term.setTextColor(colors.red)
+            print("No options available.")
+            sleep(1)
+        else
+            local sel = f.value
+            local cur = 1
+            while true do
+                term.clear()
+                local w, _ = term.getSize()
+                term.setTextColor(colors.lightGray)
+                centerText(1, "Multi-Select", w)
+                term.setTextColor(colors.white)
+                centerText(2, f.label, w)
+                for i, v in ipairs(opts) do
+                    term.setCursorPos(4, 3 + i)
+                    local checked = sel[i] and "[X]" or "[ ]"
+                    term.setTextColor(i == cur and colors.yellow or colors.white)
+                    term.write(checked .. " " .. tostring(v))
+                end
+                term.setCursorPos(1, #opts + 5)
+                term.setTextColor(colors.lightGray)
+                term.write("Space: toggle | Enter: done | Up/Down: move")
+                local e, k = os.pullEvent("key")
+                if k == keys.up then cur = (cur > 1) and cur - 1 or #opts
+                elseif k == keys.down then cur = (cur < #opts) and cur + 1 or 1
+                elseif k == keys.space then sel[cur] = not sel[cur]
+                elseif k == keys.enter then break
+                elseif k == keys.q or k == keys.leftCtrl then break
+                end
+            end
+            f.value = sel
+        end
+    elseif f.type == "list" then
+        local list = f.value
+        local cur = math.min(1, #list > 0 and #list or 1)
+        while true do
+            term.clear()
+            local w, _ = term.getSize()
+            term.setTextColor(colors.lightGray)
+            centerText(1, "Edit List", w)
+            term.setTextColor(colors.white)
+            centerText(2, f.label .. " (" .. f.itemType .. ")", w)
+            
+            if #list == 0 then
+                term.setCursorPos(4, 4)
+                term.setTextColor(colors.lightGray)
+                term.write("(empty list)")
+            else
+                for i, v in ipairs(list) do
+                    term.setCursorPos(4, 3 + i)
+                    term.setTextColor(i == cur and colors.yellow or colors.white)
+                    term.write(tostring(i) .. ". " .. tostring(v))
+                end
+            end
+            
+            term.setCursorPos(1, math.max(6, #list + 5))
+            term.setTextColor(colors.lightGray)
+            term.write("A: add | D: delete | M: move | E: edit")
+            term.setCursorPos(1, math.max(7, #list + 6))
+            term.write("Up/Down: navigate | Enter: done")
+            
+            local e, k = os.pullEvent("key")
+            if k == keys.up and #list > 0 then 
+                cur = (cur > 1) and cur - 1 or #list
+            elseif k == keys.down and #list > 0 then 
+                cur = (cur < #list) and cur + 1 or 1
+            elseif k == keys.a then
+                term.setCursorPos(1, math.max(8, #list + 7))
+                term.setTextColor(colors.white)
+                term.clearLine()
+                term.write("Add item: ")
+                local input = read()
+                if input and input ~= "" then
+                    if f.itemType == "number" then
+                        local num = tonumber(input)
+                        if num then
+                            table.insert(list, num)
+                            cur = #list
+                        else
+                            term.setTextColor(colors.red)
+                            term.write(" Invalid number!")
+                            sleep(1)
+                        end
+                    else
+                        table.insert(list, input)
+                        cur = #list
+                    end
+                end
+            elseif k == keys.d and #list > 0 then
+                table.remove(list, cur)
+                cur = math.max(1, math.min(cur, #list))
+            elseif k == keys.m and #list > 1 then
+                term.setCursorPos(1, math.max(8, #list + 7))
+                term.setTextColor(colors.white)
+                term.clearLine()
+                term.write("Move to position (1-" .. #list .. "): ")
+                local input = read()
+                local pos = tonumber(input)
+                if pos and pos >= 1 and pos <= #list then
+                    local item = table.remove(list, cur)
+                    table.insert(list, pos, item)
+                    cur = pos
+                end
+            elseif k == keys.e and #list > 0 then
+                term.setCursorPos(1, math.max(8, #list + 7))
+                term.setTextColor(colors.white)
+                term.clearLine()
+                term.write("Edit item " .. cur .. ": ")
+                local input = read()
+                if input and input ~= "" then
+                    if f.itemType == "number" then
+                        local num = tonumber(input)
+                        if num then
+                            list[cur] = num
+                        else
+                            term.setTextColor(colors.red)
+                            term.write(" Invalid number!")
+                            sleep(1)
+                        end
+                    else
+                        list[cur] = input
+                    end
+                end
+            elseif k == keys.enter then 
+                break
+            elseif k == keys.q or k == keys.leftCtrl then 
+                break
+            end
+        end
+        f.value = list
     end
 end
 
@@ -687,7 +936,19 @@ function FormUI:run()
 
     local result = {}
     for _, f in ipairs(self.fields) do
-        result[f.label] = (f.options and f.options[f.value]) or f.value
+        if f.type == "select" or f.type == "peripheral" then
+            result[f.label] = f.options[f.value]
+        elseif f.type == "multiselect" then
+            local selected = {}
+            for idx, isSelected in pairs(f.value) do
+                if isSelected and f.options[idx] then
+                    table.insert(selected, f.options[idx])
+                end
+            end
+            result[f.label] = selected
+        else
+            result[f.label] = f.value
+        end
     end
     self.result = result
     term.clear()
