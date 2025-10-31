@@ -78,16 +78,6 @@
       "classes": []
     },
     {
-      "name": "installergen",
-      "version": "2.1.0",
-      "description": "Installer Generator for CC-Misc Utilities Interactive tool to install ComputerCraft libraries with dependency management This tool provides a user-friendly interface to select and install libraries from the cc-misc repository directly to your ComputerCraft computer. Library information is loaded from the online API at https://ccmisc.twijn.dev/api/all.json with automatic fallback to offline mode. Features: - Dynamic library loading from API with detailed information - Press RIGHT arrow to view library details (functions, version, dependencies) - Automatic dependency resolution - Visual indicators for selections and requirements - Install/update or generate installer scripts",
-      "dependencies": [],
-      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/installergen.html",
-      "functions": [],
-      "classes": []
-    },
-    {
       "name": "updater",
       "version": "1.0.0",
       "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, and JSON API integration.",
@@ -166,5 +156,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-10-31T04:16:32Z"
+  "updated": "2025-10-31T04:22:34Z"
 }
