@@ -877,6 +877,27 @@ local {module['name']} = require(libDir .. "{module['name']}")
         with open(api_dir / 'libraries.json', 'w', encoding='utf-8') as f:
             json.dump(api_data, f, indent=2)
         
+        # Generate all.json with complete library details
+        all_data = {
+            'libraries': {},
+            'updated': api_data['updated']
+        }
+        
+        for module in self.modules:
+            all_data['libraries'][module['name']] = {
+                'name': module['name'],
+                'version': module.get('version'),
+                'description': module['description'],
+                'dependencies': module['dependencies'],
+                'download_url': f"https://raw.githubusercontent.com/Twijn/cc-misc/main/util/{module['name']}.lua",
+                'documentation_url': f"https://twijn.github.io/cc-misc/{module['name']}.html",
+                'functions': module['functions'],
+                'classes': module['classes']
+            }
+        
+        with open(api_dir / 'all.json', 'w', encoding='utf-8') as f:
+            json.dump(all_data, f, indent=2)
+        
         print(f"Generated API files in {api_dir}")
 
 if __name__ == '__main__':
