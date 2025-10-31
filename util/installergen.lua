@@ -14,7 +14,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.5.2"
+local VERSION = "1.6.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions and dependencies
@@ -188,10 +188,25 @@ local function selectLibraries(preselected)
                 end
             end
             
+            -- Check if required by force-selected (argument) libraries
+            local requiredByArgs = false
+            for _, reqBy in ipairs(isRequiredBy) do
+                if forceSelected[reqBy] then
+                    requiredByArgs = true
+                    break
+                end
+            end
+            
             -- Determine marker
             local marker
             if willDelete then
                 marker = "[D]" -- Marked for uninstall (unchecked existing library)
+            elseif forceSelected[lib.name] then
+                marker = "[X]" -- Force-selected via arguments
+            elseif requiredByArgs then
+                marker = "[R]" -- Required by argument-specified packages
+            elseif #isRequiredBy > 0 and selected[lib.name] then
+                marker = "[+]" -- Required by other selected packages (dependency)
             elseif selected[lib.name] then
                 marker = "[X]"
             else
@@ -205,6 +220,10 @@ local function selectLibraries(preselected)
                 -- Color based on status
                 if willDelete then
                     term.setTextColor(colors.red) -- Marked for uninstall (always red)
+                elseif requiredByArgs then
+                    term.setTextColor(colors.cyan) -- Required by argument packages
+                elseif #isRequiredBy > 0 and selected[lib.name] then
+                    term.setTextColor(colors.lightBlue) -- Auto-added dependency
                 elseif isExisting then
                     term.setTextColor(colors.yellow) -- Existing library (update)
                 elseif selected[lib.name] then
