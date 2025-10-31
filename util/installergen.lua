@@ -14,7 +14,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.5.0"
+local VERSION = "1.5.1"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions and dependencies
@@ -127,6 +127,7 @@ local function selectLibraries(preselected)
     local selected = {}
     local cursor = 1
     local w, h = term.getSize()
+    local forceSelected = {} -- Track libraries that were pre-selected via args
     
     -- Pre-select existing libraries
     for _, lib in ipairs(LIBRARIES) do
@@ -136,10 +137,11 @@ local function selectLibraries(preselected)
         end
     end
     
-    -- Apply preselected libraries from arguments
+    -- Apply preselected libraries from arguments (force-selected)
     if preselected then
         for _, libName in ipairs(preselected) do
             selected[libName] = true
+            forceSelected[libName] = true
         end
     end
     
@@ -174,6 +176,18 @@ local function selectLibraries(preselected)
             local isCursor = (i == cursor)
             local willDelete = isExisting and not selected[lib.name]
             
+            -- Check if this library is required by any selected library
+            local isRequiredBy = {}
+            for _, otherLib in ipairs(LIBRARIES) do
+                if selected[otherLib.name] and otherLib.deps then
+                    for _, dep in ipairs(otherLib.deps) do
+                        if dep == lib.name then
+                            table.insert(isRequiredBy, otherLib.name)
+                        end
+                    end
+                end
+            end
+            
             -- Determine marker
             local marker
             if willDelete then
@@ -204,6 +218,9 @@ local function selectLibraries(preselected)
             local line = string.format("%s %s - %s", marker, lib.name, lib.description)
             if lib.deps and #lib.deps > 0 then
                 line = line .. " (requires: " .. table.concat(lib.deps, ", ") .. ")"
+            end
+            if #isRequiredBy > 0 then
+                line = line .. " (required by: " .. table.concat(isRequiredBy, ", ") .. ")"
             end
             if #line > w then
                 line = line:sub(1, w)
@@ -250,10 +267,45 @@ local function selectLibraries(preselected)
             cursor = math.min(totalItems, cursor + 1)
         elseif key == keys.space or key == keys.d then
             local lib = LIBRARIES[cursor]
-            if selected[lib.name] then
-                selected[lib.name] = nil
+            
+            -- Check if this library is force-selected (from arguments)
+            if forceSelected[lib.name] and selected[lib.name] then
+                -- Cannot deselect force-selected libraries
+                term.setTextColor(colors.red)
+                term.setCursorPos(1, h - 1)
+                term.clearLine()
+                write("Cannot deselect: specified in arguments")
+                term.setTextColor(colors.white)
+                sleep(0.5)
             else
-                selected[lib.name] = true
+                -- Check if this library is required by any selected library
+                local isRequiredBy = {}
+                for _, otherLib in ipairs(LIBRARIES) do
+                    if selected[otherLib.name] and otherLib.deps then
+                        for _, dep in ipairs(otherLib.deps) do
+                            if dep == lib.name then
+                                table.insert(isRequiredBy, otherLib.name)
+                            end
+                        end
+                    end
+                end
+                
+                if #isRequiredBy > 0 and selected[lib.name] then
+                    -- Cannot deselect if required by other selected libraries
+                    term.setTextColor(colors.red)
+                    term.setCursorPos(1, h - 1)
+                    term.clearLine()
+                    write("Cannot deselect: required by " .. table.concat(isRequiredBy, ", "))
+                    term.setTextColor(colors.white)
+                    sleep(0.5)
+                else
+                    -- Toggle selection
+                    if selected[lib.name] then
+                        selected[lib.name] = nil
+                    else
+                        selected[lib.name] = true
+                    end
+                end
             end
         elseif key == keys.enter then
             if selectedCount > 0 or deleteCount > 0 then
