@@ -232,12 +232,12 @@
         }
         .version-badge {
             display: inline-block;
-            background: var(--link);
-            color: white;
-            padding: 0.3rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.85em;
-            font-weight: 600;
+            background: #2a3540;
+            color: #8b949e;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 500;
             margin-left: 1rem;
             vertical-align: middle;
         }
@@ -246,7 +246,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>timeutil</h1>
+        <h1>timeutil <span class="version-badge">v1.0.0</span></h1>
         <p>A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop.</p>
     </div>
     
@@ -380,7 +380,7 @@ timeutil.run()</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.every(cb, intervalTime, fileName)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L45' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L47' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Create an absolute time-based interval that runs based on system time This type of interval will "catch up" if the computer was offline, running immediately if the interval time has passed since the last recorded execution.</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -394,7 +394,7 @@ timeutil.run()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.everyLoaded(cb, intervalTime, fileName)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L112' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L114' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Create a runtime-based interval that accumulates time only when the program is running This type of interval will NOT catch up after downtime, only counting actual runtime. Useful for operations that should happen after X seconds of actual program execution.</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -408,12 +408,12 @@ timeutil.run()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.run()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L187' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L189' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Start the main interval management loop This function blocks and continuously checks all registered intervals, executing them when their time has elapsed. Runs indefinitely until terminated.</p>
     </div>
     <div class='function'>
         <h3><code>module.getRelativeTime(sec)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L200' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/timeutil.lua#L202' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Format a duration in seconds into a human-readable relative time string</p>
         <div class='params'>
             <strong>Parameters:</strong>

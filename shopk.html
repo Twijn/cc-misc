@@ -232,12 +232,12 @@
         }
         .version-badge {
             display: inline-block;
-            background: var(--link);
-            color: white;
-            padding: 0.3rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.85em;
-            font-weight: 600;
+            background: #2a3540;
+            color: #8b949e;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 500;
             margin-left: 1rem;
             vertical-align: middle;
         }
@@ -246,7 +246,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>shopk</h1>
+        <h1>shopk <span class="version-badge">v0.0.4</span></h1>
         <p>A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.</p>
     </div>
     
@@ -384,7 +384,7 @@ client.run()</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.on(event, listener)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L183' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L186' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Register an event listener</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -396,17 +396,17 @@ client.run()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.run()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L196' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L199' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Start the WebSocket connection and enter the main event loop This function blocks until the connection is closed</p>
     </div>
     <div class='function'>
         <h3><code>module.close()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L235' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L238' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Close the WebSocket connection and stop reconnecting</p>
     </div>
     <div class='function'>
         <h3><code>module.me(cb?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L244' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L247' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get information about the current wallet</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -417,7 +417,7 @@ client.run()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.send(data, cb?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L252' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L255' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Send a Kromer transaction</p>
         <div class='params'>
             <strong>Parameters:</strong>

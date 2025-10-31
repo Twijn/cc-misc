@@ -232,12 +232,12 @@
         }
         .version-badge {
             display: inline-block;
-            background: var(--link);
-            color: white;
-            padding: 0.3rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.85em;
-            font-weight: 600;
+            background: #2a3540;
+            color: #8b949e;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 500;
             margin-left: 1rem;
             vertical-align: middle;
         }
@@ -246,7 +246,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>tables</h1>
+        <h1>tables <span class="version-badge">v1.0.0</span></h1>
         <p>A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking with includes(), table size counting for any table type, deep recursive copying with nested table support, deep recursive equality comparison, and works with both array-like and associative tables.</p>
     </div>
     
@@ -377,7 +377,7 @@ print(tables.recursiveEquals(myTable, copy)) -- true</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.includes(table, object)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L21' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L24' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Check if a table contains a specific value</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -390,7 +390,7 @@ print(tables.recursiveEquals(myTable, copy)) -- true</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.count(table)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L32' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L35' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Count the number of elements in a table (works with both arrays and associative tables)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -402,7 +402,7 @@ print(tables.recursiveEquals(myTable, copy)) -- true</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.recursiveCopy(table)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L43' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L46' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Create a deep copy of a table, recursively copying all nested tables</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -414,7 +414,7 @@ print(tables.recursiveEquals(myTable, copy)) -- true</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.recursiveEquals(t1, t2)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L58' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/tables.lua#L61' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Compare two tables for deep equality, recursively checking nested tables</p>
         <div class='params'>
             <strong>Parameters:</strong>
