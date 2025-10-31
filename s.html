@@ -230,12 +230,23 @@
         .collapsible-content.active {
             margin-bottom: 1rem;
         }
+        .version-badge {
+            display: inline-block;
+            background: var(--link);
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 1rem;
+            vertical-align: middle;
+        }
     </style>
 </head>
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>s</h1>
+        <h1>s <span class="version-badge">v2.0.0</span></h1>
         <p>A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.</p>
     </div>
     
