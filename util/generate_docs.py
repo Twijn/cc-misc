@@ -298,12 +298,12 @@ class LuaDocGenerator:
         }
         .version-badge {
             display: inline-block;
-            background: var(--link);
-            color: white;
-            padding: 0.2rem 0.5rem;
+            background: #2a3540;
+            color: #8b949e;
+            padding: 0.15rem 0.4rem;
             border-radius: 3px;
-            font-size: 0.75em;
-            font-weight: 600;
+            font-size: 0.7em;
+            font-weight: 500;
             margin-left: 0.5rem;
             vertical-align: middle;
         }
@@ -580,12 +580,12 @@ class LuaDocGenerator:
         }}
         .version-badge {{
             display: inline-block;
-            background: var(--link);
-            color: white;
-            padding: 0.3rem 0.6rem;
-            border-radius: 4px;
-            font-size: 0.85em;
-            font-weight: 600;
+            background: #2a3540;
+            color: #8b949e;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 500;
             margin-left: 1rem;
             vertical-align: middle;
         }}
