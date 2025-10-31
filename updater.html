@@ -252,17 +252,17 @@
     
     <div class="install-section">
         <h2>Installation</h2>
-        <p><strong>Recommended:</strong> Install via installergen (handles dependencies automatically):</p>
-        <div class="install-cmd" id="installergen-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua updater</div>
-        <div class="install-controls">
-            <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
-            <a href="https://github.com/Twijn/cc-misc/blob/main/util/updater.lua" class="github-link" target="_blank">View on GitHub →</a>
-        </div>
-        
-        <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
-        <div class="collapsible-content">
-            <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
-            <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
+        <p><strong>Recommended:</strong> Install via installer (handles dependencies automatically):</p>
+        <div class="install-cmd" id="installer-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua updater</div>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCommand(this, 'installer-cmd')">Copy Command</button>
+                <a href="https://github.com/Twijn/cc-misc/blob/main/util/updater.lua" class="github-link" target="_blank">View on GitHub →</a>
+            </div>
+            
+            <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
+            <div class="collapsible-content">
+                <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
+                <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
 local libs = {"updater"} -- Add more libraries as needed
 local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
 local allExist = true
@@ -275,7 +275,7 @@ for _, lib in ipairs(libs) do
 end
 
 if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
 local updater = require(libDir .. "updater")
@@ -283,15 +283,15 @@ local updater = require(libDir .. "updater")
 -- Use the library
 -- (your code here)
 </code></pre>
-            <div class="install-controls">
-                <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
+                <div class="install-controls">
+                    <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
+                </div>
             </div>
-        </div>
         <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
-        <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua</div>
-        <div class="install-controls">
-            <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
-        </div>
+            <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua</div>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
+            </div>
     </div>
     
     <script>
@@ -360,7 +360,7 @@ for _, lib in ipairs(libs) do
 end
 
 if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
 local updater = require(libDir .. "updater")

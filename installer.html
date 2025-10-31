@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>installergen - CC-Misc Utilities</title>
+    <title>installer - CC-Misc Utilities</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
@@ -246,24 +246,24 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>installergen <span class="version-badge">v2.1.0</span></h1>
+        <h1>installer <span class="version-badge">v3.0.0</span></h1>
         <p>Installer Generator for CC-Misc Utilities Interactive tool to install ComputerCraft libraries with dependency management This tool provides a user-friendly interface to select and install libraries from the cc-misc repository directly to your ComputerCraft computer. Library information is loaded from the online API at https://ccmisc.twijn.dev/api/all.json with automatic fallback to offline mode. Features: - Dynamic library loading from API with detailed information - Press RIGHT arrow to view library details (functions, version, dependencies) - Automatic dependency resolution - Visual indicators for selections and requirements - Install/update or generate installer scripts</p>
     </div>
     
     <div class="install-section">
         <h2>Installation</h2>
-        <p><strong>Recommended:</strong> Install via installergen (handles dependencies automatically):</p>
-        <div class="install-cmd" id="installergen-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua installergen</div>
-        <div class="install-controls">
-            <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
-            <a href="https://github.com/Twijn/cc-misc/blob/main/util/installergen.lua" class="github-link" target="_blank">View on GitHub →</a>
-        </div>
-        
-        <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
-        <div class="collapsible-content">
-            <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
-            <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
-local libs = {"installergen"} -- Add more libraries as needed
+        <p><strong>Recommended:</strong> Install via installer (handles dependencies automatically):</p>
+        <div class="install-cmd" id="installer-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua installer</div>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCommand(this, 'installer-cmd')">Copy Command</button>
+                <a href="https://github.com/Twijn/cc-misc/blob/main/util/installer.lua" class="github-link" target="_blank">View on GitHub →</a>
+            </div>
+            
+            <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
+            <div class="collapsible-content">
+                <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
+                <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
+local libs = {"installer"} -- Add more libraries as needed
 local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
 local allExist = true
 
@@ -275,23 +275,23 @@ for _, lib in ipairs(libs) do
 end
 
 if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
-local installergen = require(libDir .. "installergen")
+local installer = require(libDir .. "installer")
 
 -- Use the library
 -- (your code here)
 </code></pre>
-            <div class="install-controls">
-                <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
+                <div class="install-controls">
+                    <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
+                </div>
             </div>
-        </div>
         <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
-        <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua</div>
-        <div class="install-controls">
-            <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
-        </div>
+            <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua</div>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
+            </div>
     </div>
     
     <script>
@@ -348,7 +348,7 @@ local installergen = require(libDir .. "installergen")
     <h3>Using with Runtime Installation</h3>
     <p>This example shows how to download and use libraries with automatic installation:</p>
     <pre><code class="language-lua">-- Auto-install and require libraries
-local libs = {"installergen"} -- Add more libraries as needed
+local libs = {"installer"} -- Add more libraries as needed
 local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
 local allExist = true
 
@@ -360,18 +360,18 @@ for _, lib in ipairs(libs) do
 end
 
 if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
-local installergen = require(libDir .. "installergen")
+local installer = require(libDir .. "installer")
 
 -- Use the library
 </code></pre>
     
     <h3>Usage Examples</h3>
-    <pre><code class="language-lua">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua
+    <pre><code class="language-lua">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua
 Or pre-select libraries:
-wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua cmd s</code></pre>
+wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua cmd s</code></pre>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
