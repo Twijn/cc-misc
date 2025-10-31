@@ -1,20 +1,18 @@
 --- Installer Generator for CC-Misc Utilities
---- Interactive tool to generate custom installer scripts for ComputerCraft libraries
+--- Interactive tool to install ComputerCraft libraries with dependency management
 ---
---- This tool provides a user-friendly interface to select multiple libraries from the cc-misc
---- repository and generates a single installer.lua file that will download all selected
---- libraries to your ComputerCraft computer.
+--- This tool provides a user-friendly interface to select and install libraries from the cc-misc
+--- repository directly to your ComputerCraft computer.
 ---
 ---@usage
----wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua installergen.lua
----installergen.lua
+---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua
 ---
 --- Or pre-select libraries:
----installergen.lua cmd s tables
+---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua cmd s
 ---
 -- @module installergen
 
-local VERSION = "1.6.0"
+local VERSION = "2.0.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions and dependencies
@@ -293,9 +291,9 @@ local function selectLibraries(preselected)
                 term.setTextColor(colors.red)
                 term.setCursorPos(1, h - 1)
                 term.clearLine()
-                write("Cannot deselect: specified in arguments")
+                write("Cannot deselect: required by arguments")
                 term.setTextColor(colors.white)
-                sleep(0.5)
+                sleep(2.5)
             else
                 -- Check if this library is required by any selected library
                 local isRequiredBy = {}
@@ -316,7 +314,7 @@ local function selectLibraries(preselected)
                     term.clearLine()
                     write("Cannot deselect: required by " .. table.concat(isRequiredBy, ", "))
                     term.setTextColor(colors.white)
-                    sleep(0.5)
+                    sleep(2.5)
                 else
                     -- Toggle selection
                     if selected[lib.name] then

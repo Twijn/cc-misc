@@ -518,6 +518,44 @@ class LuaDocGenerator:
             border-color: #28a745;
             color: white;
         }}
+        .collapsible {{
+            background: transparent;
+            color: var(--link);
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            border: 1px solid var(--border);
+            text-align: left;
+            outline: none;
+            font-size: 0.95em;
+            border-radius: 4px;
+            margin-top: 1rem;
+            transition: all 0.2s;
+            font-family: inherit;
+        }}
+        .collapsible:hover {{
+            background: var(--code-bg);
+        }}
+        .collapsible:after {{
+            content: '\\25B6';
+            float: right;
+            margin-left: 5px;
+            font-size: 0.8em;
+        }}
+        .collapsible.active:after {{
+            content: '\\25BC';
+        }}
+        .collapsible-content {{
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+            border-left: 3px solid var(--border);
+            padding-left: 1rem;
+            margin-top: 0.5rem;
+        }}
+        .collapsible-content.active {{
+            margin-bottom: 1rem;
+        }}
     </style>
 </head>
 <body>
@@ -544,6 +582,20 @@ class LuaDocGenerator:
         <div class="install-controls">
             <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
             <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
+        </div>
+        
+        <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
+        <div class="collapsible-content">
+            <p style="margin-top: 0.5rem;">This pattern downloads and runs the library at runtime, automatically installing it if not present:</p>
+            <pre><code class="language-lua">-- Download and require {module['name']} with automatic installation
+if not fs.exists("{module['name']}.lua") then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "{module['name']}")
+end
+local {module['name']} = require("{module['name']}")
+
+-- Use the library
+-- (your code here)
+</code></pre>
         </div>
 """
         
@@ -577,12 +629,39 @@ class LuaDocGenerator:
                 }}, 2000);
             }});
         }}
+        
+        function toggleCollapsible(btn) {{
+            btn.classList.toggle('active');
+            const content = btn.nextElementSibling;
+            content.classList.toggle('active');
+            if (content.style.maxHeight) {{
+                content.style.maxHeight = null;
+            }} else {{
+                content.style.maxHeight = content.scrollHeight + 'px';
+            }}
+        }}
     </script>
 """
         
         # Examples
         if module['examples']:
             html += "    <h2>Examples</h2>\n"
+            
+            # Add wget run pattern before examples
+            html += f"""    <h3>Using with Runtime Installation</h3>
+    <p>This example shows how to download and use the library with automatic installation:</p>
+    <pre><code class="language-lua">-- Download and require {module['name']} with automatic installation
+if not fs.exists("{module['name']}.lua") then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "{module['name']}")
+end
+local {module['name']} = require("{module['name']}")
+
+-- Use the library
+</code></pre>
+    
+    <h3>Usage Examples</h3>
+"""
+            
             for example in module['examples']:
                 escaped_example = example.replace('<', '&lt;').replace('>', '&gt;')
                 html += f"""    <pre><code class="language-lua">{escaped_example}</code></pre>\n"""
