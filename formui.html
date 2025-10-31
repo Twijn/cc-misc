@@ -513,13 +513,26 @@ end</code></pre>
         <div class='returns'><strong>Returns:</strong> any # The field's current value, or nil if not found</div>
     </div>
     <div class='function'>
-        <h3><code>FormUI:draw()</code></h3>
+        <h3><code>FormUI:setValue(label, value)</code></h3>
         <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L319' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Set the value of a field by label</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>label</code> (string): The field label</li>
+                <li><code>value</code> (any): The new value to set</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean # True if field was found and updated, false otherwise</div>
+    </div>
+    <div class='function'>
+        <h3><code>FormUI:draw()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L350' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Draw the form to the terminal</p>
     </div>
     <div class='function'>
         <h3><code>FormUI:edit(index)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L460' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L491' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Edit a field at the specified index</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -531,7 +544,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:nextSelectableField(from)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L533' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L564' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Find the next selectable field index (skips labels)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -543,7 +556,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:prevSelectableField(from)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L551' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L582' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Find the previous selectable field index (skips labels)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -555,7 +568,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:run()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L569' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L600' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Run the form's main input loop</p>
         <div class='returns'><strong>Returns:</strong> FormResult? result Table of field values indexed by label, or nil if cancelled</div>
     </div>

@@ -141,6 +141,17 @@ Get the current value of a field by label
 
 **Returns:** any # The field's current value, or nil if not found
 
+### `FormUI:setValue(label, value)`
+
+Set the value of a field by label
+
+**Parameters:**
+
+- `label` (string): The field label
+- `value` (any): The new value to set
+
+**Returns:** boolean # True if field was found and updated, false otherwise
+
 ### `FormUI:draw()`
 
 Draw the form to the terminal
