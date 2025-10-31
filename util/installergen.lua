@@ -200,7 +200,7 @@ local function selectLibraries(preselected)
             if willDelete then
                 marker = "[D]" -- Marked for uninstall (unchecked existing library)
             elseif forceSelected[lib.name] then
-                marker = "[X]" -- Force-selected via arguments
+                marker = "[A]" -- Specified via arguments (forced selection)
             elseif requiredByArgs then
                 marker = "[R]" -- Required by argument-specified packages
             elseif #isRequiredBy > 0 and selected[lib.name] then
@@ -218,6 +218,8 @@ local function selectLibraries(preselected)
                 -- Color based on status
                 if willDelete then
                     term.setTextColor(colors.red) -- Marked for uninstall (always red)
+                elseif forceSelected[lib.name] then
+                    term.setTextColor(colors.orange) -- Specified via arguments
                 elseif requiredByArgs then
                     term.setTextColor(colors.cyan) -- Required by argument packages
                 elseif #isRequiredBy > 0 and selected[lib.name] then
