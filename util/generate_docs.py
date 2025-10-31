@@ -586,13 +586,24 @@ class LuaDocGenerator:
         
         <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
         <div class="collapsible-content">
-            <p style="margin-top: 0.5rem;">This pattern downloads and runs the library at runtime, automatically installing it if not present:</p>
-            <pre><code class="language-lua" id="advanced-usage">-- Download and require {module['name']} with automatic installation
-local libPath = (fs.exists("disk") and "disk/lib/{module['name']}" or "/lib/{module['name']}")
-if not fs.exists(libPath .. ".lua") then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "{module['name']}")
+            <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
+            <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
+local libs = {{"{module['name']}"}} -- Add more libraries as needed
+local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
+local allExist = true
+
+for _, lib in ipairs(libs) do
+    if not fs.exists(libDir .. lib .. ".lua") then
+        allExist = false
+        break
+    end
 end
-local {module['name']} = require(libPath)
+
+if not allExist then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+end
+
+local {module['name']} = require(libDir .. "{module['name']}")
 
 -- Use the library
 -- (your code here)
@@ -672,13 +683,24 @@ local {module['name']} = require(libPath)
             
             # Add wget run pattern before examples
             html += f"""    <h3>Using with Runtime Installation</h3>
-    <p>This example shows how to download and use the library with automatic installation:</p>
-    <pre><code class="language-lua">-- Download and require {module['name']} with automatic installation
-local libPath = (fs.exists("disk") and "disk/lib/{module['name']}" or "/lib/{module['name']}")
-if not fs.exists(libPath .. ".lua") then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "{module['name']}")
+    <p>This example shows how to download and use libraries with automatic installation:</p>
+    <pre><code class="language-lua">-- Auto-install and require libraries
+local libs = {{"{module['name']}"}} -- Add more libraries as needed
+local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
+local allExist = true
+
+for _, lib in ipairs(libs) do
+    if not fs.exists(libDir .. lib .. ".lua") then
+        allExist = false
+        break
+    end
 end
-local {module['name']} = require(libPath)
+
+if not allExist then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+end
+
+local {module['name']} = require(libDir .. "{module['name']}")
 
 -- Use the library
 </code></pre>
