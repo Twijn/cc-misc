@@ -20,7 +20,10 @@
 ---
 ---cmd("MyApp", "1.0.0", customCommands)
 ---
+---@version 1.0.0
 -- @module cmd
+
+local VERSION = "1.0.0"
 
 local history = {}
 local running = true

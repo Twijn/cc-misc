@@ -12,7 +12,10 @@
 ---log.warn("High memory usage detected")
 ---log.error("Failed to connect to database")
 ---
+---@version 1.0.0
 -- @module log
+
+local VERSION = "1.0.0"
 
 local module = {}
 

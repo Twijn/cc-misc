@@ -14,7 +14,10 @@
 ---local copy = tables.recursiveCopy(myTable)
 ---print(tables.recursiveEquals(myTable, copy)) -- true
 ---
+---@version 1.0.0
 -- @module tables
+
+local VERSION = "1.0.0"
 
 local module = {}
 

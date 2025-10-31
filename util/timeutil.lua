@@ -18,8 +18,10 @@
 ---
 ---timeutil.run()
 ---
+---@version 1.0.0
 -- @module timeutil
 
+local VERSION = "1.0.0"
 ---@class TimeutilInterval
 ---@field cb function Callback function to execute
 ---@field intervalTime number Interval duration in seconds

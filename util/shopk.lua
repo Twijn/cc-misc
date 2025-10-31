@@ -27,7 +27,10 @@
 ---
 ---client.run()
 ---
+---@version 0.0.4
 -- @module shopk
+
+local VERSION = "0.0.4"
 
 ---@class ShopkOptions
 ---@field syncNode? string The Kromer API endpoint URL (defaults to official endpoint)

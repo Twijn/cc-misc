@@ -13,7 +13,10 @@
 ---config.set("name", "MyServer")
 ---print(config.get("port")) -- 8080
 ---
+---@version 1.0.0
 -- @module persist
+
+local VERSION = "1.0.0"
 
 local dataDir = "data/"
 fs.makeDir(dataDir)
