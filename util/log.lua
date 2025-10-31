@@ -76,4 +76,6 @@ function module.error(msg)
     log("error", msg)
 end
 
+module.VERSION = VERSION
+
 return module

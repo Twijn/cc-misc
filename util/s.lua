@@ -321,4 +321,6 @@ function module.useForm(title)
     return formInterface
 end
 
+module.VERSION = VERSION
+
 return module

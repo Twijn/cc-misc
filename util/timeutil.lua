@@ -223,5 +223,8 @@ end
 ---@field everyLoaded fun(cb: function, intervalTime: number, fileName: string): TimeutilInterval Create runtime-based interval
 ---@field run fun(): nil Start the interval management loop
 ---@field getRelativeTime fun(sec: number): string Format seconds into human-readable time
+---@field VERSION string Module version
+
+module.VERSION = VERSION
 
 return module

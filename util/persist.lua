@@ -171,6 +171,9 @@ return function(fileName, useSerialize)
     persistModule.getAll = function()
         return object
     end
+    
+    ---Module version
+    persistModule.VERSION = VERSION
 
     return persistModule
 end

@@ -848,9 +848,16 @@ local {module['name']} = require(libDir .. "{module['name']}")
         api_dir = self.output_dir / 'api'
         api_dir.mkdir(exist_ok=True)
         
+        # Exclude installergen from API
+        EXCLUDE_FROM_API = {"installergen"}
+        
         # Generate libraries.json with all module info
         libraries = []
         for module in self.modules:
+            # Skip excluded modules
+            if module['name'] in EXCLUDE_FROM_API:
+                continue
+            
             lib_info = {
                 'name': module['name'],
                 'version': module.get('version'),
@@ -884,6 +891,9 @@ local {module['name']} = require(libDir .. "{module['name']}")
         }
         
         for module in self.modules:
+            if module['name'] in EXCLUDE_FROM_API:
+                continue
+            
             all_data['libraries'][module['name']] = {
                 'name': module['name'],
                 'version': module.get('version'),

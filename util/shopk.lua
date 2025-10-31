@@ -277,6 +277,9 @@ return function(options)
             metadata = metadata
         }, cb)
     end
+    
+    ---Module version
+    module.VERSION = VERSION
 
     return module
 end

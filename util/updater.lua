@@ -373,4 +373,6 @@ function module.install(name, silent)
     return module.update(name, silent)
 end
 
+module.VERSION = VERSION
+
 return module

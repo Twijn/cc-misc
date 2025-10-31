@@ -85,5 +85,8 @@ end
 ---@field count fun(table: table): number Count elements in a table
 ---@field recursiveCopy fun(table: table): table Create a deep copy of a table
 ---@field recursiveEquals fun(t1: table, t2: table): boolean Compare tables for deep equality
+---@field VERSION string Module version
+
+module.VERSION = VERSION
 
 return module
