@@ -587,15 +587,19 @@ class LuaDocGenerator:
         <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
         <div class="collapsible-content">
             <p style="margin-top: 0.5rem;">This pattern downloads and runs the library at runtime, automatically installing it if not present:</p>
-            <pre><code class="language-lua">-- Download and require {module['name']} with automatic installation
-if not fs.exists("{module['name']}.lua") then
+            <pre><code class="language-lua" id="advanced-usage">-- Download and require {module['name']} with automatic installation
+local libPath = (fs.exists("disk") and "disk/lib/{module['name']}" or "/lib/{module['name']}")
+if not fs.exists(libPath .. ".lua") then
     shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "{module['name']}")
 end
-local {module['name']} = require("{module['name']}")
+local {module['name']} = require(libPath)
 
 -- Use the library
 -- (your code here)
 </code></pre>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
+            </div>
         </div>
 """
         
@@ -630,6 +634,25 @@ local {module['name']} = require("{module['name']}")
             }});
         }}
         
+        function copyCode(btn, codeId) {{
+            const code = document.getElementById(codeId).textContent;
+            navigator.clipboard.writeText(code).then(() => {{
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {{
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy:', err);
+                btn.textContent = '✗ Failed';
+                setTimeout(() => {{
+                    btn.textContent = 'Copy Code';
+                }}, 2000);
+            }});
+        }}
+        
         function toggleCollapsible(btn) {{
             btn.classList.toggle('active');
             const content = btn.nextElementSibling;
@@ -651,10 +674,11 @@ local {module['name']} = require("{module['name']}")
             html += f"""    <h3>Using with Runtime Installation</h3>
     <p>This example shows how to download and use the library with automatic installation:</p>
     <pre><code class="language-lua">-- Download and require {module['name']} with automatic installation
-if not fs.exists("{module['name']}.lua") then
+local libPath = (fs.exists("disk") and "disk/lib/{module['name']}" or "/lib/{module['name']}")
+if not fs.exists(libPath .. ".lua") then
     shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "{module['name']}")
 end
-local {module['name']} = require("{module['name']}")
+local {module['name']} = require(libPath)
 
 -- Use the library
 </code></pre>
