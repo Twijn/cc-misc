@@ -1,0 +1,942 @@
+{
+  "libraries": {
+    "cmd": {
+      "name": "cmd",
+      "version": "1.0.0",
+      "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, and string utility functions (split, startsWith).",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/cmd.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/cmd.html",
+      "functions": [
+        {
+          "name": "string.split",
+          "params": [
+            {
+              "name": "self",
+              "type": "string",
+              "description": "The string to split"
+            },
+            {
+              "name": "sep?",
+              "type": "string",
+              "description": "The separator to split on (defaults to each character)"
+            },
+            {
+              "name": "plain?",
+              "type": "boolean",
+              "description": "Whether to treat separator as plain text (no pattern matching)"
+            }
+          ],
+          "returns": "string[] # Array of split substrings",
+          "description": "Split a string into an array of substrings based on a separator",
+          "line": 138
+        },
+        {
+          "name": "string.startsWith",
+          "params": [
+            {
+              "name": "self",
+              "type": "string",
+              "description": "The string to check"
+            },
+            {
+              "name": "target",
+              "type": "string",
+              "description": "The substring to look for at the beginning"
+            },
+            {
+              "name": "caseSensitive?",
+              "type": "boolean",
+              "description": "Whether the comparison should be case-sensitive (defaults to false)"
+            }
+          ],
+          "returns": "boolean # True if the string starts with the target",
+          "description": "Check if a string starts with a target substring",
+          "line": 162
+        }
+      ],
+      "classes": []
+    },
+    "shopk": {
+      "name": "shopk",
+      "version": "0.0.4",
+      "description": "A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/shopk.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/shopk.html",
+      "functions": [
+        {
+          "name": "module.on",
+          "params": [
+            {
+              "name": "event",
+              "type": "\"ready\"|\"transaction\"|\"transactions\"",
+              "description": "Event type to listen for"
+            },
+            {
+              "name": "listener",
+              "type": "function",
+              "description": "Function to call when event occurs"
+            }
+          ],
+          "returns": "",
+          "description": "Register an event listener",
+          "line": 186
+        },
+        {
+          "name": "module.run",
+          "params": [],
+          "returns": "",
+          "description": "Start the WebSocket connection and enter the main event loop This function blocks until the connection is closed",
+          "line": 199
+        },
+        {
+          "name": "module.close",
+          "params": [],
+          "returns": "",
+          "description": "Close the WebSocket connection and stop reconnecting",
+          "line": 238
+        },
+        {
+          "name": "module.me",
+          "params": [
+            {
+              "name": "cb?",
+              "type": "function",
+              "description": "Optional callback to receive wallet data"
+            }
+          ],
+          "returns": "",
+          "description": "Get information about the current wallet",
+          "line": 247
+        },
+        {
+          "name": "module.send",
+          "params": [
+            {
+              "name": "data",
+              "type": "ShopkSendData",
+              "description": "Transaction details"
+            },
+            {
+              "name": "cb?",
+              "type": "function",
+              "description": "Optional callback to receive transaction result"
+            }
+          ],
+          "returns": "",
+          "description": "Send a Kromer transaction",
+          "line": 255
+        }
+      ],
+      "classes": []
+    },
+    "persist": {
+      "name": "persist",
+      "version": "1.0.0",
+      "description": "A persistence module for ComputerCraft that provides automatic data serialization and storage to files with support for both Lua serialization and JSON formats. Features: Automatic file creation and loading, deep copy functionality to handle circular references, support for both Lua serialize and JSON formats, error handling with fallback mechanisms, array and object manipulation methods, and automatic saving on data changes.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/persist.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/persist.html",
+      "functions": [],
+      "classes": []
+    },
+    "s": {
+      "name": "s",
+      "version": "2.0.0",
+      "description": "A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.",
+      "dependencies": [
+        "tables",
+        "formui"
+      ],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/s.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/s.html",
+      "functions": [
+        {
+          "name": "module.peripheral",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name to store/retrieve"
+            },
+            {
+              "name": "type",
+              "type": "string",
+              "description": "The required peripheral type (e.g., \"modem\", \"monitor\")"
+            },
+            {
+              "name": "sideOnly?",
+              "type": "boolean",
+              "description": "If true, only allow peripherals attached to computer sides"
+            }
+          ],
+          "returns": "table # The wrapped peripheral object",
+          "description": "Get or configure a peripheral setting with automatic validation and recovery",
+          "line": 97
+        },
+        {
+          "name": "module.number",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name to store/retrieve"
+            },
+            {
+              "name": "from?",
+              "type": "number",
+              "description": "Minimum allowed value (nil for no minimum)"
+            },
+            {
+              "name": "to?",
+              "type": "number",
+              "description": "Maximum allowed value (nil for no maximum)"
+            },
+            {
+              "name": "default?",
+              "type": "number",
+              "description": "Default value if user provides empty input"
+            }
+          ],
+          "returns": "number # The configured number value",
+          "description": "Get or configure a number setting with range validation",
+          "line": 127
+        },
+        {
+          "name": "module.string",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name to store/retrieve"
+            },
+            {
+              "name": "default?",
+              "type": "string",
+              "description": "Default value if user provides empty input"
+            }
+          ],
+          "returns": "string # The configured string value",
+          "description": "Get or configure a string setting with optional default value",
+          "line": 164
+        },
+        {
+          "name": "module.boolean",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name to store/retrieve"
+            }
+          ],
+          "returns": "boolean # The configured boolean value",
+          "description": "Get or configure a boolean setting using an interactive menu",
+          "line": 191
+        },
+        {
+          "name": "module.useForm",
+          "params": [
+            {
+              "name": "title?",
+              "type": "string",
+              "description": "The form title (defaults to \"Settings\")"
+            }
+          ],
+          "returns": "table # Form interface with peripheral, number, string, boolean, and submit functions",
+          "description": "Create a form-based settings interface using formui.lua Requires formui.lua to be installed. Returns a table with form-based versions of all s.lua functions.  local s = require(\"s\") local form = s.useForm(\"My App Configuration\")  local modem = form.peripheral(\"modem\", \"modem\", true) local port = form.number(\"port\", 1, 65535, 8080) local name = form.string(\"server_name\", \"MyServer\") local enabled = form.boolean(\"enabled\")  if form.submit() then print(\"Settings saved!\") print(\"Modem:\", modem()) print(\"Port:\", port()) end ",
+          "line": 206
+        },
+        {
+          "name": "formInterface.peripheral",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name"
+            },
+            {
+              "name": "type",
+              "type": "string",
+              "description": "The peripheral type to filter for"
+            },
+            {
+              "name": "sideOnly?",
+              "type": "boolean",
+              "description": "If true, only show peripherals attached to computer sides"
+            }
+          ],
+          "returns": "function # Getter function that returns the peripheral name",
+          "description": "Add a peripheral field to the form",
+          "line": 232
+        },
+        {
+          "name": "formInterface.number",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name"
+            },
+            {
+              "name": "from?",
+              "type": "number",
+              "description": "Minimum allowed value"
+            },
+            {
+              "name": "to?",
+              "type": "number",
+              "description": "Maximum allowed value"
+            },
+            {
+              "name": "default?",
+              "type": "number",
+              "description": "Default value"
+            }
+          ],
+          "returns": "function # Getter function that returns the number value",
+          "description": "Add a number field to the form",
+          "line": 257
+        },
+        {
+          "name": "formInterface.string",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name"
+            },
+            {
+              "name": "default?",
+              "type": "string",
+              "description": "Default value"
+            }
+          ],
+          "returns": "function # Getter function that returns the string value",
+          "description": "Add a string field to the form",
+          "line": 279
+        },
+        {
+          "name": "formInterface.boolean",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name"
+            }
+          ],
+          "returns": "function # Getter function that returns the boolean value",
+          "description": "Add a boolean field to the form",
+          "line": 296
+        },
+        {
+          "name": "formInterface.submit",
+          "params": [],
+          "returns": "boolean # True if submitted, false if cancelled",
+          "description": "Add submit and cancel buttons, then run the form",
+          "line": 314
+        }
+      ],
+      "classes": []
+    },
+    "log": {
+      "name": "log",
+      "version": "1.0.0",
+      "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, and timestamped log entries.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/log.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/log.html",
+      "functions": [
+        {
+          "name": "module.info",
+          "params": [
+            {
+              "name": "msg",
+              "type": "string",
+              "description": "The message to log"
+            }
+          ],
+          "returns": "",
+          "description": "Log an informational message in blue",
+          "line": 61
+        },
+        {
+          "name": "module.warn",
+          "params": [
+            {
+              "name": "msg",
+              "type": "string",
+              "description": "The message to log"
+            }
+          ],
+          "returns": "",
+          "description": "Log a warning message in yellow",
+          "line": 67
+        },
+        {
+          "name": "module.error",
+          "params": [
+            {
+              "name": "msg",
+              "type": "string",
+              "description": "The message to log"
+            }
+          ],
+          "returns": "",
+          "description": "Log an error message in red",
+          "line": 73
+        }
+      ],
+      "classes": []
+    },
+    "installergen": {
+      "name": "installergen",
+      "version": "2.0.0",
+      "description": "Installer Generator for CC-Misc Utilities Interactive tool to install ComputerCraft libraries with dependency management This tool provides a user-friendly interface to select and install libraries from the cc-misc repository directly to your ComputerCraft computer.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/installergen.html",
+      "functions": [],
+      "classes": []
+    },
+    "updater": {
+      "name": "updater",
+      "version": "1.0.0",
+      "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, and JSON API integration.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/updater.html",
+      "functions": [
+        {
+          "name": "module.getLibraries",
+          "params": [],
+          "returns": "table|nil List of library info or nil on error",
+          "description": "Get information about all available libraries",
+          "line": 156
+        },
+        {
+          "name": "module.getLibraryInfo",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "Library name"
+            }
+          ],
+          "returns": "table|nil Library info or nil on error",
+          "description": "Get information about a specific library",
+          "line": 162
+        },
+        {
+          "name": "module.checkUpdates",
+          "params": [],
+          "returns": "table List of libraries with available updates",
+          "description": "Check for updates to installed libraries",
+          "line": 169
+        },
+        {
+          "name": "module.hasUpdate",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "Library name"
+            }
+          ],
+          "returns": "boolean, string|nil, string|nil Has update, current version, latest version",
+          "description": "Check if a specific library has an update available",
+          "line": 201
+        },
+        {
+          "name": "module.update",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "Library name"
+            },
+            {
+              "name": "silent?",
+              "type": "boolean",
+              "description": "Suppress output messages"
+            }
+          ],
+          "returns": "boolean Success",
+          "description": "Install or update a library",
+          "line": 223
+        },
+        {
+          "name": "module.updateAll",
+          "params": [
+            {
+              "name": "silent?",
+              "type": "boolean",
+              "description": "Suppress output messages"
+            }
+          ],
+          "returns": "number Number of successful updates",
+          "description": "Update all installed libraries that have updates available",
+          "line": 270
+        },
+        {
+          "name": "module.listInstalled",
+          "params": [],
+          "returns": "table List of {name, version, path} for installed libraries",
+          "description": "List all installed libraries with their versions",
+          "line": 308
+        },
+        {
+          "name": "module.install",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "Library name"
+            },
+            {
+              "name": "silent?",
+              "type": "boolean",
+              "description": "Suppress output messages"
+            }
+          ],
+          "returns": "boolean Success",
+          "description": "Install a new library with its dependencies",
+          "line": 333
+        }
+      ],
+      "classes": []
+    },
+    "tables": {
+      "name": "tables",
+      "version": "1.0.0",
+      "description": "A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking with includes(), table size counting for any table type, deep recursive copying with nested table support, deep recursive equality comparison, and works with both array-like and associative tables.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/tables.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/tables.html",
+      "functions": [
+        {
+          "name": "module.includes",
+          "params": [
+            {
+              "name": "table",
+              "type": "table",
+              "description": "The table to search in"
+            },
+            {
+              "name": "object",
+              "type": "any",
+              "description": "The value to search for"
+            }
+          ],
+          "returns": "boolean # True if the object is found in the table",
+          "description": "Check if a table contains a specific value",
+          "line": 24
+        },
+        {
+          "name": "module.count",
+          "params": [
+            {
+              "name": "table",
+              "type": "table",
+              "description": "The table to count elements in"
+            }
+          ],
+          "returns": "number # The number of key-value pairs in the table",
+          "description": "Count the number of elements in a table (works with both arrays and associative tables)",
+          "line": 35
+        },
+        {
+          "name": "module.recursiveCopy",
+          "params": [
+            {
+              "name": "table",
+              "type": "table",
+              "description": "The table to copy"
+            }
+          ],
+          "returns": "table # A new table with all values copied (nested tables are also copied)",
+          "description": "Create a deep copy of a table, recursively copying all nested tables",
+          "line": 46
+        },
+        {
+          "name": "module.recursiveEquals",
+          "params": [
+            {
+              "name": "t1",
+              "type": "table",
+              "description": "The first table to compare"
+            },
+            {
+              "name": "t2",
+              "type": "table",
+              "description": "The second table to compare"
+            }
+          ],
+          "returns": "boolean # True if both tables have the same structure and values",
+          "description": "Compare two tables for deep equality, recursively checking nested tables",
+          "line": 61
+        }
+      ],
+      "classes": []
+    },
+    "timeutil": {
+      "name": "timeutil",
+      "version": "1.0.0",
+      "description": "A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/timeutil.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/timeutil.html",
+      "functions": [
+        {
+          "name": "module.every",
+          "params": [
+            {
+              "name": "cb",
+              "type": "function",
+              "description": "Callback function to execute when interval triggers"
+            },
+            {
+              "name": "intervalTime",
+              "type": "number",
+              "description": "Interval duration in seconds"
+            },
+            {
+              "name": "fileName",
+              "type": "string",
+              "description": "File path to persist the last run timestamp"
+            }
+          ],
+          "returns": "TimeutilInterval # Interval object with control methods",
+          "description": "Create an absolute time-based interval that runs based on system time This type of interval will \"catch up\" if the computer was offline, running immediately if the interval time has passed since the last recorded execution.",
+          "line": 47
+        },
+        {
+          "name": "module.everyLoaded",
+          "params": [
+            {
+              "name": "cb",
+              "type": "function",
+              "description": "Callback function to execute when interval triggers"
+            },
+            {
+              "name": "intervalTime",
+              "type": "number",
+              "description": "Interval duration in seconds of actual runtime"
+            },
+            {
+              "name": "fileName",
+              "type": "string",
+              "description": "File path to persist the accumulated elapsed time"
+            }
+          ],
+          "returns": "TimeutilInterval # Interval object with control methods",
+          "description": "Create a runtime-based interval that accumulates time only when the program is running This type of interval will NOT catch up after downtime, only counting actual runtime. Useful for operations that should happen after X seconds of actual program execution.",
+          "line": 114
+        },
+        {
+          "name": "module.run",
+          "params": [],
+          "returns": "",
+          "description": "Start the main interval management loop This function blocks and continuously checks all registered intervals, executing them when their time has elapsed. Runs indefinitely until terminated.",
+          "line": 189
+        },
+        {
+          "name": "module.getRelativeTime",
+          "params": [
+            {
+              "name": "sec",
+              "type": "number",
+              "description": "Duration in seconds"
+            }
+          ],
+          "returns": "string # Formatted time string (e.g., \"5.2 minutes\", \"1 day\", \"30 seconds\")",
+          "description": "Format a duration in seconds into a human-readable relative time string",
+          "line": 202
+        }
+      ],
+      "classes": []
+    },
+    "formui": {
+      "name": "formui",
+      "version": "0.1.0",
+      "description": "A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/formui.lua",
+      "documentation_url": "https://twijn.github.io/cc-misc/formui.html",
+      "functions": [
+        {
+          "name": "FormUI.new",
+          "params": [
+            {
+              "name": "title?",
+              "type": "string",
+              "description": "The form title (defaults to \"Form\")"
+            }
+          ],
+          "returns": "FormUI # New FormUI instance",
+          "description": "Create a new FormUI instance",
+          "line": 137
+        },
+        {
+          "name": "FormUI:addField",
+          "params": [
+            {
+              "name": "field",
+              "type": "FormField",
+              "description": "The field definition to add"
+            }
+          ],
+          "returns": "fun(): any # Function that returns the field's final value after form submission",
+          "description": "Add a field to the form and return a getter function",
+          "line": 149
+        },
+        {
+          "name": "FormUI:text",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The field label"
+            },
+            {
+              "name": "default?",
+              "type": "string",
+              "description": "Default value"
+            },
+            {
+              "name": "validator?",
+              "type": "ValidationFunction",
+              "description": "Custom validation function"
+            }
+          ],
+          "returns": "fun(): string # Function to get the field value after submission",
+          "description": "Add a text input field",
+          "line": 162
+        },
+        {
+          "name": "FormUI:number",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The field label"
+            },
+            {
+              "name": "default?",
+              "type": "number",
+              "description": "Default value"
+            },
+            {
+              "name": "validator?",
+              "type": "ValidationFunction",
+              "description": "Custom validation function"
+            }
+          ],
+          "returns": "fun(): number # Function to get the field value after submission",
+          "description": "Add a number input field",
+          "line": 178
+        },
+        {
+          "name": "FormUI:select",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The field label"
+            },
+            {
+              "name": "options?",
+              "type": "string[]",
+              "description": "Available options"
+            },
+            {
+              "name": "defaultIndex?",
+              "type": "number",
+              "description": "Index of default selection (1-based)"
+            },
+            {
+              "name": "validator?",
+              "type": "ValidationFunction",
+              "description": "Custom validation function"
+            }
+          ],
+          "returns": "fun(): string # Function to get the selected option after submission",
+          "description": "Add a select dropdown field",
+          "line": 194
+        },
+        {
+          "name": "FormUI:peripheral",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The field label"
+            },
+            {
+              "name": "filterType?",
+              "type": "string",
+              "description": "Peripheral type to filter by (e.g., \"modem\", \"monitor\")"
+            },
+            {
+              "name": "validator?",
+              "type": "ValidationFunction",
+              "description": "Custom validation function"
+            },
+            {
+              "name": "defaultValue?",
+              "type": "string|number",
+              "description": "Default peripheral (name or index)"
+            }
+          ],
+          "returns": "fun(): string # Function to get the selected peripheral name after submission",
+          "description": "Add a peripheral selector field that automatically detects peripherals",
+          "line": 212
+        },
+        {
+          "name": "FormUI:label",
+          "params": [
+            {
+              "name": "text",
+              "type": "string",
+              "description": "The label text to display"
+            }
+          ],
+          "returns": "fun(): string # Function to get the label text (always returns the same text)",
+          "description": "Add a non-interactive label for display purposes",
+          "line": 245
+        },
+        {
+          "name": "FormUI:button",
+          "params": [
+            {
+              "name": "text",
+              "type": "string",
+              "description": "The button text"
+            },
+            {
+              "name": "action?",
+              "type": "string",
+              "description": "Action identifier (defaults to lowercase text)"
+            }
+          ],
+          "returns": "fun(): string # Function to get the button text",
+          "description": "Add a button that can trigger actions",
+          "line": 258
+        },
+        {
+          "name": "FormUI:addSubmitCancel",
+          "params": [],
+          "returns": "",
+          "description": "Add standard Submit and Cancel buttons to the form",
+          "line": 273
+        },
+        {
+          "name": "FormUI:validateField",
+          "params": [
+            {
+              "name": "i",
+              "type": "number",
+              "description": "The field index to validate"
+            }
+          ],
+          "returns": "string? error Error message if validation failed",
+          "description": "Validate a specific field by index",
+          "line": 279
+        },
+        {
+          "name": "FormUI:isValid",
+          "params": [],
+          "returns": "boolean # True if all fields are valid",
+          "description": "Validate all fields in the form",
+          "line": 293
+        },
+        {
+          "name": "FormUI:get",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The field label"
+            }
+          ],
+          "returns": "any # The field's current value, or nil if not found",
+          "description": "Get the current value of a field by label",
+          "line": 307
+        },
+        {
+          "name": "FormUI:setValue",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The field label"
+            },
+            {
+              "name": "value",
+              "type": "any",
+              "description": "The new value to set"
+            }
+          ],
+          "returns": "boolean # True if field was found and updated, false otherwise",
+          "description": "Set the value of a field by label",
+          "line": 319
+        },
+        {
+          "name": "FormUI:draw",
+          "params": [],
+          "returns": "",
+          "description": "Draw the form to the terminal",
+          "line": 350
+        },
+        {
+          "name": "FormUI:edit",
+          "params": [
+            {
+              "name": "index",
+              "type": "number",
+              "description": "The field index to edit"
+            }
+          ],
+          "returns": "string? action Action identifier if a button was pressed",
+          "description": "Edit a field at the specified index",
+          "line": 491
+        },
+        {
+          "name": "FormUI:nextSelectableField",
+          "params": [
+            {
+              "name": "from",
+              "type": "number",
+              "description": "Starting field index"
+            }
+          ],
+          "returns": "number # Next selectable field index (wraps around)",
+          "description": "Find the next selectable field index (skips labels)",
+          "line": 564
+        },
+        {
+          "name": "FormUI:prevSelectableField",
+          "params": [
+            {
+              "name": "from",
+              "type": "number",
+              "description": "Starting field index"
+            }
+          ],
+          "returns": "number # Previous selectable field index (wraps around)",
+          "description": "Find the previous selectable field index (skips labels)",
+          "line": 582
+        },
+        {
+          "name": "FormUI:run",
+          "params": [],
+          "returns": "FormResult? result Table of field values indexed by label, or nil if cancelled",
+          "description": "Run the form's main input loop",
+          "line": 600
+        }
+      ],
+      "classes": []
+    }
+  },
+  "updated": "2025-10-31T04:10:08Z"
+}
