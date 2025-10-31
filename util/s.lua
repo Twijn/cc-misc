@@ -3,7 +3,7 @@
 ---
 --- Features: Interactive peripheral selection with type filtering, number input with range validation,
 --- string input with default values, boolean selection with menu interface, automatic settings persistence,
---- peripheral availability checking and recovery, and side-only peripheral filtering.
+--- peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.
 ---
 ---@usage
 ---local s = require("s")
@@ -13,7 +13,10 @@
 ---local name = s.string("server_name", "MyServer")
 ---local enabled = s.boolean("enabled")
 ---
+---@version 2.0.0
 -- @module s
+
+local VERSION = "2.0.0"
 
 local module = {}
 
@@ -198,6 +201,124 @@ function module.boolean(name)
     end
 
     return value
+end
+
+---Create a form-based settings interface using formui.lua
+---Requires formui.lua to be installed. Returns a table with form-based versions of all s.lua functions.
+---
+---@usage
+---local s = require("s")
+---local form = s.useForm("My App Configuration")
+---
+---local modem = form.peripheral("modem", "modem", true)
+---local port = form.number("port", 1, 65535, 8080)
+---local name = form.string("server_name", "MyServer")
+---local enabled = form.boolean("enabled")
+---
+---if form.submit() then
+---  print("Settings saved!")
+---  print("Modem:", modem())
+---  print("Port:", port())
+---end
+---
+---@param title? string The form title (defaults to "Settings")
+---@return table # Form interface with peripheral, number, string, boolean, and submit functions
+function module.useForm(title)
+    local formui = require("formui")
+    local form = formui.new(title or "Settings")
+    
+    local formInterface = {}
+    
+    ---Add a peripheral field to the form
+    ---@param name string The setting name
+    ---@param type string The peripheral type to filter for
+    ---@param sideOnly? boolean If true, only show peripherals attached to computer sides
+    ---@return function # Getter function that returns the peripheral name
+    function formInterface.peripheral(name, type, sideOnly)
+        local existingValue = settings.get(name)
+        local field = form:peripheral(name, type, sideOnly and "side" or nil)
+        if existingValue then
+            -- Set the existing value if it exists and is valid
+            local p = peripheral.wrap(existingValue)
+            if p then
+                field.value = existingValue
+            end
+        end
+        return function()
+            local value = field()
+            if value then
+                settings.set(name, value)
+                settings.save()
+            end
+            return value and peripheral.wrap(value) or nil
+        end
+    end
+    
+    ---Add a number field to the form
+    ---@param name string The setting name
+    ---@param from? number Minimum allowed value
+    ---@param to? number Maximum allowed value
+    ---@param default? number Default value
+    ---@return function # Getter function that returns the number value
+    function formInterface.number(name, from, to, default)
+        local existingValue = settings.get(name)
+        local field = form:number(name, existingValue or default or 0)
+        if from or to then
+            field.validate = formui.validation.number_range(from or -math.huge, to or math.huge)
+        end
+        return function()
+            local value = field()
+            if value then
+                settings.set(name, value)
+                settings.save()
+            end
+            return value
+        end
+    end
+    
+    ---Add a string field to the form
+    ---@param name string The setting name
+    ---@param default? string Default value
+    ---@return function # Getter function that returns the string value
+    function formInterface.string(name, default)
+        local existingValue = settings.get(name)
+        local field = form:text(name, existingValue or default or "")
+        return function()
+            local value = field()
+            if value then
+                settings.set(name, value)
+                settings.save()
+            end
+            return value
+        end
+    end
+    
+    ---Add a boolean field to the form
+    ---@param name string The setting name
+    ---@return function # Getter function that returns the boolean value
+    function formInterface.boolean(name)
+        local existingValue = settings.get(name)
+        local field = form:select(name, {"true", "false"}, existingValue == true and 1 or 2)
+        return function()
+            local value = field()
+            if value then
+                local boolValue = (value == "true")
+                settings.set(name, boolValue)
+                settings.save()
+                return boolValue
+            end
+            return nil
+        end
+    end
+    
+    ---Add submit and cancel buttons, then run the form
+    ---@return boolean # True if submitted, false if cancelled
+    function formInterface.submit()
+        form:addSubmitCancel()
+        return form:run()
+    end
+    
+    return formInterface
 end
 
 return module
