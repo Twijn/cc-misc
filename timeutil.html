@@ -250,13 +250,24 @@
         
         <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
         <div class="collapsible-content">
-            <p style="margin-top: 0.5rem;">This pattern downloads and runs the library at runtime, automatically installing it if not present:</p>
-            <pre><code class="language-lua" id="advanced-usage">-- Download and require timeutil with automatic installation
-local libPath = (fs.exists("disk") and "disk/lib/timeutil" or "/lib/timeutil")
-if not fs.exists(libPath .. ".lua") then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "timeutil")
+            <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
+            <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
+local libs = {"timeutil"} -- Add more libraries as needed
+local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
+local allExist = true
+
+for _, lib in ipairs(libs) do
+    if not fs.exists(libDir .. lib .. ".lua") then
+        allExist = false
+        break
+    end
 end
-local timeutil = require(libPath)
+
+if not allExist then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+end
+
+local timeutil = require(libDir .. "timeutil")
 
 -- Use the library
 -- (your code here)
@@ -324,13 +335,24 @@ local timeutil = require(libPath)
     </script>
     <h2>Examples</h2>
     <h3>Using with Runtime Installation</h3>
-    <p>This example shows how to download and use the library with automatic installation:</p>
-    <pre><code class="language-lua">-- Download and require timeutil with automatic installation
-local libPath = (fs.exists("disk") and "disk/lib/timeutil" or "/lib/timeutil")
-if not fs.exists(libPath .. ".lua") then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "timeutil")
+    <p>This example shows how to download and use libraries with automatic installation:</p>
+    <pre><code class="language-lua">-- Auto-install and require libraries
+local libs = {"timeutil"} -- Add more libraries as needed
+local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
+local allExist = true
+
+for _, lib in ipairs(libs) do
+    if not fs.exists(libDir .. lib .. ".lua") then
+        allExist = false
+        break
+    end
 end
-local timeutil = require(libPath)
+
+if not allExist then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+end
+
+local timeutil = require(libDir .. "timeutil")
 
 -- Use the library
 </code></pre>
