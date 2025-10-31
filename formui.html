@@ -203,17 +203,22 @@
     
     <div class="install-section">
         <h2>Installation</h2>
-        <p>Quick install via wget:</p>
-        <div class="install-cmd" id="install-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/formui.lua formui.lua</div>
+        <p><strong>Option 1:</strong> Quick install via installergen (recommended):</p>
+        <div class="install-cmd" id="installergen-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua formui</div>
         <div class="install-controls">
-            <button class="copy-btn" onclick="copyInstallCommand(this)">Copy Command</button>
+            <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
+        </div>
+        <p style="margin-top: 1.5rem;"><strong>Option 2:</strong> Direct download via wget:</p>
+        <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/formui.lua</div>
+        <div class="install-controls">
+            <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
             <a href="https://github.com/Twijn/cc-misc/blob/main/util/formui.lua" class="github-link" target="_blank">View on GitHub →</a>
         </div>
     </div>
     
     <script>
-        function copyInstallCommand(btn) {
-            const cmd = document.getElementById('install-cmd').textContent;
+        function copyCommand(btn, cmdId) {
+            const cmd = document.getElementById(cmdId).textContent;
             navigator.clipboard.writeText(cmd).then(() => {
                 const originalText = btn.textContent;
                 btn.textContent = '✓ Copied!';

@@ -7,5 +7,7 @@ Installer Generator for CC-Misc Utilities Interactive tool to generate custom in
 ```lua
 wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua installergen.lua
 installergen.lua
+Or pre-select libraries:
+installergen.lua cmd s tables
 ```
 
