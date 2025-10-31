@@ -1,4 +1,4 @@
---- Installer Generator for CC-Misc Utilities
+--- Installer for CC-Misc Utilities
 --- Interactive tool to install ComputerCraft libraries with dependency management
 ---
 --- This tool provides a user-friendly interface to select and install libraries from the cc-misc
@@ -10,7 +10,7 @@
 --- - Press RIGHT arrow to view library details (functions, version, dependencies)
 --- - Automatic dependency resolution
 --- - Visual indicators for selections and requirements
---- - Install/update or generate installer scripts
+--- - Install/update libraries directly from the API
 ---
 ---@usage
 ---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua
@@ -20,7 +20,7 @@
 ---
 -- @module installer
 
-local VERSION = "3.0.1"
+local VERSION = "3.1.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 local API_URL = "https://ccmisc.twijn.dev/api/all.json"
 
@@ -130,6 +130,19 @@ local function getLibraryInfo(name)
         end
     end
     return nil
+end
+
+---Get download URL for a library
+---@param name string Library name
+---@return string Download URL (from API or constructed fallback)
+local function getDownloadURL(name)
+    -- Try to get from API data first
+    if API_DATA and API_DATA[name] and API_DATA[name].download_url then
+        return API_DATA[name].download_url
+    end
+    
+    -- Fallback to constructed URL
+    return GITHUB_RAW_BASE .. name .. ".lua"
 end
 
 ---Show detailed library information
@@ -591,96 +604,9 @@ local function selectLibraries(preselected)
     return selectedList, deleteList, originalSelection
 end
 
----Get installation directory from user
----@return string The installation directory
-local function getInstallDir()
-    clearScreen()
-    
-    -- Determine default directory
-    local defaultDir = "/lib"
-    if fs.exists("disk") and fs.isDir("disk") then
-        defaultDir = "disk/lib"
-    end
-    
-    -- Compact header
-    term.setTextColor(colors.yellow)
-    print("Installation Directory")
-    term.setTextColor(colors.lightGray)
-    print("Where should libraries be installed?")
-    print("(Leave empty for default: " .. defaultDir .. ")")
-    term.setTextColor(colors.white)
-    print()
-    
-    write("> ")
-    
-    local dir = read()
-    if dir == "" then
-        dir = defaultDir
-    else
-        -- Remove trailing slash if present
-        if dir:sub(-1) == "/" then
-            dir = dir:sub(1, -2)
-        end
-    end
-    
-    return dir
-end
 
----Choose installation action
----@return string|nil "install" or "generate" or nil for cancel
-local function chooseAction()
-    local cursor = 1
-    local options = {
-        {key = "install", label = "Install/Uninstall Now", desc = "Download and install or uninstall libraries immediately"},
-        {key = "generate", label = "Generate Installer", desc = "Create installer.lua script for later use"}
-    }
-    
-    while true do
-        clearScreen()
-        
-        term.setTextColor(colors.yellow)
-        print("Choose Action")
-        term.setTextColor(colors.lightGray)
-        print("Up/Down: Move | Enter: Select | Q: Cancel")
-        term.setTextColor(colors.white)
-        print()
-        
-        for i, opt in ipairs(options) do
-            if i == cursor then
-                term.setTextColor(colors.black)
-                term.setBackgroundColor(colors.white)
-            else
-                term.setTextColor(colors.white)
-                term.setBackgroundColor(colors.black)
-            end
-            
-            local w = term.getSize()
-            local line = opt.label
-            line = line .. string.rep(" ", w - #line)
-            print(line)
-            
-            term.setTextColor(colors.lightGray)
-            term.setBackgroundColor(colors.black)
-            print("  " .. opt.desc)
-            term.setTextColor(colors.white)
-        end
-        
-        term.setBackgroundColor(colors.black)
-        
-        local event, key = os.pullEvent("key")
-        
-        if key == keys.up then
-            cursor = math.max(1, cursor - 1)
-        elseif key == keys.down then
-            cursor = math.min(#options, cursor + 1)
-        elseif key == keys.enter then
-            return options[cursor].key
-        elseif key == keys.q then
-            sleep()
-            return nil
-        end
-    end
-end
+
+
 
 ---Download and install a file
 ---@param url string The URL to download from
@@ -808,7 +734,7 @@ local function installLibraries(libraries, installDir, skipClear, originalSelect
     local failed = 0
     
     for _, lib in ipairs(libraries) do
-        local url = GITHUB_RAW_BASE .. lib .. ".lua"
+        local url = getDownloadURL(lib)
         local info = status[lib]
         
         -- Determine target path
@@ -903,108 +829,7 @@ local function deleteLibraries(libraries)
     term.setTextColor(colors.white)
 end
 
----Generate installer script content
----@param libraries table List of library names
----@param installDir string Installation directory
----@return string The installer script content
-local function generateInstaller(libraries, installDir)
-    local script = [[--- Auto-generated installer for CC-Misc utilities
---- Generated by installer.lua
----
---- This script will download and install the following libraries:
-]]
 
-    for _, lib in ipairs(libraries) do
-        script = script .. string.format("---   - %s\n", lib)
-    end
-    
-    script = script .. [[---
---- Usage: lua installer.lua
-
-local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
-local INSTALL_DIR = "]] .. installDir .. [["
-
-local LIBRARIES = {
-]]
-
-    for _, lib in ipairs(libraries) do
-        script = script .. string.format('    "%s",\n', lib)
-    end
-    
-    script = script .. [[}
-
-local function printColored(text, color)
-    term.setTextColor(color)
-    print(text)
-    term.setTextColor(colors.white)
-end
-
-local function downloadFile(url, filename)
-    printColored("Downloading " .. filename .. "...", colors.yellow)
-    
-    local response = http.get(url)
-    if not response then
-        printColored("Failed to download " .. filename, colors.red)
-        return false
-    end
-    
-    local content = response.readAll()
-    response.close()
-    
-    -- Create directory if needed
-    if INSTALL_DIR ~= "." then
-        fs.makeDir(INSTALL_DIR)
-    end
-    
-    local filepath = INSTALL_DIR == "." and filename or (INSTALL_DIR .. "/" .. filename)
-    local file = fs.open(filepath, "w")
-    if not file then
-        printColored("Failed to write " .. filename, colors.red)
-        return false
-    end
-    
-    file.write(content)
-    file.close()
-    
-    printColored("✓ Installed " .. filename, colors.green)
-    return true
-end
-
--- Main installation process
-print("CC-Misc Utilities Installer")
-print("============================\n")
-
-local success = 0
-local failed = 0
-
-for _, lib in ipairs(LIBRARIES) do
-    local url = GITHUB_RAW_BASE .. lib .. ".lua"
-    local filename = lib .. ".lua"
-    
-    if downloadFile(url, filename) then
-        success = success + 1
-    else
-        failed = failed + 1
-    end
-end
-
-print()
-print("============================")
-printColored(string.format("Installation complete: %d succeeded, %d failed", success, failed), 
-    failed == 0 and colors.green or colors.yellow)
-
-if failed == 0 then
-    print("\nAll libraries installed successfully!")
-    if INSTALL_DIR ~= "." then
-        print("Libraries installed to: " .. INSTALL_DIR)
-    end
-else
-    print("\nSome libraries failed to install. Check your internet connection.")
-end
-]]
-
-    return script
-end
 
 ---Main function
 ---@param ... string Library names to pre-select
@@ -1053,78 +878,29 @@ local function main(...)
         return
     end
     
-    -- Choose action
-    local action = chooseAction()
-    if not action then
-        clearScreen()
-        printColored("Cancelled.", colors.yellow)
-        return
+    -- Determine installation directory
+    local installDir = "/lib"
+    if fs.exists("disk") and fs.isDir("disk") then
+        installDir = "disk/lib"
     end
     
-    -- Get installation directory
-    local installDir = getInstallDir()
+    -- Clear screen before operations
+    clearScreen()
     
-    if action == "install" then
-        -- Clear screen before operations
+    -- Uninstall libraries first (unchecked existing libraries)
+    if toDelete and #toDelete > 0 then
+        deleteLibraries(toDelete)
+    end
+    
+    -- Then install/update selected libraries
+    if #selected > 0 then
+        installLibraries(selected, installDir, toDelete and #toDelete > 0, originalSelection)
+    end
+    
+    -- Final summary
+    if (not toDelete or #toDelete == 0) and #selected == 0 then
         clearScreen()
-        
-        -- Uninstall libraries first (unchecked existing libraries)
-        if toDelete and #toDelete > 0 then
-            deleteLibraries(toDelete)
-        end
-        
-        -- Then install/update selected libraries
-        if #selected > 0 then
-            installLibraries(selected, installDir, toDelete and #toDelete > 0, originalSelection)
-        end
-        
-        -- Final summary
-        if (not toDelete or #toDelete == 0) and #selected == 0 then
-            clearScreen()
-            printColored("No changes to make.", colors.yellow)
-        end
-    else
-        -- Generate installer script
-        clearScreen()
-        
-        term.setTextColor(colors.yellow)
-        print("Generating Installer")
-        term.setTextColor(colors.white)
-        print()
-        
-        term.setTextColor(colors.lightGray)
-        print("Selected: " .. #selected .. " libraries")
-        print("Directory: " .. installDir)
-        term.setTextColor(colors.white)
-        print()
-        
-        for _, lib in ipairs(selected) do
-            term.setTextColor(colors.green)
-            print("  * " .. lib)
-        end
-        
-        term.setTextColor(colors.white)
-        print()
-        
-        local installerContent = generateInstaller(selected, installDir)
-        
-        -- Save installer
-        local file = fs.open("installer.lua", "w")
-        if not file then
-            term.setTextColor(colors.red)
-            print("Failed to create installer.lua!")
-            term.setTextColor(colors.white)
-            return
-        end
-        
-        file.write(installerContent)
-        file.close()
-        
-        term.setTextColor(colors.green)
-        print("Success!")
-        term.setTextColor(colors.white)
-        print()
-        print("Run: lua installer.lua")
+        printColored("No changes to make.", colors.yellow)
     end
 end
 
