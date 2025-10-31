@@ -7,7 +7,7 @@
 ---
 ---@usage
 ---local persist = require("persist")
----local config = persist("config.json", false)
+---local config = persist("config.json", false) -- Set to "true" to use textutils.serialize() rather than serializeJSON
 ---
 ---config.setDefault("port", 8080)
 ---config.set("name", "MyServer")
