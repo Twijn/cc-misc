@@ -14,19 +14,19 @@
 ---
 -- @module installergen
 
-local VERSION = "1.4.1"
+local VERSION = "1.5.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
--- Available libraries with descriptions
+-- Available libraries with descriptions and dependencies
 local LIBRARIES = {
-    {name = "cmd", description = "Command-line interface with REPL, autocompletion, and history"},
-    {name = "formui", description = "Form-based UI builder for creating interactive forms"},
-    {name = "log", description = "Logging utility with file and term output support"},
-    {name = "persist", description = "Data persistence utility for saving/loading Lua tables"},
-    {name = "s", description = "String manipulation utilities and extensions"},
-    {name = "tables", description = "Table manipulation utilities (deep copy, merge, etc.)"},
-    {name = "timeutil", description = "Time formatting and manipulation utilities"},
-    {name = "shopk", description = "Kromer API client for shop integration"},
+    {name = "cmd", description = "Command-line interface with REPL, autocompletion, and history", deps = {}},
+    {name = "formui", description = "Form-based UI builder for creating interactive forms", deps = {}},
+    {name = "log", description = "Logging utility with file and term output support", deps = {}},
+    {name = "persist", description = "Data persistence utility for saving/loading Lua tables", deps = {}},
+    {name = "s", description = "String manipulation utilities and extensions", deps = {"tables"}},
+    {name = "tables", description = "Table manipulation utilities (deep copy, merge, etc.)", deps = {}},
+    {name = "timeutil", description = "Time formatting and manipulation utilities", deps = {}},
+    {name = "shopk", description = "Kromer API client for shop integration", deps = {}},
 }
 
 ---Clear the terminal screen
@@ -64,10 +64,65 @@ local function findExistingLibrary(libName)
     return nil
 end
 
+---Get library info by name
+---@param name string Library name
+---@return table|nil Library info or nil
+local function getLibraryInfo(name)
+    for _, lib in ipairs(LIBRARIES) do
+        if lib.name == name then
+            return lib
+        end
+    end
+    return nil
+end
+
+---Resolve dependencies recursively
+---@param libNames table List of library names
+---@return table List of library names with all dependencies
+local function resolveDependencies(libNames)
+    local resolved = {}
+    local resolvedSet = {}
+    local visiting = {}
+    
+    local function resolve(name)
+        if resolvedSet[name] then
+            return -- Already resolved
+        end
+        
+        if visiting[name] then
+            -- Circular dependency detected - skip
+            return
+        end
+        
+        visiting[name] = true
+        
+        local lib = getLibraryInfo(name)
+        if lib and lib.deps then
+            for _, dep in ipairs(lib.deps) do
+                resolve(dep)
+            end
+        end
+        
+        visiting[name] = nil
+        
+        if not resolvedSet[name] then
+            table.insert(resolved, name)
+            resolvedSet[name] = true
+        end
+    end
+    
+    for _, name in ipairs(libNames) do
+        resolve(name)
+    end
+    
+    return resolved
+end
+
 ---Display library selection menu with scrolling support
 ---@param preselected table? Table of library names to pre-select
----@return table|nil Selected library names
+---@return table|nil Selected library names (with dependencies resolved)
 ---@return table|nil Libraries to delete
+---@return table|nil Original selection (before dependency resolution)
 local function selectLibraries(preselected)
     local selected = {}
     local cursor = 1
@@ -147,6 +202,9 @@ local function selectLibraries(preselected)
             end
             
             local line = string.format("%s %s - %s", marker, lib.name, lib.description)
+            if lib.deps and #lib.deps > 0 then
+                line = line .. " (requires: " .. table.concat(lib.deps, ", ") .. ")"
+            end
             if #line > w then
                 line = line:sub(1, w)
             else
@@ -214,6 +272,16 @@ local function selectLibraries(preselected)
     end
     table.sort(selectedList)
     
+    -- Keep original selection for tracking which were user-selected vs auto-added deps
+    local originalSelection = {}
+    for _, name in ipairs(selectedList) do
+        table.insert(originalSelection, name)
+    end
+    
+    -- Resolve dependencies (add any missing dependencies)
+    selectedList = resolveDependencies(selectedList)
+    table.sort(selectedList)
+    
     -- Build delete list (installed but not selected)
     local deleteList = {}
     for _, lib in ipairs(LIBRARIES) do
@@ -224,7 +292,7 @@ local function selectLibraries(preselected)
     end
     table.sort(deleteList)
     
-    return selectedList, deleteList
+    return selectedList, deleteList, originalSelection
 end
 
 ---Get installation directory from user
@@ -406,7 +474,8 @@ end
 ---@param libraries table List of library names
 ---@param installDir string Installation directory
 ---@param skipClear boolean? Skip clearing screen (for when deletions happened first)
-local function installLibraries(libraries, installDir, skipClear)
+---@param originalSelection table? Original selection before dependency resolution
+local function installLibraries(libraries, installDir, skipClear, originalSelection)
     -- Check existing libraries
     local status = checkLibraryStatus(libraries)
     
@@ -418,6 +487,26 @@ local function installLibraries(libraries, installDir, skipClear)
     print("Installing/Updating Libraries")
     term.setTextColor(colors.white)
     print()
+    
+    -- Show dependencies that were automatically added
+    if originalSelection then
+        local addedDeps = {}
+        local origSet = {}
+        for _, name in ipairs(originalSelection) do
+            origSet[name] = true
+        end
+        for _, name in ipairs(libraries) do
+            if not origSet[name] then
+                table.insert(addedDeps, name)
+            end
+        end
+        if #addedDeps > 0 then
+            term.setTextColor(colors.cyan)
+            print("Auto-adding dependencies: " .. table.concat(addedDeps, ", "))
+            term.setTextColor(colors.white)
+            print()
+        end
+    end
     
     local success = 0
     local failed = 0
@@ -650,7 +739,7 @@ local function main(...)
     end
     
     -- Select libraries (with optional pre-selection)
-    local selected, toDelete = selectLibraries(#preselected > 0 and preselected or nil)
+    local selected, toDelete, originalSelection = selectLibraries(#preselected > 0 and preselected or nil)
     if not selected then
         clearScreen()
         printColored("Cancelled.", colors.yellow)
@@ -679,7 +768,7 @@ local function main(...)
         
         -- Then install/update selected libraries
         if #selected > 0 then
-            installLibraries(selected, installDir, toDelete and #toDelete > 0)
+            installLibraries(selected, installDir, toDelete and #toDelete > 0, originalSelection)
         end
         
         -- Final summary

@@ -28,8 +28,18 @@ class LuaDocGenerator:
             'examples': [],
             'functions': [],
             'classes': [],
-            'fields': []
+            'fields': [],
+            'dependencies': []
         }
+        
+        # Extract dependencies from require() calls
+        # Look for require("lib") or require('/lib/lib')
+        require_pattern = r'require\s*\(\s*["\'](?:/lib/)?(\w+)["\']'
+        for match in re.finditer(require_pattern, content):
+            dep = match.group(1)
+            # Only add if it's one of our modules (avoid system modules)
+            if dep not in module['dependencies'] and dep != filepath.stem:
+                module['dependencies'].append(dep)
         
         # Extract module description (first block of comments before any code)
         # Stop at @usage or other tags
@@ -519,18 +529,34 @@ class LuaDocGenerator:
     
     <div class="install-section">
         <h2>Installation</h2>
-        <p><strong>Option 1:</strong> Quick install via installergen (recommended):</p>
+"""
+        
+        # Add dependency warning if there are dependencies
+        if module['dependencies']:
+            html += f"""        <div style="background: #3b362f; border: 1px solid #d89a3a; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+            <strong>⚠️ Dependencies:</strong> This library requires: {', '.join([f'<code style="background: #3b362f; border: 1px solid #c6ac83;">{dep}</code>' for dep in module['dependencies']])}
+            <br><em>Using installergen will automatically install all dependencies.</em>
+        </div>
+"""
+        
+        html += f"""        <p><strong>Recommended:</strong> Install via installergen (handles dependencies automatically):</p>
         <div class="install-cmd" id="installergen-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua {module['name']}</div>
         <div class="install-controls">
             <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
+            <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
         </div>
-        <p style="margin-top: 1.5rem;"><strong>Option 2:</strong> Direct download via wget:</p>
+"""
+        
+        # Only show direct wget option if there are no dependencies
+        if not module['dependencies']:
+            html += f"""        <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
         <div class="install-cmd" id="wget-cmd">wget {github_raw_url}</div>
         <div class="install-controls">
             <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
-            <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
         </div>
-    </div>
+"""
+        
+        html += """    </div>
     
     <script>
         function copyCommand(btn, cmdId) {{
