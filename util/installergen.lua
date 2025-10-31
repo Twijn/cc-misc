@@ -202,6 +202,7 @@ local function selectLibraries(preselected)
                 break
             end
         elseif key == keys.q then
+            sleep()
             return nil, nil
         end
     end
