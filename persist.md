@@ -6,7 +6,7 @@ A persistence module for ComputerCraft that provides automatic data serializatio
 
 ```lua
 local persist = require("persist")
-local config = persist("config.json", false)
+local config = persist("config.json", false) -- Set to "true" to use textutils.serialize() rather than serializeJSON
 config.setDefault("port", 8080)
 config.set("name", "MyServer")
 print(config.get("port")) -- 8080

@@ -238,7 +238,7 @@
     </script>
     <h2>Examples</h2>
     <pre><code class="language-lua">local persist = require("persist")
-local config = persist("config.json", false)
+local config = persist("config.json", false) -- Set to "true" to use textutils.serialize() rather than serializeJSON
 config.setDefault("port", 8080)
 config.set("name", "MyServer")
 print(config.get("port")) -- 8080</code></pre>
