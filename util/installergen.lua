@@ -14,7 +14,7 @@
 ---
 -- @module installergen
 
-local VERSION = "1.5.1"
+local VERSION = "1.5.2"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions and dependencies
@@ -191,7 +191,7 @@ local function selectLibraries(preselected)
             -- Determine marker
             local marker
             if willDelete then
-                marker = "[X]" -- Marked for uninstall (unchecked existing library)
+                marker = "[D]" -- Marked for uninstall (unchecked existing library)
             elseif selected[lib.name] then
                 marker = "[X]"
             else
@@ -204,7 +204,7 @@ local function selectLibraries(preselected)
             else
                 -- Color based on status
                 if willDelete then
-                    term.setTextColor(colors.red) -- Marked for uninstall
+                    term.setTextColor(colors.red) -- Marked for uninstall (always red)
                 elseif isExisting then
                     term.setTextColor(colors.yellow) -- Existing library (update)
                 elseif selected[lib.name] then
