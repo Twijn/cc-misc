@@ -520,7 +520,7 @@ class LuaDocGenerator:
     <div class="install-section">
         <h2>Installation</h2>
         <p>Quick install via wget:</p>
-        <div class="install-cmd" id="install-cmd">wget {github_raw_url} {module['name']}.lua</div>
+        <div class="install-cmd" id="install-cmd">wget {github_raw_url}</div>
         <div class="install-controls">
             <button class="copy-btn" onclick="copyInstallCommand(this)">Copy Command</button>
             <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
