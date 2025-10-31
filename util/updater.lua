@@ -19,12 +19,12 @@
 ----- Update all packages
 ---updater.updateAll()
 ---
----@version 1.0.0
+---@version 1.0.1
 -- @module updater
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
-local API_BASE = "https://twijn.github.io/cc-misc/api/"
+local API_BASE = "https://ccmisc.twijn.dev/api/"
 local DOWNLOAD_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 local module = {}

@@ -861,7 +861,7 @@ local {module['name']} = require(libDir .. "{module['name']}")
                 'description': module['description'],
                 'dependencies': module['dependencies'],
                 'download_url': f"https://raw.githubusercontent.com/Twijn/cc-misc/main/util/{module['name']}.lua",
-                'documentation_url': f"https://twijn.github.io/cc-misc/{module['name']}.html",
+                'documentation_url': f"https://ccmisc.twijn.dev/{module['name']}.html",
                 'functions': [f['name'] for f in module['functions']],
                 'classes': [c['name'] for c in module['classes']]
             }
@@ -897,7 +897,7 @@ local {module['name']} = require(libDir .. "{module['name']}")
                 'description': module['description'],
                 'dependencies': module['dependencies'],
                 'download_url': f"https://raw.githubusercontent.com/Twijn/cc-misc/main/util/{module['name']}.lua",
-                'documentation_url': f"https://twijn.github.io/cc-misc/{module['name']}.html",
+                'documentation_url': f"https://ccmisc.twijn.dev/{module['name']}.html",
                 'functions': module['functions'],
                 'classes': module['classes']
             }

@@ -20,7 +20,7 @@
 ---
 -- @module installer
 
-local VERSION = "3.0.0"
+local VERSION = "3.0.1"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 local API_URL = "https://ccmisc.twijn.dev/api/all.json"
 
@@ -73,14 +73,14 @@ end
 local function loadFallbackLibraries()
     LIBRARIES = {
         {name = "cmd", version = "1.0.0", description = "Command-line interface with REPL, autocompletion, and history", deps = {}},
-        {name = "formui", version = "0.1.0", description = "Form-based UI builder for creating interactive forms", deps = {}},
+        {name = "formui", version = "0.2.0", description = "Form-based UI builder for creating interactive forms", deps = {}},
         {name = "log", version = "1.0.0", description = "Logging utility with file and term output support", deps = {}},
         {name = "persist", version = "1.0.0", description = "Data persistence utility for saving/loading Lua tables", deps = {}},
         {name = "s", version = "2.0.0", description = "Settings management with interactive config", deps = {"tables"}},
         {name = "tables", version = "1.0.0", description = "Table manipulation utilities (deep copy, merge, etc.)", deps = {}},
         {name = "timeutil", version = "1.0.0", description = "Time formatting and manipulation utilities", deps = {}},
         {name = "shopk", version = "0.0.4", description = "Kromer API client for shop integration", deps = {}},
-        {name = "updater", version = "1.0.0", description = "Programmatic package updater and version manager", deps = {}},
+        {name = "updater", version = "1.0.1", description = "Programmatic package updater and version manager", deps = {}},
     }
     API_DATA = nil
 end
