@@ -9,9 +9,12 @@
 ---wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua installergen.lua
 ---installergen.lua
 ---
+--- Or pre-select libraries:
+---installergen.lua cmd s tables
+---
 -- @module installergen
 
-local VERSION = "1.3.2"
+local VERSION = "1.4.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 
 -- Available libraries with descriptions
@@ -62,9 +65,10 @@ local function findExistingLibrary(libName)
 end
 
 ---Display library selection menu with scrolling support
+---@param preselected table? Table of library names to pre-select
 ---@return table|nil Selected library names
 ---@return table|nil Libraries to delete
-local function selectLibraries()
+local function selectLibraries(preselected)
     local selected = {}
     local cursor = 1
     local w, h = term.getSize()
@@ -74,6 +78,13 @@ local function selectLibraries()
         local existing = findExistingLibrary(lib.name)
         if existing then
             selected[lib.name] = true
+        end
+    end
+    
+    -- Apply preselected libraries from arguments
+    if preselected then
+        for _, libName in ipairs(preselected) do
+            selected[libName] = true
         end
     end
     
@@ -610,15 +621,35 @@ end
 end
 
 ---Main function
-local function main()
+---@param ... string Library names to pre-select
+local function main(...)
     -- Check if we're in a ComputerCraft environment
     if not term or not colors then
         print("This script must be run in ComputerCraft!")
         return
     end
     
-    -- Select libraries
-    local selected, toDelete = selectLibraries()
+    -- Parse command-line arguments for pre-selection
+    local args = {...}
+    local preselected = {}
+    local validLibs = {}
+    for _, lib in ipairs(LIBRARIES) do
+        validLibs[lib.name] = true
+    end
+    
+    -- Validate and collect pre-selected libraries
+    for _, arg in ipairs(args) do
+        if validLibs[arg] then
+            table.insert(preselected, arg)
+        else
+            -- Show warning for invalid library names
+            printColored("Warning: Unknown library '" .. arg .. "' - ignoring", colors.yellow)
+            sleep(1)
+        end
+    end
+    
+    -- Select libraries (with optional pre-selection)
+    local selected, toDelete = selectLibraries(#preselected > 0 and preselected or nil)
     if not selected then
         clearScreen()
         printColored("Cancelled.", colors.yellow)
@@ -701,4 +732,4 @@ local function main()
 end
 
 -- Run the main function
-main()
+main(...)
