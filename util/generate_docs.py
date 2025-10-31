@@ -604,23 +604,22 @@ class LuaDocGenerator:
         
         # Add dependency warning if there are dependencies
         if module['dependencies']:
-            html += f"""        <div style="background: #3b362f; border: 1px solid #d89a3a; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
+            html += f'''        <div style="background: #3b362f; border: 1px solid #d89a3a; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
             <strong>⚠️ Dependencies:</strong> This library requires: {', '.join([f'<code style="background: #3b362f; border: 1px solid #c6ac83;">{dep}</code>' for dep in module['dependencies']])}
-            <br><em>Using installergen will automatically install all dependencies.</em>
-        </div>
-"""
-        
-        html += f"""        <p><strong>Recommended:</strong> Install via installergen (handles dependencies automatically):</p>
-        <div class="install-cmd" id="installergen-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua {module['name']}</div>
-        <div class="install-controls">
-            <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
-            <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
-        </div>
-        
-        <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
-        <div class="collapsible-content">
-            <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
-            <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
+            <br><em>Using installer will automatically install all dependencies.</em>
+        </div>\n'''
+
+        html += f'''        <p><strong>Recommended:</strong> Install via installer (handles dependencies automatically):</p>
+        <div class="install-cmd" id="installer-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua {module['name']}</div>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCommand(this, 'installer-cmd')">Copy Command</button>
+                <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
+            </div>
+            
+            <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
+            <div class="collapsible-content">
+                <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
+                <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
 local libs = {{"{module['name']}"}} -- Add more libraries as needed
 local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
 local allExist = true
@@ -633,7 +632,7 @@ for _, lib in ipairs(libs) do
 end
 
 if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
 local {module['name']} = require(libDir .. "{module['name']}")
@@ -641,20 +640,18 @@ local {module['name']} = require(libDir .. "{module['name']}")
 -- Use the library
 -- (your code here)
 </code></pre>
-            <div class="install-controls">
-                <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
-            </div>
-        </div>
-"""
-        
+                <div class="install-controls">
+                    <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
+                </div>
+            </div>\n'''
+
         # Only show direct wget option if there are no dependencies
         if not module['dependencies']:
-            html += f"""        <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
-        <div class="install-cmd" id="wget-cmd">wget {github_raw_url}</div>
-        <div class="install-controls">
-            <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
-        </div>
-"""
+            html += f'''        <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
+            <div class="install-cmd" id="wget-cmd">wget {github_raw_url}</div>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
+            </div>\n'''
         
         html += """    </div>
     
@@ -730,7 +727,7 @@ for _, lib in ipairs(libs) do
 end
 
 if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
 local {module['name']} = require(libDir .. "{module['name']}")
@@ -847,17 +844,17 @@ local {module['name']} = require(libDir .. "{module['name']}")
         # Create api directory inside docs
         api_dir = self.output_dir / 'api'
         api_dir.mkdir(exist_ok=True)
-        
-        # Exclude installergen from API
-        EXCLUDE_FROM_API = {"installergen"}
-        
+
+        # Exclude installer from API
+        EXCLUDE_FROM_API = {"installer"}
+
         # Generate libraries.json with all module info
         libraries = []
         for module in self.modules:
             # Skip excluded modules
             if module['name'] in EXCLUDE_FROM_API:
                 continue
-            
+
             lib_info = {
                 'name': module['name'],
                 'version': module.get('version'),
@@ -869,7 +866,7 @@ local {module['name']} = require(libDir .. "{module['name']}")
                 'classes': [c['name'] for c in module['classes']]
             }
             libraries.append(lib_info)
-            
+
             # Generate individual library JSON files
             lib_file = api_dir / f"{module['name']}.json"
             with open(lib_file, 'w', encoding='utf-8') as f:
