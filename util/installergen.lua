@@ -2,7 +2,15 @@
 --- Interactive tool to install ComputerCraft libraries with dependency management
 ---
 --- This tool provides a user-friendly interface to select and install libraries from the cc-misc
---- repository directly to your ComputerCraft computer.
+--- repository directly to your ComputerCraft computer. Library information is loaded from the
+--- online API at https://ccmisc.twijn.dev/api/all.json with automatic fallback to offline mode.
+---
+--- Features:
+--- - Dynamic library loading from API with detailed information
+--- - Press RIGHT arrow to view library details (functions, version, dependencies)
+--- - Automatic dependency resolution
+--- - Visual indicators for selections and requirements
+--- - Install/update or generate installer scripts
 ---
 ---@usage
 ---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua
@@ -12,21 +20,70 @@
 ---
 -- @module installergen
 
-local VERSION = "2.0.0"
+local VERSION = "2.1.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
+local API_URL = "https://ccmisc.twijn.dev/api/all.json"
 
--- Available libraries with descriptions and dependencies
-local LIBRARIES = {
-    {name = "cmd", description = "Command-line interface with REPL, autocompletion, and history", deps = {}},
-    {name = "formui", description = "Form-based UI builder for creating interactive forms", deps = {}},
-    {name = "log", description = "Logging utility with file and term output support", deps = {}},
-    {name = "persist", description = "Data persistence utility for saving/loading Lua tables", deps = {}},
-    {name = "s", description = "Settings management with interactive config", deps = {"tables"}},
-    {name = "tables", description = "Table manipulation utilities (deep copy, merge, etc.)", deps = {}},
-    {name = "timeutil", description = "Time formatting and manipulation utilities", deps = {}},
-    {name = "shopk", description = "Kromer API client for shop integration", deps = {}},
-    {name = "updater", description = "Programmatic package updater and version manager", deps = {}},
-}
+-- Available libraries (loaded from API or fallback)
+local LIBRARIES = nil
+local API_DATA = nil -- Full API data with detailed information
+
+---Load libraries from API
+---@return boolean Success
+local function loadLibrariesFromAPI()
+    term.setTextColor(colors.lightGray)
+    print("Loading library information from API...")
+    term.setTextColor(colors.white)
+    
+    local response = http.get(API_URL)
+    if not response then
+        return false
+    end
+    
+    local content = response.readAll()
+    response.close()
+    
+    -- Parse JSON
+    local data = textutils.unserializeJSON(content)
+    if not data or not data.libraries then
+        return false
+    end
+    
+    -- Store full API data
+    API_DATA = data.libraries
+    
+    -- Convert to LIBRARIES format
+    LIBRARIES = {}
+    for name, info in pairs(data.libraries) do
+        table.insert(LIBRARIES, {
+            name = name,
+            version = info.version or "unknown",
+            description = info.description or "No description available",
+            deps = info.dependencies or {}
+        })
+    end
+    
+    -- Sort by name
+    table.sort(LIBRARIES, function(a, b) return a.name < b.name end)
+    
+    return true
+end
+
+---Fallback libraries (used if API is unavailable)
+local function loadFallbackLibraries()
+    LIBRARIES = {
+        {name = "cmd", version = "1.0.0", description = "Command-line interface with REPL, autocompletion, and history", deps = {}},
+        {name = "formui", version = "0.1.0", description = "Form-based UI builder for creating interactive forms", deps = {}},
+        {name = "log", version = "1.0.0", description = "Logging utility with file and term output support", deps = {}},
+        {name = "persist", version = "1.0.0", description = "Data persistence utility for saving/loading Lua tables", deps = {}},
+        {name = "s", version = "2.0.0", description = "Settings management with interactive config", deps = {"tables"}},
+        {name = "tables", version = "1.0.0", description = "Table manipulation utilities (deep copy, merge, etc.)", deps = {}},
+        {name = "timeutil", version = "1.0.0", description = "Time formatting and manipulation utilities", deps = {}},
+        {name = "shopk", version = "0.0.4", description = "Kromer API client for shop integration", deps = {}},
+        {name = "updater", version = "1.0.0", description = "Programmatic package updater and version manager", deps = {}},
+    }
+    API_DATA = nil
+end
 
 ---Clear the terminal screen
 local function clearScreen()
@@ -73,6 +130,169 @@ local function getLibraryInfo(name)
         end
     end
     return nil
+end
+
+---Show detailed library information
+---@param libName string Library name
+local function showLibraryDetails(libName)
+    local lib = getLibraryInfo(libName)
+    if not lib then
+        return
+    end
+    
+    local apiInfo = API_DATA and API_DATA[libName]
+    local w, h = term.getSize()
+    local scroll = 0
+    
+    while true do
+        clearScreen()
+        
+        -- Header
+        term.setTextColor(colors.yellow)
+        print(libName .. " - Details")
+        term.setTextColor(colors.lightGray)
+        print("Up/Down: Scroll | Left/ESC: Back")
+        term.setTextColor(colors.white)
+        print()
+        
+        -- Build content lines
+        local lines = {}
+        
+        -- Version
+        table.insert(lines, {text = "Version: " .. lib.version, color = colors.lightBlue})
+        table.insert(lines, {text = "", color = colors.white})
+        
+        -- Description
+        table.insert(lines, {text = "Description:", color = colors.yellow})
+        -- Word wrap description
+        local desc = lib.description
+        local maxWidth = w - 2
+        while #desc > 0 do
+            if #desc <= maxWidth then
+                table.insert(lines, {text = "  " .. desc, color = colors.lightGray})
+                break
+            else
+                local cutoff = maxWidth
+                -- Try to break at a space
+                local lastSpace = desc:sub(1, maxWidth):match("^.*() ")
+                if lastSpace and lastSpace > maxWidth * 0.6 then
+                    cutoff = lastSpace - 1
+                end
+                table.insert(lines, {text = "  " .. desc:sub(1, cutoff), color = colors.lightGray})
+                desc = desc:sub(cutoff + 1):match("^%s*(.*)") -- Trim leading whitespace
+            end
+        end
+        table.insert(lines, {text = "", color = colors.white})
+        
+        -- Dependencies
+        if lib.deps and #lib.deps > 0 then
+            table.insert(lines, {text = "Dependencies:", color = colors.yellow})
+            for _, dep in ipairs(lib.deps) do
+                table.insert(lines, {text = "  - " .. dep, color = colors.cyan})
+            end
+            table.insert(lines, {text = "", color = colors.white})
+        end
+        
+        -- API information (if available)
+        if apiInfo then
+            -- Functions
+            if apiInfo.functions and #apiInfo.functions > 0 then
+                table.insert(lines, {text = "Functions (" .. #apiInfo.functions .. "):", color = colors.yellow})
+                for i, func in ipairs(apiInfo.functions) do
+                    if i <= 10 then -- Limit to first 10 functions
+                        local signature = func.name .. "("
+                        if func.params and #func.params > 0 then
+                            local paramNames = {}
+                            for _, param in ipairs(func.params) do
+                                table.insert(paramNames, param.name)
+                            end
+                            signature = signature .. table.concat(paramNames, ", ")
+                        end
+                        signature = signature .. ")"
+                        
+                        table.insert(lines, {text = "  " .. signature, color = colors.lightBlue})
+                        if func.description and func.description ~= "" then
+                            -- Word wrap function description
+                            local funcDesc = "    " .. func.description
+                            local fmaxWidth = w - 4
+                            while #funcDesc > 0 do
+                                if #funcDesc <= fmaxWidth then
+                                    table.insert(lines, {text = funcDesc, color = colors.gray})
+                                    break
+                                else
+                                    local fcutoff = fmaxWidth
+                                    local flastSpace = funcDesc:sub(1, fmaxWidth):match("^.*() ")
+                                    if flastSpace and flastSpace > fmaxWidth * 0.6 then
+                                        fcutoff = flastSpace - 1
+                                    end
+                                    table.insert(lines, {text = funcDesc:sub(1, fcutoff), color = colors.gray})
+                                    funcDesc = "    " .. funcDesc:sub(fcutoff + 1):match("^%s*(.*)")
+                                end
+                            end
+                        end
+                        if func.returns and func.returns ~= "" then
+                            table.insert(lines, {text = "    Returns: " .. func.returns, color = colors.green})
+                        end
+                    end
+                end
+                if #apiInfo.functions > 10 then
+                    table.insert(lines, {text = "  ... and " .. (#apiInfo.functions - 10) .. " more", color = colors.gray})
+                end
+                table.insert(lines, {text = "", color = colors.white})
+            end
+            
+            -- Classes
+            if apiInfo.classes and #apiInfo.classes > 0 then
+                table.insert(lines, {text = "Classes (" .. #apiInfo.classes .. "):", color = colors.yellow})
+                for _, class in ipairs(apiInfo.classes) do
+                    table.insert(lines, {text = "  " .. class.name, color = colors.lightBlue})
+                    if class.description and class.description ~= "" then
+                        table.insert(lines, {text = "    " .. class.description, color = colors.gray})
+                    end
+                end
+                table.insert(lines, {text = "", color = colors.white})
+            end
+            
+            -- Links
+            if apiInfo.documentation_url then
+                table.insert(lines, {text = "Documentation:", color = colors.yellow})
+                table.insert(lines, {text = "  " .. apiInfo.documentation_url, color = colors.blue})
+                table.insert(lines, {text = "", color = colors.white})
+            end
+        else
+            table.insert(lines, {text = "No detailed information available (offline mode)", color = colors.gray})
+        end
+        
+        -- Display visible lines with scrolling
+        local maxVisibleLines = h - 4
+        local startLine = scroll + 1
+        local endLine = math.min(startLine + maxVisibleLines - 1, #lines)
+        
+        for i = startLine, endLine do
+            term.setTextColor(lines[i].color)
+            print(lines[i].text)
+        end
+        
+        -- Scroll indicator
+        if #lines > maxVisibleLines then
+            term.setCursorPos(1, h)
+            term.setTextColor(colors.gray)
+            write(string.format("Line %d-%d of %d", startLine, endLine, #lines))
+        end
+        
+        term.setTextColor(colors.white)
+        
+        -- Handle input
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            scroll = math.max(0, scroll - 1)
+        elseif key == keys.down then
+            scroll = math.min(math.max(0, #lines - maxVisibleLines), scroll + 1)
+        elseif key == keys.left or key == keys.backspace then
+            break
+        end
+    end
 end
 
 ---Resolve dependencies recursively
@@ -156,7 +376,7 @@ local function selectLibraries(preselected)
         term.setTextColor(colors.yellow)
         print("CC-Misc Installer v" .. VERSION)
         term.setTextColor(colors.lightGray)
-        print("Up/Down: Move | Space: Toggle | Enter: Continue | Q: Quit")
+        print("Up/Down: Move | Space: Toggle | Right: Details | Enter: Continue | Q: Quit")
         term.setTextColor(colors.white)
         print()
         
@@ -285,6 +505,10 @@ local function selectLibraries(preselected)
             cursor = math.max(1, cursor - 1)
         elseif key == keys.down then
             cursor = math.min(totalItems, cursor + 1)
+        elseif key == keys.right then
+            -- Show library details
+            local lib = LIBRARIES[cursor]
+            showLibraryDetails(lib.name)
         elseif key == keys.space or key == keys.d then
             local lib = LIBRARIES[cursor]
             
@@ -789,6 +1013,17 @@ local function main(...)
     if not term or not colors then
         print("This script must be run in ComputerCraft!")
         return
+    end
+    
+    -- Load libraries from API or fallback
+    clearScreen()
+    if not loadLibrariesFromAPI() then
+        printColored("Warning: Could not load from API, using offline library list", colors.yellow)
+        sleep(1.5)
+        loadFallbackLibraries()
+    else
+        printColored("Successfully loaded " .. #LIBRARIES .. " libraries from API", colors.green)
+        sleep(1)
     end
     
     -- Parse command-line arguments for pre-selection
