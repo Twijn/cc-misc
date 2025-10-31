@@ -192,13 +192,51 @@
             border-color: #28a745;
             color: white;
         }
+        .collapsible {
+            background: transparent;
+            color: var(--link);
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            border: 1px solid var(--border);
+            text-align: left;
+            outline: none;
+            font-size: 0.95em;
+            border-radius: 4px;
+            margin-top: 1rem;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .collapsible:hover {
+            background: var(--code-bg);
+        }
+        .collapsible:after {
+            content: '\25B6';
+            float: right;
+            margin-left: 5px;
+            font-size: 0.8em;
+        }
+        .collapsible.active:after {
+            content: '\25BC';
+        }
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+            border-left: 3px solid var(--border);
+            padding-left: 1rem;
+            margin-top: 0.5rem;
+        }
+        .collapsible-content.active {
+            margin-bottom: 1rem;
+        }
     </style>
 </head>
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
         <h1>installergen</h1>
-        <p>Installer Generator for CC-Misc Utilities Interactive tool to generate custom installer scripts for ComputerCraft libraries This tool provides a user-friendly interface to select multiple libraries from the cc-misc repository and generates a single installer.lua file that will download all selected libraries to your ComputerCraft computer.</p>
+        <p>Installer Generator for CC-Misc Utilities Interactive tool to install ComputerCraft libraries with dependency management This tool provides a user-friendly interface to select and install libraries from the cc-misc repository directly to your ComputerCraft computer.</p>
     </div>
     
     <div class="install-section">
@@ -208,6 +246,20 @@
         <div class="install-controls">
             <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
             <a href="https://github.com/Twijn/cc-misc/blob/main/util/installergen.lua" class="github-link" target="_blank">View on GitHub →</a>
+        </div>
+        
+        <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
+        <div class="collapsible-content">
+            <p style="margin-top: 0.5rem;">This pattern downloads and runs the library at runtime, automatically installing it if not present:</p>
+            <pre><code class="language-lua">-- Download and require installergen with automatic installation
+if not fs.exists("installergen.lua") then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "installergen")
+end
+local installergen = require("installergen")
+
+-- Use the library
+-- (your code here)
+</code></pre>
         </div>
         <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
         <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua</div>
@@ -235,12 +287,34 @@
                 }}, 2000);
             }});
         }}
+        
+        function toggleCollapsible(btn) {{
+            btn.classList.toggle('active');
+            const content = btn.nextElementSibling;
+            content.classList.toggle('active');
+            if (content.style.maxHeight) {{
+                content.style.maxHeight = null;
+            }} else {{
+                content.style.maxHeight = content.scrollHeight + 'px';
+            }}
+        }}
     </script>
     <h2>Examples</h2>
-    <pre><code class="language-lua">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua installergen.lua
-installergen.lua
+    <h3>Using with Runtime Installation</h3>
+    <p>This example shows how to download and use the library with automatic installation:</p>
+    <pre><code class="language-lua">-- Download and require installergen with automatic installation
+if not fs.exists("installergen.lua") then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", "installergen")
+end
+local installergen = require("installergen")
+
+-- Use the library
+</code></pre>
+    
+    <h3>Usage Examples</h3>
+    <pre><code class="language-lua">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua
 Or pre-select libraries:
-installergen.lua cmd s tables</code></pre>
+wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua cmd s</code></pre>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
