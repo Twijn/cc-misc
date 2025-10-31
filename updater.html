@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>updater - CC-Misc Utilities</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        .header p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            opacity: 0.9;
+        }
+        h2 {
+            margin-top: 3rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.8rem;
+        }
+        h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
+        }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        .function:not(.token) {
+            margin: 2rem 0;
+            padding: 1.5rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+        }
+        .function h3 {
+            margin-top: 0;
+        }
+        .function > p {
+            margin: 1rem 0;
+            line-height: 1.7;
+        }
+        .params, .returns {
+            margin-top: 1rem;
+        }
+        .params ul, .returns ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        .params li, .returns li {
+            padding: 0.5rem 0;
+            padding-left: 1rem;
+            border-left: 3px solid var(--border);
+            margin: 0.25rem 0;
+        }
+        a {
+            color: var(--link);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+        .install-section {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        .install-section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            border-bottom: none;
+        }
+        .install-cmd {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 0.5rem 0;
+            word-break: break-all;
+        }
+        .github-link {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--link);
+            color: white;
+            border: 1px solid var(--link);
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .github-link:hover {
+            opacity: 0.85;
+            text-decoration: none;
+        }
+        .install-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        .copy-btn {
+            display: inline-block;
+            background: transparent;
+            color: var(--link);
+            border: 1px solid var(--link);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+            text-decoration: none;
+        }
+        .copy-btn:hover {
+            background: var(--link);
+            color: white;
+        }
+        .copy-btn.copied {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .collapsible {
+            background: transparent;
+            color: var(--link);
+            cursor: pointer;
+            padding: 0.75rem 1rem;
+            width: 100%;
+            border: 1px solid var(--border);
+            text-align: left;
+            outline: none;
+            font-size: 0.95em;
+            border-radius: 4px;
+            margin-top: 1rem;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .collapsible:hover {
+            background: var(--code-bg);
+        }
+        .collapsible:after {
+            content: '\25B6';
+            float: right;
+            margin-left: 5px;
+            font-size: 0.8em;
+        }
+        .collapsible.active:after {
+            content: '\25BC';
+        }
+        .collapsible-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+            border-left: 3px solid var(--border);
+            padding-left: 1rem;
+            margin-top: 0.5rem;
+        }
+        .collapsible-content.active {
+            margin-bottom: 1rem;
+        }
+        .version-badge {
+            display: inline-block;
+            background: #2a3540;
+            color: #8b949e;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 500;
+            margin-left: 1rem;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>updater <span class="version-badge">v1.0.0</span></h1>
+        <p>A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, and JSON API integration.</p>
+    </div>
+    
+    <div class="install-section">
+        <h2>Installation</h2>
+        <p><strong>Recommended:</strong> Install via installergen (handles dependencies automatically):</p>
+        <div class="install-cmd" id="installergen-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua updater</div>
+        <div class="install-controls">
+            <button class="copy-btn" onclick="copyCommand(this, 'installergen-cmd')">Copy Command</button>
+            <a href="https://github.com/Twijn/cc-misc/blob/main/util/updater.lua" class="github-link" target="_blank">View on GitHub →</a>
+        </div>
+        
+        <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
+        <div class="collapsible-content">
+            <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
+            <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
+local libs = {"updater"} -- Add more libraries as needed
+local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
+local allExist = true
+
+for _, lib in ipairs(libs) do
+    if not fs.exists(libDir .. lib .. ".lua") then
+        allExist = false
+        break
+    end
+end
+
+if not allExist then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+end
+
+local updater = require(libDir .. "updater")
+
+-- Use the library
+-- (your code here)
+</code></pre>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
+            </div>
+        </div>
+        <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
+        <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua</div>
+        <div class="install-controls">
+            <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
+        </div>
+    </div>
+    
+    <script>
+        function copyCommand(btn, cmdId) {{
+            const cmd = document.getElementById(cmdId).textContent;
+            navigator.clipboard.writeText(cmd).then(() => {{
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {{
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy:', err);
+                btn.textContent = '✗ Failed';
+                setTimeout(() => {{
+                    btn.textContent = 'Copy Command';
+                }}, 2000);
+            }});
+        }}
+        
+        function copyCode(btn, codeId) {{
+            const code = document.getElementById(codeId).textContent;
+            navigator.clipboard.writeText(code).then(() => {{
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {{
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy:', err);
+                btn.textContent = '✗ Failed';
+                setTimeout(() => {{
+                    btn.textContent = 'Copy Code';
+                }}, 2000);
+            }});
+        }}
+        
+        function toggleCollapsible(btn) {{
+            btn.classList.toggle('active');
+            const content = btn.nextElementSibling;
+            content.classList.toggle('active');
+            if (content.style.maxHeight) {{
+                content.style.maxHeight = null;
+            }} else {{
+                content.style.maxHeight = content.scrollHeight + 'px';
+            }}
+        }}
+    </script>
+    <h2>Examples</h2>
+    <h3>Using with Runtime Installation</h3>
+    <p>This example shows how to download and use libraries with automatic installation:</p>
+    <pre><code class="language-lua">-- Auto-install and require libraries
+local libs = {"updater"} -- Add more libraries as needed
+local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
+local allExist = true
+
+for _, lib in ipairs(libs) do
+    if not fs.exists(libDir .. lib .. ".lua") then
+        allExist = false
+        break
+    end
+end
+
+if not allExist then
+    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installergen.lua", table.unpack(libs))
+end
+
+local updater = require(libDir .. "updater")
+
+-- Use the library
+</code></pre>
+    
+    <h3>Usage Examples</h3>
+    <pre><code class="language-lua">local updater = require("updater")
+-- Check for updates
+local updates = updater.checkUpdates()
+for _, update in ipairs(updates) do
+ print(update.name .. ": " .. update.current .. " -&gt; " .. update.latest)
+end
+-- Update a specific package
+updater.update("s")
+-- Update all packages
+updater.updateAll()</code></pre>
+    <h2>Functions</h2>
+    <div class='function'>
+        <h3><code>module.getLibraries()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L156' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Get information about all available libraries</p>
+        <div class='returns'><strong>Returns:</strong> table|nil List of library info or nil on error</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.getLibraryInfo(name)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L162' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Get information about a specific library</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): Library name</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table|nil Library info or nil on error</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.checkUpdates()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L169' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Check for updates to installed libraries</p>
+        <div class='returns'><strong>Returns:</strong> table List of libraries with available updates</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.hasUpdate(name)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L201' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Check if a specific library has an update available</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): Library name</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean, string|nil, string|nil Has update, current version, latest version</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.update(name, silent?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L223' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Install or update a library</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): Library name</li>
+                <li><code>silent?</code> (boolean): Suppress output messages</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean Success</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.updateAll(silent?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L270' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Update all installed libraries that have updates available</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>silent?</code> (boolean): Suppress output messages</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> number Number of successful updates</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.listInstalled()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L308' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>List all installed libraries with their versions</p>
+        <div class='returns'><strong>Returns:</strong> table List of {name, version, path} for installed libraries</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.install(name, silent?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L333' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Install a new library with its dependencies</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): Library name</li>
+                <li><code>silent?</code> (boolean): Suppress output messages</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean Success</div>
+    </div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
+</html>

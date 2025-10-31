@@ -1,0 +1,24 @@
+{
+  "name": "s",
+  "version": "2.0.0",
+  "description": "A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.",
+  "dependencies": [
+    "tables",
+    "formui"
+  ],
+  "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/s.lua",
+  "documentation_url": "https://twijn.github.io/cc-misc/s.html",
+  "functions": [
+    "module.peripheral",
+    "module.number",
+    "module.string",
+    "module.boolean",
+    "module.useForm",
+    "formInterface.peripheral",
+    "formInterface.number",
+    "formInterface.string",
+    "formInterface.boolean",
+    "formInterface.submit"
+  ],
+  "classes": []
+}

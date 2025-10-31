@@ -1,0 +1,19 @@
+{
+  "name": "updater",
+  "version": "1.0.0",
+  "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, and JSON API integration.",
+  "dependencies": [],
+  "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua",
+  "documentation_url": "https://twijn.github.io/cc-misc/updater.html",
+  "functions": [
+    "module.getLibraries",
+    "module.getLibraryInfo",
+    "module.checkUpdates",
+    "module.hasUpdate",
+    "module.update",
+    "module.updateAll",
+    "module.listInstalled",
+    "module.install"
+  ],
+  "classes": []
+}
