@@ -7,7 +7,7 @@
     "formui"
   ],
   "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/s.lua",
-  "documentation_url": "https://twijn.github.io/cc-misc/s.html",
+  "documentation_url": "https://ccmisc.twijn.dev/s.html",
   "functions": [
     "module.peripheral",
     "module.number",

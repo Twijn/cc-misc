@@ -6,7 +6,7 @@
       "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, and string utility functions (split, startsWith).",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/cmd.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/cmd.html",
+      "documentation_url": "https://ccmisc.twijn.dev/cmd.html",
       "functions": [
         "string.split",
         "string.startsWith"
@@ -19,7 +19,7 @@
       "description": "A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/shopk.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/shopk.html",
+      "documentation_url": "https://ccmisc.twijn.dev/shopk.html",
       "functions": [
         "module.on",
         "module.run",
@@ -35,7 +35,7 @@
       "description": "A persistence module for ComputerCraft that provides automatic data serialization and storage to files with support for both Lua serialization and JSON formats. Features: Automatic file creation and loading, deep copy functionality to handle circular references, support for both Lua serialize and JSON formats, error handling with fallback mechanisms, array and object manipulation methods, and automatic saving on data changes.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/persist.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/persist.html",
+      "documentation_url": "https://ccmisc.twijn.dev/persist.html",
       "functions": [],
       "classes": []
     },
@@ -48,7 +48,7 @@
         "formui"
       ],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/s.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/s.html",
+      "documentation_url": "https://ccmisc.twijn.dev/s.html",
       "functions": [
         "module.peripheral",
         "module.number",
@@ -69,7 +69,7 @@
       "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, and timestamped log entries.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/log.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/log.html",
+      "documentation_url": "https://ccmisc.twijn.dev/log.html",
       "functions": [
         "module.info",
         "module.warn",
@@ -79,11 +79,11 @@
     },
     {
       "name": "updater",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, and JSON API integration.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/updater.html",
+      "documentation_url": "https://ccmisc.twijn.dev/updater.html",
       "functions": [
         "module.getLibraries",
         "module.getLibraryInfo",
@@ -102,7 +102,7 @@
       "description": "A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking with includes(), table size counting for any table type, deep recursive copying with nested table support, deep recursive equality comparison, and works with both array-like and associative tables.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/tables.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/tables.html",
+      "documentation_url": "https://ccmisc.twijn.dev/tables.html",
       "functions": [
         "module.includes",
         "module.count",
@@ -117,7 +117,7 @@
       "description": "A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/timeutil.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/timeutil.html",
+      "documentation_url": "https://ccmisc.twijn.dev/timeutil.html",
       "functions": [
         "module.every",
         "module.everyLoaded",
@@ -132,7 +132,7 @@
       "description": "A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, checkbox/toggle fields, multi-select dropdowns, list fields with item management, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/formui.lua",
-      "documentation_url": "https://twijn.github.io/cc-misc/formui.html",
+      "documentation_url": "https://ccmisc.twijn.dev/formui.html",
       "functions": [
         "FormUI.new",
         "FormUI:addField",
@@ -159,5 +159,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-10-31T05:30:47Z"
+  "updated": "2025-10-31T06:09:53Z"
 }
