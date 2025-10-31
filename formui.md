@@ -1,6 +1,6 @@
 # formui
 
-A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.
+A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, checkbox/toggle fields, multi-select dropdowns, list fields with item management, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.
 
 ## Examples
 
@@ -10,11 +10,16 @@ local form = FormUI.new("Configuration")
 local nameField = form:text("Name", "default")
 local portField = form:number("Port", 8080)
 local modemField = form:peripheral("Modem", "modem")
+local enabledField = form:checkbox("Enabled", true)
+local featuresField = form:multiselect("Features", {"feature1", "feature2", "feature3"})
+local itemsField = form:list("Items", {"item1", "item2"}, "string")
 form:addSubmitCancel()
 local result = form:run()
 if result then
  print("Name:", nameField())
  print("Port:", portField())
+ print("Enabled:", enabledField())
+ print("Features:", table.concat(featuresField(), ", "))
 end
 ```
 
@@ -110,6 +115,41 @@ Add a button that can trigger actions
 - `action?` (string): Action identifier (defaults to lowercase text)
 
 **Returns:** fun(): string # Function to get the button text
+
+### `FormUI:checkbox(label, default?)`
+
+Add a checkbox/toggle field
+
+**Parameters:**
+
+- `label` (string): The field label
+- `default?` (boolean): Default value (true/false)
+
+**Returns:** fun(): boolean # Function to get the field value after submission
+
+### `FormUI:multiselect(label, options, defaultIndices?)`
+
+Add a multi-select dropdown field
+
+**Parameters:**
+
+- `label` (string): The field label
+- `options` (string[]): Available options
+- `defaultIndices?` (number[]): Indices of default selections (1-based)
+
+**Returns:** fun(): string[] # Function to get selected options after submission
+
+### `FormUI:list(label, default?, itemType?)`
+
+Add a list field (string or number list, with item reordering)
+
+**Parameters:**
+
+- `label` (string): The field label
+- `default?` (table): Default list value
+- `itemType?` (string): "string" or "number"
+
+**Returns:** fun(): table # Function to get the list after submission
 
 ### `FormUI:addSubmitCancel()`
 
