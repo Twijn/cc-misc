@@ -29,8 +29,18 @@ class LuaDocGenerator:
             'functions': [],
             'classes': [],
             'fields': [],
-            'dependencies': []
+            'dependencies': [],
+            'version': None
         }
+        
+        # Extract version from VERSION constant or @version tag
+        version_const_match = re.search(r'VERSION\s*=\s*["\']([^"\']+)["\']', content)
+        if version_const_match:
+            module['version'] = version_const_match.group(1)
+        else:
+            version_tag_match = re.search(r'---@version\s+([^\s]+)', content)
+            if version_tag_match:
+                module['version'] = version_tag_match.group(1)
         
         # Extract dependencies from require() calls
         # Look for require("lib") or require('/lib/lib')
@@ -286,6 +296,17 @@ class LuaDocGenerator:
             color: var(--text);
             opacity: 0.8;
         }
+        .version-badge {
+            display: inline-block;
+            background: var(--link);
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 600;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
         code {
             background: var(--code-bg);
             padding: 0.2rem 0.4rem;
@@ -303,8 +324,9 @@ class LuaDocGenerator:
 """
         
         for module in modules:
+            version_badge = f'<span class="version-badge">v{module["version"]}</span>' if module.get('version') else ''
             html += f"""        <div class="module">
-            <h3><a href="{module['name']}.html">{module['name']}</a></h3>
+            <h3><a href="{module['name']}.html">{module['name']}</a>{version_badge}</h3>
             <p>{module['description'][:200]}{'...' if len(module['description']) > 200 else ''}</p>
         </div>
 """
@@ -556,12 +578,23 @@ class LuaDocGenerator:
         .collapsible-content.active {{
             margin-bottom: 1rem;
         }}
+        .version-badge {{
+            display: inline-block;
+            background: var(--link);
+            color: white;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+            font-weight: 600;
+            margin-left: 1rem;
+            vertical-align: middle;
+        }}
     </style>
 </head>
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>{module['name']}</h1>
+        <h1>{module['name']}{' <span class="version-badge">v' + module['version'] + '</span>' if module.get('version') else ''}</h1>
         <p>{description}</p>
     </div>
     
