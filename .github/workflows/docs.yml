@@ -26,6 +26,9 @@ jobs:
       run: |
         cd util
         python3 generate_docs.py
+
+    - name: Add CNAME
+      run: echo 'ccmisc.twijn.dev' > ./docs/CNAME
         
     - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
