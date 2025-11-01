@@ -14,18 +14,18 @@
 ---local copy = tables.recursiveCopy(myTable)
 ---print(tables.recursiveEquals(myTable, copy)) -- true
 ---
----@version 1.0.0
+---@version 1.0.1
 -- @module tables
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
-local module = {}
+local tables = {}
 
 ---Check if a table contains a specific value
 ---@param table table The table to search in
 ---@param object any The value to search for
 ---@return boolean # True if the object is found in the table
-function module.includes(table, object)
+function tables.includes(table, object)
     for i,v in pairs(table) do
         if v == object then return true end
     end
@@ -35,7 +35,7 @@ end
 ---Count the number of elements in a table (works with both arrays and associative tables)
 ---@param table table The table to count elements in
 ---@return number # The number of key-value pairs in the table
-function module.count(table)
+function tables.count(table)
     local count = 0
     for i,v in pairs(table) do
         count = count + 1
@@ -46,11 +46,11 @@ end
 ---Create a deep copy of a table, recursively copying all nested tables
 ---@param table table The table to copy
 ---@return table # A new table with all values copied (nested tables are also copied)
-function module.recursiveCopy(table)
+function tables.recursiveCopy(table)
     local newTable = {}
     for i,v in pairs(table) do
         if type(v) == "table" then
-            newTable[i] = module.recursiveCopy(v)
+            newTable[i] = tables.recursiveCopy(v)
         else
             newTable[i] = v
         end
@@ -62,12 +62,12 @@ end
 ---@param t1 table The first table to compare
 ---@param t2 table The second table to compare
 ---@return boolean # True if both tables have the same structure and values
-function module.recursiveEquals(t1, t2)
+function tables.recursiveEquals(t1, t2)
     for i,v1 in pairs(t1) do
         local v2 = t2[i]
         if type(v1) == "table" then
             if type(v2) == "table" then
-                if not module.recursiveEquals(v1, v2) then
+                if not tables.recursiveEquals(v1, v2) then
                     return false
                 end
             else
@@ -87,6 +87,6 @@ end
 ---@field recursiveEquals fun(t1: table, t2: table): boolean Compare tables for deep equality
 ---@field VERSION string Module version
 
-module.VERSION = VERSION
+tables.VERSION = VERSION
 
-return module
+return tables
