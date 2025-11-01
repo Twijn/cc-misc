@@ -14,7 +14,7 @@ print(tables.recursiveEquals(myTable, copy)) -- true
 
 ## Functions
 
-### `module.includes(table, object)`
+### `tables.includes(table, object)`
 
 Check if a table contains a specific value
 
@@ -25,7 +25,7 @@ Check if a table contains a specific value
 
 **Returns:** boolean # True if the object is found in the table
 
-### `module.count(table)`
+### `tables.count(table)`
 
 Count the number of elements in a table (works with both arrays and associative tables)
 
@@ -35,7 +35,7 @@ Count the number of elements in a table (works with both arrays and associative 
 
 **Returns:** number # The number of key-value pairs in the table
 
-### `module.recursiveCopy(table)`
+### `tables.recursiveCopy(table)`
 
 Create a deep copy of a table, recursively copying all nested tables
 
@@ -45,7 +45,7 @@ Create a deep copy of a table, recursively copying all nested tables
 
 **Returns:** table # A new table with all values copied (nested tables are also copied)
 
-### `module.recursiveEquals(t1, t2)`
+### `tables.recursiveEquals(t1, t2)`
 
 Compare two tables for deep equality, recursively checking nested tables
 

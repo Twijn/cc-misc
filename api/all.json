@@ -143,10 +143,9 @@
     },
     "s": {
       "name": "s",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "description": "A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.",
       "dependencies": [
-        "tables",
         "formui"
       ],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/s.lua",
@@ -498,14 +497,14 @@
     },
     "tables": {
       "name": "tables",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "description": "A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking with includes(), table size counting for any table type, deep recursive copying with nested table support, deep recursive equality comparison, and works with both array-like and associative tables.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/tables.lua",
       "documentation_url": "https://ccmisc.twijn.dev/tables.html",
       "functions": [
         {
-          "name": "module.includes",
+          "name": "tables.includes",
           "params": [
             {
               "name": "table",
@@ -523,7 +522,7 @@
           "line": 24
         },
         {
-          "name": "module.count",
+          "name": "tables.count",
           "params": [
             {
               "name": "table",
@@ -536,7 +535,7 @@
           "line": 35
         },
         {
-          "name": "module.recursiveCopy",
+          "name": "tables.recursiveCopy",
           "params": [
             {
               "name": "table",
@@ -549,7 +548,7 @@
           "line": 46
         },
         {
-          "name": "module.recursiveEquals",
+          "name": "tables.recursiveEquals",
           "params": [
             {
               "name": "t1",
@@ -992,5 +991,5 @@
       "classes": []
     }
   },
-  "updated": "2025-10-31T06:09:53Z"
+  "updated": "2025-11-01T16:18:08Z"
 }

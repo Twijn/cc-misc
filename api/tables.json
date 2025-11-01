@@ -1,15 +1,15 @@
 {
   "name": "tables",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking with includes(), table size counting for any table type, deep recursive copying with nested table support, deep recursive equality comparison, and works with both array-like and associative tables.",
   "dependencies": [],
   "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/tables.lua",
   "documentation_url": "https://ccmisc.twijn.dev/tables.html",
   "functions": [
-    "module.includes",
-    "module.count",
-    "module.recursiveCopy",
-    "module.recursiveEquals"
+    "tables.includes",
+    "tables.count",
+    "tables.recursiveCopy",
+    "tables.recursiveEquals"
   ],
   "classes": []
 }
