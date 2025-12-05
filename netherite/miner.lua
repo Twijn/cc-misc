@@ -13,9 +13,9 @@
 --- Ensure turtle has fuel, pickaxe, scanner, and ender storage in inventory
 --- Run: netherite/miner
 ---
----@version 1.3.0
+---@version 1.3.1
 
-local MINER_VERSION = "1.3.0"
+local MINER_VERSION = "1.3.1"
 local MINER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/netherite/miner.lua"
 
 if not package.path:find("lib") then
@@ -32,13 +32,9 @@ if not updaterLoaded then
     updater = nil
 end
 
--- Optional: turtle-tracker for remote stat tracking
-local trackerLoaded, tracker = pcall(require, "turtle-tracker")
-if trackerLoaded then
-    tracker.setEndpoint("https://krawlet-api.twijn.dev")
-else
-    tracker = nil
-end
+-- Turtle-tracker for remote stat tracking
+local tracker = require("turtle-tracker")
+tracker.setEndpoint("https://krawlet-api.twijn.dev")
 
 -- ======= Configuration =======
 local CONFIG = {
@@ -210,16 +206,24 @@ local function setupPeripherals()
 end
 
 -- ======= GPS Functions =======
+local modem = nil
+
+local function setupModem()
+    modem = attach.find("modem")
+    if not modem then
+        log.error("Wireless modem not found! Please equip a wireless modem.")
+        return false
+    end
+    log.info("Wireless modem found and ready")
+    return true
+end
+
 --- Get absolute GPS position using a modem peripheral
 --- Uses attach to handle modem equipping/finding and re-attaches tools after
 ---@return number|nil x, number|nil y, number|nil z GPS coordinates or nil if unavailable
 local function getGPSPosition()
-    -- Use attach to find/equip the modem
-    local modem = attach.find("modem")
-    if not modem then
-        log.warn("No modem available for GPS")
-        return nil, nil, nil
-    end
+    -- Ensure modem is attached
+    modem = attach.find("modem")
     
     -- Try to get GPS location
     local x, y, z = gps.locate(2)  -- 2 second timeout
@@ -646,8 +650,6 @@ end
 local lastTrackerSync = 0
 
 local function syncTracker()
-    if not tracker then return end
-    
     local stats = state.get("stats")
     
     -- Update tracker stats
@@ -675,8 +677,6 @@ local function syncTracker()
 end
 
 local function checkTrackerSync()
-    if not tracker then return end
-    
     local now = os.clock()
     if now - lastTrackerSync >= CONFIG.TRACKER_SYNC_INTERVAL then
         syncTracker()
@@ -880,18 +880,22 @@ local function main()
     -- First-time setup (asks for facing direction)
     initialSetup()
 
-    -- Initialize tracker
-    if tracker then
-        tracker.init(nil, "Netherite Miner")
-        log.info("Turtle tracker initialized")
-        syncTracker()  -- Initial sync
-    end
-
-    -- Setup peripherals
+    -- Setup peripherals (scanner)
     if not setupPeripherals() then
         log.error("Failed to setup peripherals. Exiting.")
         return
     end
+
+    -- Setup wireless modem (required for GPS)
+    if not setupModem() then
+        log.error("Failed to setup modem. Exiting.")
+        return
+    end
+
+    -- Initialize tracker
+    tracker.init(nil, "Netherite Miner")
+    log.info("Turtle tracker initialized")
+    syncTracker()  -- Initial sync
 
     -- Initial refuel
     refuel()
@@ -906,9 +910,7 @@ local function main()
     end
 
     -- Final tracker sync
-    if tracker then
-        syncTracker()
-    end
+    syncTracker()
 
     printStats()
     log.info("Mining operation complete")
