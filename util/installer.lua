@@ -72,6 +72,7 @@ end
 ---Fallback libraries (used if API is unavailable)
 local function loadFallbackLibraries()
     LIBRARIES = {
+        {name = "attach", version = "1.0.0", description = "Turtle utility for safe digging, auto tool equipping, and peripheral management", deps = {}},
         {name = "cmd", version = "1.0.0", description = "Command-line interface with REPL, autocompletion, and history", deps = {}},
         {name = "formui", version = "0.2.0", description = "Form-based UI builder for creating interactive forms", deps = {}},
         {name = "log", version = "1.0.0", description = "Logging utility with file and term output support", deps = {}},
