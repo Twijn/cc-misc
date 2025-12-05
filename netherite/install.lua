@@ -35,7 +35,16 @@ shell.run(installerPath, "attach", "log", "persist", "updater")
 -- Clean up installer
 fs.delete(installerPath)
 
--- Step 2: Download the miner program
+-- Step 2: Download turtle-tracker (may not be in installer yet)
+print("")
+print("Downloading turtle-tracker...")
+local trackerUrl = BASE_URL .. "/util/turtle-tracker.lua"
+local libDir = fs.exists("disk") and "disk/lib" or "lib"
+fs.makeDir(libDir)
+fs.delete(libDir .. "/turtle-tracker.lua")
+shell.run("wget", trackerUrl, libDir .. "/turtle-tracker.lua")
+
+-- Step 3: Download the miner program
 print("")
 print("Downloading netherite miner...")
 

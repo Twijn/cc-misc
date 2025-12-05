@@ -32,6 +32,14 @@ if not updaterLoaded then
     updater = nil
 end
 
+-- Optional: turtle-tracker for remote stat tracking
+local trackerLoaded, tracker = pcall(require, "turtle-tracker")
+if trackerLoaded then
+    tracker.setEndpoint("https://krawlet-api.twijn.dev")
+else
+    tracker = nil
+end
+
 -- ======= Configuration =======
 local CONFIG = {
     -- Scanner settings
@@ -60,6 +68,9 @@ local CONFIG = {
     -- Default tools
     DEFAULT_PICKAXE = "minecraft:diamond_pickaxe",
     DEFAULT_SWORD = "minecraft:diamond_sword",
+
+    -- Tracker settings
+    TRACKER_SYNC_INTERVAL = 30,  -- Seconds between tracker syncs
 }
 
 -- ======= State Management =======
@@ -592,6 +603,41 @@ local function mineExplore()
     state.set("stats", stats)
 end
 
+-- ======= Tracker Sync =======
+local lastTrackerSync = 0
+
+local function syncTracker()
+    if not tracker then return end
+    
+    local stats = state.get("stats")
+    
+    -- Update tracker stats
+    tracker.setStat("debris_found", stats.debris_found)
+    tracker.setStat("blocks_mined", stats.blocks_mined)
+    tracker.setStat("deposits", stats.deposits)
+    
+    -- Update tracker position
+    tracker.setRelativePosition(pos.x, pos.y, pos.z)
+    
+    -- Sync to server
+    local success, err = tracker.sync()
+    if success then
+        log.info("Tracker synced successfully")
+    else
+        log.warn("Tracker sync failed: " .. tostring(err))
+    end
+end
+
+local function checkTrackerSync()
+    if not tracker then return end
+    
+    local now = os.clock()
+    if now - lastTrackerSync >= CONFIG.TRACKER_SYNC_INTERVAL then
+        syncTracker()
+        lastTrackerSync = now
+    end
+end
+
 -- ======= Main Loop =======
 local function printStats()
     local stats = state.get("stats")
@@ -641,6 +687,9 @@ local function mainLoop()
                 end
             end
         end
+
+        -- Sync tracker periodically
+        checkTrackerSync()
 
         -- Small delay between scans
         sleep(CONFIG.SCAN_INTERVAL)
@@ -785,6 +834,13 @@ local function main()
     -- First-time setup (asks for facing direction)
     initialSetup()
 
+    -- Initialize tracker
+    if tracker then
+        tracker.init(nil, "Netherite Miner")
+        log.info("Turtle tracker initialized")
+        syncTracker()  -- Initial sync
+    end
+
     -- Setup peripherals
     if not setupPeripherals() then
         log.error("Failed to setup peripherals. Exiting.")
@@ -801,6 +857,11 @@ local function main()
     local success, err = pcall(mainLoop)
     if not success then
         log.error("Error in main loop: " .. tostring(err))
+    end
+
+    -- Final tracker sync
+    if tracker then
+        syncTracker()
     end
 
     printStats()
