@@ -57,6 +57,442 @@
       ],
       "classes": []
     },
+    "turtle-tracker": {
+      "name": "turtle-tracker",
+      "version": "1.0.0",
+      "description": "A turtle API client module for ComputerCraft that provides easy integration with the krawlet-api turtle tracking system. Features: Automatic stat tracking, position reporting, configurable API endpoint, periodic sync support, and simple state management for turtle data.",
+      "dependencies": [
+        "turtleApi"
+      ],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/turtle-tracker.lua",
+      "documentation_url": "https://ccmisc.twijn.dev/turtle-tracker.html",
+      "functions": [
+        {
+          "name": "module.setEndpoint",
+          "params": [
+            {
+              "name": "endpoint",
+              "type": "string",
+              "description": "The base URL of the turtle API (e.g., \"http://localhost:3000\")"
+            }
+          ],
+          "returns": "",
+          "description": "Set the API endpoint URL",
+          "line": 140
+        },
+        {
+          "name": "module.getEndpoint",
+          "params": [],
+          "returns": "string # The current API endpoint URL",
+          "description": "Get the current API endpoint",
+          "line": 150
+        },
+        {
+          "name": "module.init",
+          "params": [
+            {
+              "name": "id",
+              "type": "string|number|nil",
+              "description": "Optional turtle ID (defaults to os.getComputerID())"
+            },
+            {
+              "name": "label",
+              "type": "string|nil",
+              "description": "Optional turtle label (defaults to os.getComputerLabel())"
+            }
+          ],
+          "returns": "",
+          "description": "Initialize the turtle API client",
+          "line": 158
+        },
+        {
+          "name": "module.setDefault",
+          "params": [
+            {
+              "name": "stats",
+              "type": "table",
+              "description": "Default stat values"
+            }
+          ],
+          "returns": "",
+          "description": "Set default stats (similar to CC state.setDefault pattern)",
+          "line": 189
+        },
+        {
+          "name": "module.getStats",
+          "params": [],
+          "returns": "TurtleStats # Current stats table",
+          "description": "Get the current stats",
+          "line": 199
+        },
+        {
+          "name": "module.getStat",
+          "params": [
+            {
+              "name": "statName",
+              "type": "string",
+              "description": "Name of the stat"
+            }
+          ],
+          "returns": "number # The stat value",
+          "description": "Get a specific stat value",
+          "line": 205
+        },
+        {
+          "name": "module.setStat",
+          "params": [
+            {
+              "name": "statName",
+              "type": "string",
+              "description": "Name of the stat"
+            },
+            {
+              "name": "value",
+              "type": "number",
+              "description": "The value to set"
+            }
+          ],
+          "returns": "",
+          "description": "Set a specific stat value",
+          "line": 212
+        },
+        {
+          "name": "module.incrementStat",
+          "params": [
+            {
+              "name": "statName",
+              "type": "string",
+              "description": "Name of the stat to increment"
+            },
+            {
+              "name": "amount",
+              "type": "number|nil",
+              "description": "Amount to increment by (default 1)"
+            }
+          ],
+          "returns": "",
+          "description": "Increment a stat by a value (default 1)",
+          "line": 219
+        },
+        {
+          "name": "module.decrementStat",
+          "params": [
+            {
+              "name": "statName",
+              "type": "string",
+              "description": "Name of the stat to decrement"
+            },
+            {
+              "name": "amount",
+              "type": "number|nil",
+              "description": "Amount to decrement by (default 1)"
+            }
+          ],
+          "returns": "",
+          "description": "Decrement a stat by a value (default 1)",
+          "line": 227
+        },
+        {
+          "name": "module.setAbsolutePosition",
+          "params": [
+            {
+              "name": "x",
+              "type": "number",
+              "description": "X coordinate"
+            },
+            {
+              "name": "y",
+              "type": "number",
+              "description": "Y coordinate"
+            },
+            {
+              "name": "z",
+              "type": "number",
+              "description": "Z coordinate"
+            }
+          ],
+          "returns": "",
+          "description": "Set the absolute position (world coordinates)",
+          "line": 237
+        },
+        {
+          "name": "module.getAbsolutePosition",
+          "params": [],
+          "returns": "TurtlePosition # Absolute position table",
+          "description": "Get the absolute position",
+          "line": 245
+        },
+        {
+          "name": "module.setRelativePosition",
+          "params": [
+            {
+              "name": "x",
+              "type": "number",
+              "description": "X offset"
+            },
+            {
+              "name": "y",
+              "type": "number",
+              "description": "Y offset"
+            },
+            {
+              "name": "z",
+              "type": "number",
+              "description": "Z offset"
+            }
+          ],
+          "returns": "",
+          "description": "Set the relative position (from starting point)",
+          "line": 251
+        },
+        {
+          "name": "module.getRelativePosition",
+          "params": [],
+          "returns": "TurtlePosition # Relative position table",
+          "description": "Get the relative position",
+          "line": 259
+        },
+        {
+          "name": "module.moveRelative",
+          "params": [
+            {
+              "name": "dx",
+              "type": "number",
+              "description": "X offset to add"
+            },
+            {
+              "name": "dy",
+              "type": "number",
+              "description": "Y offset to add"
+            },
+            {
+              "name": "dz",
+              "type": "number",
+              "description": "Z offset to add"
+            }
+          ],
+          "returns": "",
+          "description": "Update relative position by offset",
+          "line": 265
+        },
+        {
+          "name": "module.moveAbsolute",
+          "params": [
+            {
+              "name": "dx",
+              "type": "number",
+              "description": "X offset to add"
+            },
+            {
+              "name": "dy",
+              "type": "number",
+              "description": "Y offset to add"
+            },
+            {
+              "name": "dz",
+              "type": "number",
+              "description": "Z offset to add"
+            }
+          ],
+          "returns": "",
+          "description": "Update absolute position by offset",
+          "line": 275
+        },
+        {
+          "name": "module.setLabel",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The label to set"
+            }
+          ],
+          "returns": "",
+          "description": "Set the turtle label",
+          "line": 287
+        },
+        {
+          "name": "module.getLabel",
+          "params": [],
+          "returns": "string|nil # The turtle label",
+          "description": "Get the turtle label",
+          "line": 293
+        },
+        {
+          "name": "module.updateFuel",
+          "params": [],
+          "returns": "",
+          "description": "Update fuel level from turtle API",
+          "line": 299
+        },
+        {
+          "name": "module.setFuel",
+          "params": [
+            {
+              "name": "fuel",
+              "type": "number",
+              "description": "The fuel level"
+            }
+          ],
+          "returns": "",
+          "description": "Set fuel level manually",
+          "line": 306
+        },
+        {
+          "name": "module.getFuel",
+          "params": [],
+          "returns": "number|nil # The fuel level",
+          "description": "Get the current fuel level",
+          "line": 312
+        },
+        {
+          "name": "module.buildPayload",
+          "params": [],
+          "returns": "table # The data payload",
+          "description": "Build the full data payload for syncing",
+          "line": 320
+        },
+        {
+          "name": "module.sync",
+          "params": [],
+          "returns": "string|nil # Error message if sync failed",
+          "description": "Sync all turtle data to the server",
+          "line": 332
+        },
+        {
+          "name": "module.syncStats",
+          "params": [],
+          "returns": "string|nil # Error message if sync failed",
+          "description": "Sync only stats to the server",
+          "line": 351
+        },
+        {
+          "name": "module.syncPosition",
+          "params": [],
+          "returns": "string|nil # Error message if sync failed",
+          "description": "Sync only position to the server",
+          "line": 366
+        },
+        {
+          "name": "module.fetch",
+          "params": [],
+          "returns": "table|nil # The turtle data or nil if not found",
+          "description": "Fetch turtle data from the server",
+          "line": 385
+        },
+        {
+          "name": "module.fetchAll",
+          "params": [],
+          "returns": "table|nil # Array of turtle data or nil on error",
+          "description": "Fetch all turtles from the server",
+          "line": 399
+        },
+        {
+          "name": "module.delete",
+          "params": [],
+          "returns": "string|nil # Error message if deletion failed",
+          "description": "Delete the current turtle from the server",
+          "line": 411
+        },
+        {
+          "name": "module.deleteById",
+          "params": [
+            {
+              "name": "id",
+              "type": "string|number",
+              "description": "The turtle ID to delete"
+            }
+          ],
+          "returns": "string|nil # Error message if deletion failed",
+          "description": "Delete a specific turtle by ID from the server",
+          "line": 426
+        },
+        {
+          "name": "module.startAutoSync",
+          "params": [
+            {
+              "name": "intervalSeconds",
+              "type": "number",
+              "description": "Seconds between syncs (default 30)"
+            }
+          ],
+          "returns": "",
+          "description": "Start automatic syncing at a given interval",
+          "line": 442
+        },
+        {
+          "name": "module.stopAutoSync",
+          "params": [],
+          "returns": "",
+          "description": "Stop automatic syncing",
+          "line": 465
+        },
+        {
+          "name": "module.isAutoSyncRunning",
+          "params": [],
+          "returns": "boolean # True if auto-sync is active",
+          "description": "Check if auto-sync is running",
+          "line": 470
+        },
+        {
+          "name": "module.forward",
+          "params": [],
+          "returns": "boolean # True if movement succeeded",
+          "description": "Wrapper for turtle.forward() that updates relative position",
+          "line": 478
+        },
+        {
+          "name": "module.back",
+          "params": [],
+          "returns": "boolean # True if movement succeeded",
+          "description": "Wrapper for turtle.back() that updates relative position",
+          "line": 489
+        },
+        {
+          "name": "module.up",
+          "params": [],
+          "returns": "boolean # True if movement succeeded",
+          "description": "Wrapper for turtle.up() that updates relative position",
+          "line": 498
+        },
+        {
+          "name": "module.down",
+          "params": [],
+          "returns": "boolean # True if movement succeeded",
+          "description": "Wrapper for turtle.down() that updates relative position",
+          "line": 509
+        },
+        {
+          "name": "module.dig",
+          "params": [],
+          "returns": "boolean # True if dig succeeded",
+          "description": "Wrapper for turtle.dig() that increments blocks_mined stat",
+          "line": 520
+        },
+        {
+          "name": "module.digUp",
+          "params": [],
+          "returns": "boolean # True if dig succeeded",
+          "description": "Wrapper for turtle.digUp() that increments blocks_mined stat",
+          "line": 530
+        },
+        {
+          "name": "module.digDown",
+          "params": [],
+          "returns": "boolean # True if dig succeeded",
+          "description": "Wrapper for turtle.digDown() that increments blocks_mined stat",
+          "line": 540
+        },
+        {
+          "name": "module._debug",
+          "params": [],
+          "returns": "",
+          "description": "Print debug information about the current state",
+          "line": 552
+        }
+      ],
+      "classes": []
+    },
     "shopk": {
       "name": "shopk",
       "version": "0.0.4",
@@ -1071,5 +1507,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-05T04:03:26Z"
+  "updated": "2025-12-05T05:23:20Z"
 }
