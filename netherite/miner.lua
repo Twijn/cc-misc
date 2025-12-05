@@ -189,9 +189,6 @@ local scanner = nil
 local enderStorage = nil
 
 local function setupPeripherals()
-    -- Set up default tools
-    attach.setDefaultEquipped(CONFIG.DEFAULT_PICKAXE, CONFIG.DEFAULT_SWORD)
-
     -- Find plethora scanner
     scanner = attach.find("plethora:scanner")
     if not scanner then
