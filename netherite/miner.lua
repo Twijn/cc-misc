@@ -13,7 +13,10 @@
 --- Ensure turtle has fuel, pickaxe, scanner, and ender storage in inventory
 --- Run: netherite/miner
 ---
----@version 1.0.0
+---@version 1.1.0
+
+local MINER_VERSION = "1.1.0"
+local MINER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/netherite/miner.lua"
 
 if not package.path:find("lib") then
     package.path = package.path .. ";lib/?.lua;lib/?/init.lua"
@@ -22,6 +25,12 @@ end
 local attach = require("attach")
 local log = require("log")
 local persist = require("persist")
+
+-- Optional: updater for auto-update functionality
+local updaterLoaded, updater = pcall(require, "updater")
+if not updaterLoaded then
+    updater = nil
+end
 
 -- ======= Configuration =======
 local CONFIG = {
@@ -414,55 +423,132 @@ local function checkFuel()
 end
 
 -- ======= Mining Logic =======
-local function mineTarget(target)
-    log.info(string.format("Mining %s at (%d, %d, %d)", target.name, target.x, target.y, target.z))
+local function isTargetBlock(blockName)
+    for _, targetName in ipairs(CONFIG.TARGET_BLOCKS) do
+        if blockName == targetName then
+            return true
+        end
+    end
+    return false
+end
 
-    -- Scanner returns relative coordinates, navigate there
-    if not navigateTo(target.x, target.y, target.z) then
-        log.warn("Could not reach target")
+local function mineTarget(target)
+    log.info(string.format("Mining %s at relative (%d, %d, %d)", target.name, target.x, target.y, target.z))
+
+    -- Scanner returns coordinates relative to the turtle's current position
+    -- We need to navigate to a position NEXT TO the block, not into it
+    
+    -- Calculate target position (one block short on the primary axis)
+    local targetX, targetY, targetZ = target.x, target.y, target.z
+    
+    -- Determine which direction to approach from (prefer horizontal approach)
+    local approachX, approachY, approachZ = targetX, targetY, targetZ
+    local mineDirection = nil  -- "forward", "up", "down"
+    
+    -- Calculate absolute distances
+    local absX, absY, absZ = math.abs(targetX), math.abs(targetY), math.abs(targetZ)
+    
+    -- Choose approach direction - prefer horizontal, then vertical
+    if absX >= absY and absX >= absZ and absX > 0 then
+        -- Approach from X axis
+        if targetX > 0 then
+            approachX = targetX - 1
+            mineDirection = "east"
+        else
+            approachX = targetX + 1
+            mineDirection = "west"
+        end
+    elseif absZ >= absY and absZ > 0 then
+        -- Approach from Z axis
+        if targetZ > 0 then
+            approachZ = targetZ - 1
+            mineDirection = "south"
+        else
+            approachZ = targetZ + 1
+            mineDirection = "north"
+        end
+    elseif absY > 0 then
+        -- Approach vertically
+        if targetY > 0 then
+            approachY = targetY - 1
+            mineDirection = "up"
+        else
+            approachY = targetY + 1
+            mineDirection = "down"
+        end
+    else
+        -- Block is at our position (shouldn't happen)
+        log.warn("Target at turtle position?")
         return false
     end
-
-    -- The target should now be adjacent or at our position
-    -- Check all adjacent blocks
+    
+    log.info(string.format("Navigating to (%d, %d, %d), will mine %s", approachX, approachY, approachZ, mineDirection))
+    
+    -- Navigate to the approach position
+    if not navigateTo(approachX, approachY, approachZ) then
+        log.warn("Could not reach approach position")
+        return false
+    end
+    
+    -- Now mine in the correct direction
     local found = false
-
-    -- Check forward
-    local success, block = turtle.inspect()
-    if success then
-        for _, targetName in ipairs(CONFIG.TARGET_BLOCKS) do
-            if block.name == targetName then
+    local success, block
+    
+    if mineDirection == "up" then
+        success, block = turtle.inspectUp()
+        if success and isTargetBlock(block.name) then
+            attach.digUp()
+            found = true
+        end
+    elseif mineDirection == "down" then
+        success, block = turtle.inspectDown()
+        if success and isTargetBlock(block.name) then
+            attach.digDown()
+            found = true
+        end
+    else
+        -- Horizontal direction - need to face the right way
+        local facingMap = {north = 0, east = 1, south = 2, west = 3}
+        local targetFacing = facingMap[mineDirection]
+        turnToFace(targetFacing)
+        
+        success, block = turtle.inspect()
+        if success and isTargetBlock(block.name) then
+            attach.dig()
+            found = true
+        end
+    end
+    
+    -- If we didn't find it where expected, check all adjacent blocks
+    if not found then
+        log.info("Target not found at expected position, checking all directions...")
+        
+        -- Check all 4 horizontal directions
+        for i = 0, 3 do
+            turnToFace(i)
+            success, block = turtle.inspect()
+            if success and isTargetBlock(block.name) then
                 attach.dig()
                 found = true
                 break
             end
         end
-    end
-
-    -- Check up
-    if not found then
-        success, block = turtle.inspectUp()
-        if success then
-            for _, targetName in ipairs(CONFIG.TARGET_BLOCKS) do
-                if block.name == targetName then
-                    attach.digUp()
-                    found = true
-                    break
-                end
+        
+        -- Check up
+        if not found then
+            success, block = turtle.inspectUp()
+            if success and isTargetBlock(block.name) then
+                attach.digUp()
+                found = true
             end
         end
-    end
-
-    -- Check down
-    if not found then
-        success, block = turtle.inspectDown()
-        if success then
-            for _, targetName in ipairs(CONFIG.TARGET_BLOCKS) do
-                if block.name == targetName then
-                    attach.digDown()
-                    found = true
-                    break
-                end
+        
+        -- Check down
+        if not found then
+            success, block = turtle.inspectDown()
+            if success and isTargetBlock(block.name) then
+                attach.digDown()
+                found = true
             end
         end
     end
@@ -473,6 +559,8 @@ local function mineTarget(target)
         stats.blocks_mined = stats.blocks_mined + 1
         state.set("stats", stats)
         log.info("Ancient debris collected! Total: " .. stats.debris_found)
+    else
+        log.warn("Could not find target block after navigation")
     end
 
     return found
@@ -548,11 +636,100 @@ local function mainLoop()
     end
 end
 
+-- ======= Auto-Update =======
+local function checkForMinerUpdate()
+    log.info("Checking for miner updates...")
+    
+    local response = http.get(MINER_UPDATE_URL)
+    if not response then
+        log.warn("Could not check for miner updates")
+        return false
+    end
+    
+    local content = response.readAll()
+    response.close()
+    
+    -- Parse version from downloaded content
+    local remoteVersion = content:match('MINER_VERSION%s*=%s*["\']([^"\']+)["\']')
+    if not remoteVersion then
+        log.warn("Could not parse remote version")
+        return false
+    end
+    
+    -- Compare versions
+    local function compareVersions(v1, v2)
+        local parts1, parts2 = {}, {}
+        for part in v1:gmatch("[^%.]+") do table.insert(parts1, tonumber(part) or 0) end
+        for part in v2:gmatch("[^%.]+") do table.insert(parts2, tonumber(part) or 0) end
+        for i = 1, math.max(#parts1, #parts2) do
+            local p1, p2 = parts1[i] or 0, parts2[i] or 0
+            if p1 < p2 then return -1 elseif p1 > p2 then return 1 end
+        end
+        return 0
+    end
+    
+    if compareVersions(MINER_VERSION, remoteVersion) < 0 then
+        log.info("Update available: " .. MINER_VERSION .. " -> " .. remoteVersion)
+        
+        -- Save the update
+        local file = fs.open(shell.getRunningProgram(), "w")
+        if file then
+            file.write(content)
+            file.close()
+            log.info("Miner updated! Restarting...")
+            sleep(1)
+            os.reboot()
+            return true
+        else
+            log.error("Failed to write update")
+        end
+    else
+        log.info("Miner is up to date (v" .. MINER_VERSION .. ")")
+    end
+    
+    return false
+end
+
+local function checkForLibraryUpdates()
+    if not updater then
+        return
+    end
+    
+    log.info("Checking for library updates...")
+    
+    local updates = updater.checkUpdates()
+    if #updates > 0 then
+        log.info("Found " .. #updates .. " library update(s)")
+        for _, update in ipairs(updates) do
+            log.info("Updating " .. update.name .. ": " .. update.current .. " -> " .. update.latest)
+            local success, err = updater.update(update.name)
+            if success then
+                log.info(update.name .. " updated successfully")
+            else
+                log.warn("Failed to update " .. update.name .. ": " .. tostring(err))
+            end
+        end
+    else
+        log.info("All libraries are up to date")
+    end
+end
+
+local function autoUpdate()
+    -- Check for miner updates first
+    checkForMinerUpdate()
+    
+    -- Then check for library updates
+    checkForLibraryUpdates()
+end
+
 -- ======= Entry Point =======
 local function main()
     print("=================================")
-    print("  Netherite Mining Program v1.0")
+    print("  Netherite Mining Program v" .. MINER_VERSION)
     print("=================================")
+
+    -- Auto-update check
+    autoUpdate()
 
     -- Set home position
     if not state.get("home") then

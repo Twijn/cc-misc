@@ -29,8 +29,8 @@ if not fs.exists(installerPath) then
     return
 end
 
--- Run installer with pre-selected libraries (attach, log, persist)
-shell.run(installerPath, "attach", "log", "persist")
+-- Run installer with pre-selected libraries (attach, log, persist, updater)
+shell.run(installerPath, "attach", "log", "persist", "updater")
 
 -- Clean up installer
 fs.delete(installerPath)
