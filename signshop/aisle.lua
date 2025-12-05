@@ -1,22 +1,55 @@
--- SignShop Aisle --
--- Twijn version:
-local v = "0.0.1"
+--- SignShop Aisle ---
+--- Turtle component that dispenses items and responds to server pings.
+---
+---@version 1.0.0
+-- @module signshop-aisle
+
+local VERSION = "1.0.0"
 
 local dropFunc = turtle.dropUp
+
+-- Adjust package path for disk-based installations
+if not package.path:find("disk") then
+    package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
+end
 
 local s = require("lib.s")
 local logger = require("lib.log")
 
-local modem = s.peripheral("modem.side", "modem", true)
+-- Check if this is first run or settings are missing
+local needsSetup = not settings.get("modem.side") or not settings.get("aisle.name")
 
-local broadcastChannel = s.number("modem.broadcast", 0, 65535, 8698)
-local privateChannel = s.number("modem.private", 0, 65535, os.getComputerID())
+local modem, broadcastChannel, privateChannel, aisleName
 
-local aisleName = s.string("aisle.name")
+if needsSetup then
+    -- Use form-based setup for new installations
+    local form = s.useForm("SignShop Aisle Setup")
+    
+    local modemField = form.peripheral("modem.side", "modem", true)
+    local broadcastField = form.number("modem.broadcast", 0, 65535, 8698)
+    local privateField = form.number("modem.private", 0, 65535, os.getComputerID())
+    local aisleField = form.string("aisle.name")
+    
+    if not form.submit() then
+        print("Setup cancelled.")
+        return
+    end
+    
+    modem = modemField()
+    broadcastChannel = broadcastField()
+    privateChannel = privateField()
+    aisleName = aisleField()
+else
+    -- Use existing settings
+    modem = s.peripheral("modem.side", "modem", true)
+    broadcastChannel = s.number("modem.broadcast", 0, 65535, 8698)
+    privateChannel = s.number("modem.private", 0, 65535, os.getComputerID())
+    aisleName = s.string("aisle.name")
+end
 
-os.setComputerLabel("aisle-"..aisleName)
+os.setComputerLabel("aisle-" .. aisleName)
 
-logger.info(string.format("Started SignShop %s v%s", aisleName, v))
+logger.info(string.format("Started SignShop %s v%s", aisleName, VERSION))
 
 local function empty()
     for slot = 1,16 do
