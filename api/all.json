@@ -338,6 +338,86 @@
       ],
       "classes": []
     },
+    "attach": {
+      "name": "attach",
+      "version": "1.0.0",
+      "description": "A turtle utility module for ComputerCraft that provides safe block interaction, automatic tool management, and peripheral handling for turtles. Features: Automatic tool equipping based on action type (dig, attack, place), unsafe block protection to prevent accidentally digging storage blocks, peripheral auto-placement and wrapping, modem protection (never unequips modems), configurable default and always-equipped tools, and proxy wrappers for peripherals.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/attach.lua",
+      "documentation_url": "https://ccmisc.twijn.dev/attach.html",
+      "functions": [
+        {
+          "name": "module.setDefaultEquipped",
+          "params": [
+            {
+              "name": "leftTool",
+              "type": "string|nil",
+              "description": "The tool to equip on the left side (e.g., \"minecraft:diamond_pickaxe\")"
+            },
+            {
+              "name": "rightTool",
+              "type": "string|nil",
+              "description": "The tool to equip on the right side (e.g., \"minecraft:diamond_sword\")"
+            }
+          ],
+          "returns": "",
+          "description": "Set the default tools to be equipped on each side",
+          "line": 245
+        },
+        {
+          "name": "module.setAlwaysEquipped",
+          "params": [
+            {
+              "name": "toolName",
+              "type": "string|nil",
+              "description": "The tool that should always be equipped"
+            }
+          ],
+          "returns": "",
+          "description": "Set a tool that should always be kept equipped (has highest priority)",
+          "line": 253
+        },
+        {
+          "name": "module.wrap",
+          "params": [
+            {
+              "name": "peripheralName",
+              "type": "string",
+              "description": "The name/type of peripheral to wrap"
+            },
+            {
+              "name": "side",
+              "type": "string",
+              "description": "The side to place/wrap the peripheral on (\"top\", \"bottom\", \"front\", \"back\", \"left\", \"right\")"
+            }
+          ],
+          "returns": "table # A proxy table with all peripheral methods that auto-replaces if removed",
+          "description": "Wrap a peripheral, automatically placing it if not present",
+          "line": 369
+        },
+        {
+          "name": "module.find",
+          "params": [
+            {
+              "name": "peripheralType",
+              "type": "string",
+              "description": "The type of peripheral to find (e.g., \"modem\", \"workbench\")"
+            }
+          ],
+          "returns": "table|nil # A proxy table with all peripheral methods, or nil if not found",
+          "description": "Find and wrap a peripheral by type, equipping it as a tool if necessary",
+          "line": 378
+        },
+        {
+          "name": "module._debug",
+          "params": [],
+          "returns": "",
+          "description": "Print debug information about the module state, peripherals, and inventory Pauses between sections for user to read (press Enter to continue)",
+          "line": 408
+        }
+      ],
+      "classes": []
+    },
     "log": {
       "name": "log",
       "version": "1.0.0",
@@ -991,5 +1071,5 @@
       "classes": []
     }
   },
-  "updated": "2025-11-01T16:18:08Z"
+  "updated": "2025-12-05T04:03:26Z"
 }
