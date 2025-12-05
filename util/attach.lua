@@ -375,6 +375,21 @@ function module.wrap(peripheralName, side)
 end
 
 
+-- Check if a peripheral type matches the requested type
+-- Handles cases like "plethora:scanner" matching "scanner" or vice versa
+local function peripheralTypeMatches(actualType, requestedType)
+    if actualType == requestedType then
+        return true
+    end
+    -- Check if one contains the other (case-insensitive)
+    local actualLower = actualType:lower()
+    local requestedLower = requestedType:lower()
+    if actualLower:find(requestedLower, 1, true) or requestedLower:find(actualLower, 1, true) then
+        return true
+    end
+    return false
+end
+
 ---Find and wrap a peripheral by type, equipping it as a tool if necessary
 ---@param peripheralType string The type of peripheral to find (e.g., "modem", "workbench")
 ---@return table|nil # A proxy table with all peripheral methods, or nil if not found
@@ -382,7 +397,7 @@ function module.find(peripheralType)
     -- 1. First look for an already-attached peripheral
     for _, side in ipairs({"left","right","front","back","top","bottom"}) do
         if peripheral.isPresent(side) then
-            if peripheral.getType(side) == peripheralType then
+            if peripheralTypeMatches(peripheral.getType(side), peripheralType) then
                 return wrapPeripheralInternal(peripheralType, side)
             end
         end
@@ -393,7 +408,7 @@ function module.find(peripheralType)
     if equippedSide then
         -- Newly equipped tool will expose a peripheral on that side
         if peripheral.isPresent(equippedSide) and
-           peripheral.getType(equippedSide) == peripheralType then
+           peripheralTypeMatches(peripheral.getType(equippedSide), peripheralType) then
             return wrapPeripheralInternal(peripheralType, equippedSide)
         end
     end
