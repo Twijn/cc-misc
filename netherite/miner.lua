@@ -722,6 +722,46 @@ local function autoUpdate()
     checkForLibraryUpdates()
 end
 
+-- ======= Initial Setup =======
+local function askFacingDirection()
+    print("")
+    print("Which direction is the turtle facing?")
+    print("  0 = North (-Z)")
+    print("  1 = East  (+X)")
+    print("  2 = South (+Z)")
+    print("  3 = West  (-X)")
+    print("")
+    write("Enter direction (0-3): ")
+    
+    local input = read()
+    local dir = tonumber(input)
+    
+    if dir and dir >= 0 and dir <= 3 then
+        facing = dir
+        savePosition()
+        log.info("Facing direction set to " .. ({"North", "East", "South", "West"})[dir + 1])
+        return true
+    else
+        print("Invalid input. Please enter 0, 1, 2, or 3.")
+        return askFacingDirection()
+    end
+end
+
+local function initialSetup()
+    if not state.get("home") then
+        print("")
+        log.info("First time setup detected!")
+        
+        -- Ask for facing direction
+        askFacingDirection()
+        
+        -- Set home position
+        state.set("home", {x = pos.x, y = pos.y, z = pos.z, facing = facing})
+        log.info("Home position set at (0, 0, 0)")
+        print("")
+    end
+end
+
 -- ======= Entry Point =======
 local function main()
     print("=================================")
@@ -731,11 +771,8 @@ local function main()
     -- Auto-update check
     autoUpdate()
 
-    -- Set home position
-    if not state.get("home") then
-        state.set("home", {x = pos.x, y = pos.y, z = pos.z, facing = facing})
-        log.info("Home position set")
-    end
+    -- First-time setup (asks for facing direction)
+    initialSetup()
 
     -- Setup peripherals
     if not setupPeripherals() then
