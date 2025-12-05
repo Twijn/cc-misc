@@ -75,6 +75,7 @@ local function updateSignShop()
     local files = {
         -- Core files
         {url = BASE_URL .. "/signshop/aisle.lua", path = diskPrefix .. "aisle.lua"},
+        {url = BASE_URL .. "/signshop/config.lua", path = diskPrefix .. "config.lua"},
         {url = BASE_URL .. "/signshop/server.lua", path = diskPrefix .. "server.lua"},
         {url = BASE_URL .. "/signshop/startup.lua", path = diskPrefix .. "startup.lua"},
         {url = BASE_URL .. "/signshop/update.lua", path = diskPrefix .. "update.lua"},
