@@ -13,9 +13,9 @@
 --- Ensure turtle has fuel, pickaxe, scanner, and ender storage in inventory
 --- Run: netherite/miner
 ---
----@version 1.2.1
+---@version 1.3.0
 
-local MINER_VERSION = "1.2.1"
+local MINER_VERSION = "1.3.0"
 local MINER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/netherite/miner.lua"
 
 if not package.path:find("lib") then
@@ -207,6 +207,45 @@ local function setupPeripherals()
     -- Ender storage will be placed when needed
     log.info("Peripherals initialized")
     return true
+end
+
+-- ======= GPS Functions =======
+--- Get absolute GPS position using a modem peripheral
+--- Uses attach to handle modem equipping/finding and re-attaches tools after
+---@return number|nil x, number|nil y, number|nil z GPS coordinates or nil if unavailable
+local function getGPSPosition()
+    -- Use attach to find/equip the modem
+    local modem = attach.find("modem")
+    if not modem then
+        log.warn("No modem available for GPS")
+        return nil, nil, nil
+    end
+    
+    -- Try to get GPS location
+    local x, y, z = gps.locate(2)  -- 2 second timeout
+    
+    -- Re-setup peripherals to ensure scanner is properly attached
+    -- This handles cases where attach may have swapped peripherals
+    scanner = attach.find("plethora:scanner")
+    
+    if x then
+        log.info(string.format("GPS position: %.1f, %.1f, %.1f", x, y, z))
+        return x, y, z
+    else
+        log.warn("GPS signal not found")
+        return nil, nil, nil
+    end
+end
+
+--- Get the best available position (GPS if available, otherwise relative)
+---@return number x, number y, number z Position coordinates
+---@return boolean isAbsolute Whether the position is absolute (GPS) or relative
+local function getBestPosition()
+    local gpsX, gpsY, gpsZ = getGPSPosition()
+    if gpsX then
+        return gpsX, gpsY, gpsZ, true
+    end
+    return pos.x, pos.y, pos.z, false
 end
 
 -- ======= Scanner Functions =======
@@ -616,13 +655,20 @@ local function syncTracker()
     tracker.setStat("blocks_mined", stats.blocks_mined)
     tracker.setStat("deposits", stats.deposits)
     
-    -- Update tracker position
-    tracker.setRelativePosition(pos.x, pos.y, pos.z)
+    -- Try to get GPS position for absolute coordinates
+    local x, y, z, isAbsolute = getBestPosition()
+    
+    -- Update tracker position (use absolute if GPS available, otherwise relative)
+    if isAbsolute then
+        tracker.setAbsolutePosition(x, y, z)
+    else
+        tracker.setRelativePosition(x, y, z)
+    end
     
     -- Sync to server
     local success, err = tracker.sync()
     if success then
-        log.info("Tracker synced successfully")
+        log.info("Tracker synced successfully".. (isAbsolute and " (GPS)" or " (relative)"))
     else
         log.warn("Tracker sync failed: " .. tostring(err))
     end
