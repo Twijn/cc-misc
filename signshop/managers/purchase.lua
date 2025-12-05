@@ -1,7 +1,7 @@
 --- SignShop Purchase Manager ---
 --- Handles Krist transactions and item dispensing.
 ---
----@version 1.0.0
+---@version 1.1.0
 
 local s = require("lib.s")
 local logger = require("lib.log")

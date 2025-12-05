@@ -1,7 +1,7 @@
 --- SignShop Inventory Manager ---
 --- Manages inventory scanning and item dispensing.
 ---
----@version 1.0.0
+---@version 1.1.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")

@@ -4,7 +4,7 @@
 --- For disk-based installations, this script runs from the disk drive and
 --- automatically starts either the aisle (turtle) or server (computer) component.
 ---
----@version 1.0.0
+---@version 1.1.0
 
 print("SignShop - Starting from disk...")
 

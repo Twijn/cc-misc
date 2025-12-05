@@ -1,7 +1,7 @@
 --- SignShop Aisle Manager ---
 --- Handles communication with aisle turtles via modem.
 ---
----@version 1.0.0
+---@version 1.1.0
 
 local s = require("lib.s")
 local logger = require("lib.log")

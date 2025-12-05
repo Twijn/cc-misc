@@ -1,10 +1,10 @@
 --- SignShop Server ---
 --- Main server component that manages aisles, inventory, products, and purchases.
 ---
----@version 1.0.0
+---@version 1.1.0
 -- @module signshop-server
 
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 
 if not package.path:find("disk") then
     package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
