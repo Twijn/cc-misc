@@ -24,10 +24,10 @@
 --- -- Find and wrap a peripheral
 ---local modem = attach.find("modem")
 ---
----@version 1.0.0
+---@version 1.0.1
 -- @module attach
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 ---@class AttachModule
 ---@field _unsafeBlocks string[] List of block IDs that should not be dug
