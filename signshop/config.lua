@@ -1,7 +1,7 @@
 --- SignShop Configuration UI ---
 --- Interactive configuration interface for SignShop using formui.
 ---
----@version 1.1.0
+---@version 1.2.0
 
 if not package.path:find("disk") then
     package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
@@ -14,22 +14,31 @@ local inventoryManager = require("managers.inventory")
 local aisleManager = require("managers.aisle")
 local signManager = require("managers.sign")
 
-local VERSION = ssVersion and ssVersion() or "1.1.0"
+local VERSION = ssVersion and ssVersion() or "1.2.0"
 
 local config = {}
 
---- Display a simple menu with arrow key navigation
+--- Display a simple menu with arrow key navigation and scrolling
 ---@param title string Menu title
 ---@param options table Array of {label, action} pairs
 ---@return string|nil action The selected action or nil if cancelled
 local function showMenu(title, options)
     local selected = 1
+    local scroll = 0
+    
+    -- Find first non-separator option
+    while options[selected] and options[selected].separator do
+        selected = selected + 1
+    end
     
     while true do
         term.clear()
         term.setCursorPos(1, 1)
         
         local w, h = term.getSize()
+        local headerHeight = 3  -- title + separator + blank line
+        local footerHeight = 2  -- help text
+        local visibleHeight = h - headerHeight - footerHeight
         
         -- Draw title
         term.setTextColor(colors.yellow)
@@ -39,32 +48,84 @@ local function showMenu(title, options)
         print(string.rep("-", w))
         print()
         
-        -- Draw options
+        -- Calculate which items to show (flattened view for scrolling)
+        local displayLines = {}
         for i, opt in ipairs(options) do
             if opt.separator then
-                term.setTextColor(colors.gray)
-                print()
                 if opt.label ~= "" then
-                    print(opt.label)
+                    table.insert(displayLines, { type = "separator", label = opt.label, index = i })
+                else
+                    table.insert(displayLines, { type = "blank", index = i })
                 end
             else
-                if i == selected then
+                table.insert(displayLines, { type = "option", label = opt.label, index = i, action = opt.action })
+            end
+        end
+        
+        -- Find which display line corresponds to selected option
+        local selectedDisplayLine = 1
+        for i, line in ipairs(displayLines) do
+            if line.index == selected then
+                selectedDisplayLine = i
+                break
+            end
+        end
+        
+        -- Adjust scroll to keep selection visible
+        if selectedDisplayLine <= scroll then
+            scroll = selectedDisplayLine - 1
+        elseif selectedDisplayLine > scroll + visibleHeight then
+            scroll = selectedDisplayLine - visibleHeight
+        end
+        
+        -- Draw visible items
+        local drawnLines = 0
+        for i = scroll + 1, math.min(#displayLines, scroll + visibleHeight) do
+            local line = displayLines[i]
+            drawnLines = drawnLines + 1
+            
+            if line.type == "blank" then
+                print()
+            elseif line.type == "separator" then
+                term.setTextColor(colors.gray)
+                print(line.label)
+            else
+                if line.index == selected then
                     term.setTextColor(colors.black)
                     term.setBackgroundColor(colors.white)
-                    write("> " .. opt.label .. " ")
+                    local displayLabel = line.label
+                    if #displayLabel > w - 3 then
+                        displayLabel = displayLabel:sub(1, w - 6) .. "..."
+                    end
+                    write("> " .. displayLabel .. " ")
                     term.setBackgroundColor(colors.black)
                     print()
                 else
                     term.setTextColor(colors.white)
-                    print("  " .. opt.label)
+                    local displayLabel = line.label
+                    if #displayLabel > w - 3 then
+                        displayLabel = displayLabel:sub(1, w - 6) .. "..."
+                    end
+                    print("  " .. displayLabel)
                 end
             end
+        end
+        
+        -- Draw scroll indicators if needed
+        term.setTextColor(colors.gray)
+        if scroll > 0 then
+            term.setCursorPos(w, headerHeight + 1)
+            write("^")
+        end
+        if scroll + visibleHeight < #displayLines then
+            term.setCursorPos(w, h - footerHeight)
+            write("v")
         end
         
         -- Draw help
         term.setCursorPos(1, h - 1)
         term.setTextColor(colors.gray)
-        print("Up/Down: Navigate | Enter: Select | Q: Exit")
+        print("Up/Down: Navigate | Enter: Select | Q: Back")
         
         -- Handle input
         local e, key = os.pullEvent("key")
@@ -78,6 +139,30 @@ local function showMenu(title, options)
                 selected = selected + 1
                 if selected > #options then selected = 1 end
             until not options[selected].separator
+        elseif key == keys.pageUp then
+            for _ = 1, visibleHeight - 1 do
+                repeat
+                    selected = selected - 1
+                    if selected < 1 then selected = #options end
+                until not options[selected].separator
+            end
+        elseif key == keys.pageDown then
+            for _ = 1, visibleHeight - 1 do
+                repeat
+                    selected = selected + 1
+                    if selected > #options then selected = 1 end
+                until not options[selected].separator
+            end
+        elseif key == keys.home then
+            selected = 1
+            while options[selected] and options[selected].separator do
+                selected = selected + 1
+            end
+        elseif key == keys["end"] then
+            selected = #options
+            while options[selected] and options[selected].separator do
+                selected = selected - 1
+            end
         elseif key == keys.enter then
             return options[selected].action
         elseif key == keys.q then
@@ -136,45 +221,253 @@ local function getProductOptions()
     return options
 end
 
---- Display the products list
-local function showProducts()
-    local products = productManager.getAll()
-    
-    term.clear()
-    term.setCursorPos(1, 1)
-    term.setTextColor(colors.yellow)
-    print("=== Products ===")
-    term.setTextColor(colors.white)
-    
-    if not products or not next(products) then
-        print("No products found.")
-    else
-        local count = 0
-        for meta, product in pairs(products) do
-            count = count + 1
-            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+-- Forward declarations for functions that reference each other
+local addProduct
+local viewProductDetails
+local showProducts
+
+--- View product details
+---@param product table The product to view
+viewProductDetails = function(product)
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        local w, h = term.getSize()
+        local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+        
+        -- Title
+        term.setTextColor(colors.yellow)
+        print("=== Product Details ===")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        print()
+        
+        -- Product info
+        term.setTextColor(colors.lightBlue)
+        write("Name: ")
+        term.setTextColor(colors.white)
+        print(productManager.getName(product))
+        
+        term.setTextColor(colors.lightBlue)
+        write("Meta: ")
+        term.setTextColor(colors.gray)
+        print(product.meta)
+        
+        print()
+        term.setTextColor(colors.lightBlue)
+        write("Line 1: ")
+        term.setTextColor(colors.white)
+        print(product.line1)
+        
+        term.setTextColor(colors.lightBlue)
+        write("Line 2: ")
+        term.setTextColor(colors.white)
+        print(product.line2)
+        
+        print()
+        term.setTextColor(colors.lightBlue)
+        write("Cost: ")
+        term.setTextColor(colors.green)
+        print(string.format("%.03f KRO", product.cost))
+        
+        term.setTextColor(colors.lightBlue)
+        write("Aisle: ")
+        term.setTextColor(colors.white)
+        print(product.aisleName)
+        
+        term.setTextColor(colors.lightBlue)
+        write("Stock: ")
+        if stock > 0 then
+            term.setTextColor(colors.green)
+        else
+            term.setTextColor(colors.red)
+        end
+        print(stock)
+        
+        print()
+        term.setTextColor(colors.lightBlue)
+        write("Mod ID: ")
+        term.setTextColor(colors.gray)
+        print(product.modid or "unknown")
+        
+        if product.itemnbt then
             term.setTextColor(colors.lightBlue)
-            write(productManager.getName(product))
+            write("NBT: ")
             term.setTextColor(colors.gray)
-            write(" [" .. meta .. "]")
+            print(product.itemnbt)
+        end
+        
+        -- Actions
+        print()
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        term.setTextColor(colors.yellow)
+        print("Actions:")
+        term.setTextColor(colors.white)
+        print("  [E] Edit product")
+        print("  [R] Refresh signs")
+        print("  [D] Delete product")
+        print("  [Q] Back to product list")
+        
+        local e, key = os.pullEvent("key")
+        if key == keys.q then
+            return nil
+        elseif key == keys.r then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.yellow)
+            print("Refreshing signs for " .. productManager.getName(product) .. "...")
+            signManager.updateItemSigns(product)
+            term.setTextColor(colors.green)
+            print("Done!")
+            sleep(0.5)
+        elseif key == keys.d then
+            -- Delete confirmation
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.red)
+            print("=== DELETE PRODUCT ===")
             term.setTextColor(colors.white)
             print()
-            print(string.format("  Cost: %.03f KRO | Stock: %d | Aisle: %s", 
-                product.cost, stock, product.aisleName))
-            term.setTextColor(colors.gray)
-            print(string.format("  ModID: %s", product.modid or "unknown"))
+            print("Product: " .. productManager.getName(product))
+            print("Meta: " .. product.meta)
+            print()
+            term.setTextColor(colors.yellow)
+            print("Are you sure? Press Y to confirm.")
+            
+            local _, confirmKey = os.pullEvent("key")
+            if confirmKey == keys.y then
+                productManager.unset(product.meta)
+                os.queueEvent("product_delete", product)
+                term.setTextColor(colors.green)
+                print("\nProduct deleted!")
+                sleep(0.5)
+                return "deleted"
+            end
+        elseif key == keys.e then
+            local form = formui.new("Edit Product: " .. productManager.getName(product))
+            
+            local metaField = form:text("Meta (unique ID)", product.meta)
+            local line1Field = form:text("Line 1 (name)", product.line1)
+            local line2Field = form:text("Line 2 (desc)", product.line2)
+            local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
+            local aisleField = form:text("Aisle Name", product.aisleName)
+            local modidField = form:text("Mod ID", product.modid or "")
+            
+            form:addSubmitCancel()
+            
+            local result = form:run()
+            if result then
+                local newProduct = {
+                    meta = metaField(),
+                    line1 = line1Field(),
+                    line2 = line2Field(),
+                    cost = costField(),
+                    aisleName = aisleField(),
+                    modid = modidField(),
+                    itemnbt = product.itemnbt
+                }
+                
+                local success, err = productManager:updateItem(product, newProduct)
+                
+                term.clear()
+                term.setCursorPos(1, 1)
+                if success then
+                    term.setTextColor(colors.green)
+                    print("Product updated!")
+                    -- Update our local reference
+                    for k, v in pairs(newProduct) do
+                        product[k] = v
+                    end
+                else
+                    term.setTextColor(colors.red)
+                    print("Error: " .. (err or "Unknown"))
+                end
+                sleep(0.5)
+            end
         end
-        term.setTextColor(colors.lightGray)
-        print("\nTotal: " .. count .. " product(s)")
     end
-    
-    term.setTextColor(colors.gray)
-    print("\nPress any key to continue...")
-    os.pullEvent("key")
+end
+
+--- Display the products list with interactive menu
+showProducts = function()
+    while true do
+        local options = getProductOptions()
+        
+        if #options == 0 then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.red)
+            print("No products found!")
+            term.setTextColor(colors.gray)
+            print("\nPress any key to continue...")
+            os.pullEvent("key")
+            return
+        end
+        
+        -- Group by aisle
+        local byAisle = {}
+        for _, opt in ipairs(options) do
+            local aisle = opt.product.aisleName or "Unknown"
+            if not byAisle[aisle] then
+                byAisle[aisle] = {}
+            end
+            table.insert(byAisle[aisle], opt)
+        end
+        
+        -- Get sorted aisle names
+        local aisleNames = {}
+        for name, _ in pairs(byAisle) do
+            table.insert(aisleNames, name)
+        end
+        table.sort(aisleNames)
+        
+        -- Build menu with aisle grouping
+        local menuOptions = {
+            { separator = true, label = string.format("Total: %d products", #options) },
+        }
+        
+        for _, aisleName in ipairs(aisleNames) do
+            table.insert(menuOptions, { separator = true, label = "--- " .. aisleName .. " ---" })
+            for _, opt in ipairs(byAisle[aisleName]) do
+                -- Shorter label for menu
+                local stock = inventoryManager.getItemStock(opt.product.modid, opt.product.itemnbt) or 0
+                local label = string.format("%s - %.03f KRO (x%d)",
+                    productManager.getName(opt.product), opt.product.cost, stock)
+                table.insert(menuOptions, { 
+                    label = label, 
+                    action = opt.action, 
+                    product = opt.product 
+                })
+            end
+        end
+        
+        table.insert(menuOptions, { separator = true, label = "" })
+        table.insert(menuOptions, { label = "Add New Product", action = "add" })
+        table.insert(menuOptions, { label = "Back to Main Menu", action = "back" })
+        
+        local action = showMenu("Products", menuOptions)
+        
+        if action == "back" or action == nil then
+            return
+        elseif action == "add" then
+            addProduct()
+        else
+            -- Find and view the selected product
+            local product = productManager.get(action)
+            if product then
+                local result = viewProductDetails(product)
+                if result == "deleted" then
+                    -- Product was deleted, refresh the list
+                end
+            end
+        end
+    end
 end
 
 --- Add a new product
-local function addProduct()
+addProduct = function()
     local form = formui.new("Add New Product")
     
     -- Get available aisles for dropdown
@@ -351,48 +644,275 @@ local function deleteProduct()
     os.pullEvent("key")
 end
 
---- View all signs
-local function viewSigns()
-    term.clear()
-    term.setCursorPos(1, 1)
-    term.setTextColor(colors.yellow)
-    print("=== Shop Signs ===")
-    term.setTextColor(colors.white)
-    
+--- Build sign options for menu selection
+---@return table options Array of sign options for menu
+local function getSignOptions()
     local signs = table.pack(peripheral.find("minecraft:sign"))
+    local options = {}
     
-    if #signs == 0 then
-        print("No signs found.")
-    else
-        for i, sign in ipairs(signs) do
-            local data = sign.getSignText()
-            local meta = data[4]
-            local product = productManager.get(meta)
-            
-            term.setTextColor(colors.lightBlue)
-            write(peripheral.getName(sign))
-            term.setTextColor(colors.gray)
-            
-            if product then
-                write(" -> ")
-                term.setTextColor(colors.white)
-                print(productManager.getName(product))
-            elseif meta and #meta > 0 then
-                write(" -> ")
-                term.setTextColor(colors.red)
-                print("Unknown: " .. meta)
-            else
-                term.setTextColor(colors.gray)
-                print(" (no product)")
-            end
+    for i, sign in ipairs(signs) do
+        local signName = peripheral.getName(sign)
+        local data = sign.getSignText()
+        local meta = data[4]
+        local product = productManager.get(meta)
+        
+        local label
+        local status
+        if product then
+            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+            label = string.format("%s -> %s (Stock: %d)", signName, productManager.getName(product), stock)
+            status = "linked"
+        elseif meta and #meta > 0 then
+            label = string.format("%s -> UNKNOWN: %s", signName, meta)
+            status = "unknown"
+        else
+            label = string.format("%s (no product)", signName)
+            status = "empty"
         end
-        term.setTextColor(colors.lightGray)
-        print("\nTotal: " .. #signs .. " sign(s)")
+        
+        table.insert(options, {
+            label = label,
+            action = signName,
+            sign = sign,
+            signName = signName,
+            product = product,
+            meta = meta,
+            status = status
+        })
     end
     
-    term.setTextColor(colors.gray)
-    print("\nPress any key to continue...")
-    os.pullEvent("key")
+    -- Sort by status (linked first, then unknown, then empty)
+    table.sort(options, function(a, b)
+        local statusOrder = { linked = 1, unknown = 2, empty = 3 }
+        if statusOrder[a.status] ~= statusOrder[b.status] then
+            return statusOrder[a.status] < statusOrder[b.status]
+        end
+        return a.signName < b.signName
+    end)
+    
+    return options
+end
+
+--- View sign details
+---@param signOpt table Sign option from getSignOptions
+local function viewSignDetails(signOpt)
+    local sign = signOpt.sign
+    local data = sign.getSignText()
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        local w, h = term.getSize()
+        
+        -- Title
+        term.setTextColor(colors.yellow)
+        print("=== Sign Details ===")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        print()
+        
+        -- Sign info
+        term.setTextColor(colors.lightBlue)
+        write("Peripheral: ")
+        term.setTextColor(colors.white)
+        print(signOpt.signName)
+        print()
+        
+        -- Sign text preview
+        term.setTextColor(colors.yellow)
+        print("Current Sign Text:")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", 20))
+        for i, line in ipairs(data) do
+            term.setTextColor(colors.white)
+            print(line ~= "" and line or "(empty)")
+        end
+        term.setTextColor(colors.gray)
+        print(string.rep("-", 20))
+        print()
+        
+        -- Product info
+        if signOpt.product then
+            term.setTextColor(colors.green)
+            print("Linked Product:")
+            term.setTextColor(colors.white)
+            print("  Name: " .. productManager.getName(signOpt.product))
+            print("  Meta: " .. signOpt.product.meta)
+            print("  Cost: " .. signOpt.product.cost .. " KRO")
+            print("  Aisle: " .. signOpt.product.aisleName)
+            local stock = inventoryManager.getItemStock(signOpt.product.modid, signOpt.product.itemnbt) or 0
+            print("  Stock: " .. stock)
+        elseif signOpt.meta and #signOpt.meta > 0 then
+            term.setTextColor(colors.red)
+            print("Unknown Product Meta: " .. signOpt.meta)
+            term.setTextColor(colors.gray)
+            print("This sign references a product that doesn't exist.")
+        else
+            term.setTextColor(colors.gray)
+            print("No product linked to this sign.")
+        end
+        
+        -- Actions
+        print()
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        term.setTextColor(colors.yellow)
+        print("Actions:")
+        term.setTextColor(colors.white)
+        if signOpt.product then
+            print("  [R] Refresh this sign")
+            print("  [E] Edit linked product")
+        end
+        print("  [Q] Back to sign list")
+        
+        local e, key = os.pullEvent("key")
+        if key == keys.q then
+            return
+        elseif key == keys.r and signOpt.product then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.yellow)
+            print("Refreshing sign...")
+            signManager.updateItemSigns(signOpt.product)
+            term.setTextColor(colors.green)
+            print("Done!")
+            sleep(0.5)
+            -- Refresh sign data
+            data = sign.getSignText()
+        elseif key == keys.e and signOpt.product then
+            -- Edit the linked product
+            local product = signOpt.product
+            local form = formui.new("Edit Product: " .. productManager.getName(product))
+            
+            local metaField = form:text("Meta (unique ID)", product.meta)
+            local line1Field = form:text("Line 1 (name)", product.line1)
+            local line2Field = form:text("Line 2 (desc)", product.line2)
+            local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
+            local aisleField = form:text("Aisle Name", product.aisleName)
+            local modidField = form:text("Mod ID", product.modid or "")
+            
+            form:addSubmitCancel()
+            
+            local result = form:run()
+            if result then
+                local newProduct = {
+                    meta = metaField(),
+                    line1 = line1Field(),
+                    line2 = line2Field(),
+                    cost = costField(),
+                    aisleName = aisleField(),
+                    modid = modidField(),
+                    itemnbt = product.itemnbt
+                }
+                
+                local success, err = productManager:updateItem(product, newProduct)
+                
+                term.clear()
+                term.setCursorPos(1, 1)
+                if success then
+                    term.setTextColor(colors.green)
+                    print("Product updated!")
+                    signOpt.product = newProduct
+                else
+                    term.setTextColor(colors.red)
+                    print("Error: " .. (err or "Unknown"))
+                end
+                sleep(0.5)
+                -- Refresh sign data
+                data = sign.getSignText()
+            end
+        end
+    end
+end
+
+--- View all signs with interactive menu
+local function viewSigns()
+    while true do
+        local signOptions = getSignOptions()
+        
+        if #signOptions == 0 then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.red)
+            print("No signs found!")
+            term.setTextColor(colors.gray)
+            print("\nPress any key to continue...")
+            os.pullEvent("key")
+            return
+        end
+        
+        -- Add summary header
+        local linkedCount = 0
+        local unknownCount = 0
+        local emptyCount = 0
+        for _, opt in ipairs(signOptions) do
+            if opt.status == "linked" then linkedCount = linkedCount + 1
+            elseif opt.status == "unknown" then unknownCount = unknownCount + 1
+            else emptyCount = emptyCount + 1 end
+        end
+        
+        local menuOptions = {
+            { separator = true, label = string.format("Total: %d | Linked: %d | Unknown: %d | Empty: %d", 
+                #signOptions, linkedCount, unknownCount, emptyCount) },
+            { separator = true, label = "" },
+        }
+        
+        -- Add grouped signs
+        if linkedCount > 0 then
+            table.insert(menuOptions, { separator = true, label = "--- Linked Signs ---" })
+            for _, opt in ipairs(signOptions) do
+                if opt.status == "linked" then
+                    table.insert(menuOptions, opt)
+                end
+            end
+        end
+        
+        if unknownCount > 0 then
+            table.insert(menuOptions, { separator = true, label = "--- Unknown Products ---" })
+            for _, opt in ipairs(signOptions) do
+                if opt.status == "unknown" then
+                    table.insert(menuOptions, opt)
+                end
+            end
+        end
+        
+        if emptyCount > 0 then
+            table.insert(menuOptions, { separator = true, label = "--- Empty Signs ---" })
+            for _, opt in ipairs(signOptions) do
+                if opt.status == "empty" then
+                    table.insert(menuOptions, opt)
+                end
+            end
+        end
+        
+        table.insert(menuOptions, { separator = true, label = "" })
+        table.insert(menuOptions, { label = "Refresh All Signs", action = "refresh_all" })
+        table.insert(menuOptions, { label = "Back to Main Menu", action = "back" })
+        
+        local action = showMenu("Shop Signs", menuOptions)
+        
+        if action == "back" or action == nil then
+            return
+        elseif action == "refresh_all" then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.yellow)
+            print("Updating all signs...")
+            signManager.updateAll()
+            term.setTextColor(colors.green)
+            print("Done!")
+            sleep(0.5)
+        else
+            -- Find the selected sign option
+            for _, opt in ipairs(signOptions) do
+                if opt.action == action then
+                    viewSignDetails(opt)
+                    break
+                end
+            end
+        end
+    end
 end
 
 --- Refresh signs for a specific product
@@ -415,59 +935,202 @@ local function refreshProductSign()
     os.pullEvent("key")
 end
 
---- Display the aisles list
+--- Display the aisles list with interactive menu
 local function showAisles()
-    local aisles = aisleManager.getAisles()
-    
-    term.clear()
-    term.setCursorPos(1, 1)
-    term.setTextColor(colors.yellow)
-    print("=== Aisles ===")
-    term.setTextColor(colors.white)
-    
-    if not aisles or not next(aisles) then
-        print("No aisles found.")
-        print("Make sure aisle turtles are running!")
-    else
-        local count = 0
+    while true do
+        local aisles = aisleManager.getAisles()
+        
+        if not aisles or not next(aisles) then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.red)
+            print("No aisles found!")
+            term.setTextColor(colors.gray)
+            print("Make sure aisle turtles are running!")
+            print("\nPress any key to continue...")
+            os.pullEvent("key")
+            return
+        end
+        
+        -- Count aisles by status
+        local onlineCount = 0
+        local staleCount = 0
+        local offlineCount = 0
+        local unknownCount = 0
+        
+        local aisleOptions = {}
         for name, aisle in pairs(aisles) do
-            count = count + 1
             local lastSeen = aisle.lastSeen and os.epoch("utc") - aisle.lastSeen or nil
             local status = "unknown"
+            local statusText = "unknown"
+            
             if lastSeen then
                 if lastSeen < 10000 then
                     status = "online"
-                    term.setTextColor(colors.green)
+                    statusText = "online"
+                    onlineCount = onlineCount + 1
                 elseif lastSeen < 60000 then
                     status = "stale"
-                    term.setTextColor(colors.yellow)
+                    statusText = string.format("stale (%ds ago)", math.floor(lastSeen / 1000))
+                    staleCount = staleCount + 1
                 else
                     status = "offline"
-                    term.setTextColor(colors.red)
+                    statusText = string.format("offline (%dm ago)", math.floor(lastSeen / 60000))
+                    offlineCount = offlineCount + 1
                 end
             else
-                term.setTextColor(colors.gray)
+                unknownCount = unknownCount + 1
             end
             
-            write(name)
+            table.insert(aisleOptions, {
+                label = string.format("%s - %s", name, statusText),
+                action = name,
+                aisle = aisle,
+                aisleName = name,
+                status = status
+            })
+        end
+        
+        -- Sort by status then name
+        table.sort(aisleOptions, function(a, b)
+            local statusOrder = { online = 1, stale = 2, offline = 3, unknown = 4 }
+            if statusOrder[a.status] ~= statusOrder[b.status] then
+                return statusOrder[a.status] < statusOrder[b.status]
+            end
+            return a.aisleName < b.aisleName
+        end)
+        
+        -- Build menu
+        local menuOptions = {
+            { separator = true, label = string.format("Online: %d | Stale: %d | Offline: %d", 
+                onlineCount, staleCount, offlineCount) },
+            { separator = true, label = "" },
+        }
+        
+        for _, opt in ipairs(aisleOptions) do
+            table.insert(menuOptions, opt)
+        end
+        
+        table.insert(menuOptions, { separator = true, label = "" })
+        table.insert(menuOptions, { label = "Ping All Aisles", action = "ping" })
+        table.insert(menuOptions, { label = "Update All Aisles", action = "update" })
+        table.insert(menuOptions, { label = "Back to Main Menu", action = "back" })
+        
+        local action = showMenu("Aisles", menuOptions)
+        
+        if action == "back" or action == nil then
+            return
+        elseif action == "ping" then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.yellow)
+            print("Pinging aisles...")
             term.setTextColor(colors.gray)
-            write(" - ")
-            term.setTextColor(status == "online" and colors.green or 
-                             status == "stale" and colors.yellow or 
-                             status == "offline" and colors.red or colors.gray)
-            print(status)
-            term.setTextColor(colors.white)
-            if aisle.self then
-                print("  Turtle: " .. aisle.self)
+            print("(Aisles should respond within a few seconds)")
+            sleep(1)
+        elseif action == "update" then
+            term.clear()
+            term.setCursorPos(1, 1)
+            term.setTextColor(colors.yellow)
+            print("Sending update command to all aisles...")
+            aisleManager.updateAisles()
+            term.setTextColor(colors.green)
+            print("Update command sent!")
+            sleep(0.5)
+        else
+            -- View aisle details
+            for _, opt in ipairs(aisleOptions) do
+                if opt.action == action then
+                    -- Show aisle details
+                    term.clear()
+                    term.setCursorPos(1, 1)
+                    
+                    local w, h = term.getSize()
+                    local aisle = opt.aisle
+                    
+                    term.setTextColor(colors.yellow)
+                    print("=== Aisle: " .. opt.aisleName .. " ===")
+                    term.setTextColor(colors.gray)
+                    print(string.rep("-", w))
+                    print()
+                    
+                    -- Status
+                    term.setTextColor(colors.lightBlue)
+                    write("Status: ")
+                    if opt.status == "online" then
+                        term.setTextColor(colors.green)
+                        print("Online")
+                    elseif opt.status == "stale" then
+                        term.setTextColor(colors.yellow)
+                        print("Stale")
+                    elseif opt.status == "offline" then
+                        term.setTextColor(colors.red)
+                        print("Offline")
+                    else
+                        term.setTextColor(colors.gray)
+                        print("Unknown")
+                    end
+                    
+                    -- Turtle ID
+                    if aisle.self then
+                        term.setTextColor(colors.lightBlue)
+                        write("Turtle: ")
+                        term.setTextColor(colors.white)
+                        print(aisle.self)
+                    end
+                    
+                    -- Last seen
+                    if aisle.lastSeen then
+                        local ago = os.epoch("utc") - aisle.lastSeen
+                        term.setTextColor(colors.lightBlue)
+                        write("Last seen: ")
+                        term.setTextColor(colors.white)
+                        if ago < 1000 then
+                            print("just now")
+                        elseif ago < 60000 then
+                            print(math.floor(ago / 1000) .. " seconds ago")
+                        else
+                            print(math.floor(ago / 60000) .. " minutes ago")
+                        end
+                    end
+                    
+                    -- Products in this aisle
+                    print()
+                    term.setTextColor(colors.yellow)
+                    print("Products in this aisle:")
+                    term.setTextColor(colors.white)
+                    
+                    local products = productManager.getAll()
+                    local aisleProducts = {}
+                    if products then
+                        for meta, product in pairs(products) do
+                            if product.aisleName == opt.aisleName then
+                                table.insert(aisleProducts, product)
+                            end
+                        end
+                    end
+                    
+                    if #aisleProducts == 0 then
+                        term.setTextColor(colors.gray)
+                        print("  (none)")
+                    else
+                        table.sort(aisleProducts, function(a, b)
+                            return productManager.getName(a) < productManager.getName(b)
+                        end)
+                        for _, product in ipairs(aisleProducts) do
+                            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+                            print(string.format("  %s (x%d)", productManager.getName(product), stock))
+                        end
+                    end
+                    
+                    term.setTextColor(colors.gray)
+                    print("\nPress any key to continue...")
+                    os.pullEvent("key")
+                    break
+                end
             end
         end
-        term.setTextColor(colors.lightGray)
-        print("\nTotal: " .. count .. " aisle(s)")
     end
-    
-    term.setTextColor(colors.gray)
-    print("\nPress any key to continue...")
-    os.pullEvent("key")
 end
 
 --- Rescan inventory
