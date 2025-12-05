@@ -15,6 +15,10 @@
 ---
 ---@version 1.0.0
 
+if not package.path:find("lib") then
+    package.path = package.path .. ";lib/?.lua;lib/?/init.lua"
+end
+
 local attach = require("attach")
 local log = require("log")
 local persist = require("persist")
