@@ -57,7 +57,7 @@ Find and wrap a peripheral by type, equipping it as a tool if necessary
 
 - `peripheralType` (string): The type of peripheral to find (e.g., "modem", "workbench")
 
-**Returns:** table|nil # A proxy table with all peripheral methods, or nil if not found
+**Returns:** string|nil # Error message if peripheral was not found
 
 ### `module._debug()`
 

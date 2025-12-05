@@ -1,6 +1,6 @@
 {
   "name": "attach",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "A turtle utility module for ComputerCraft that provides safe block interaction, automatic tool management, and peripheral handling for turtles. Features: Automatic tool equipping based on action type (dig, attack, place), unsafe block protection to prevent accidentally digging storage blocks, peripheral auto-placement and wrapping, modem protection (never unequips modems), configurable default and always-equipped tools, and proxy wrappers for peripherals.",
   "dependencies": [],
   "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/attach.lua",
