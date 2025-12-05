@@ -45,6 +45,7 @@ local CONFIG = {
 
     -- Inventory management
     DEPOSIT_THRESHOLD = 14,     -- Deposit when this many slots are full
+    DEPOSIT_DEBRIS_COUNT = 4,   -- Deposit after finding this many ancient debris
     FUEL_MINIMUM = 500,         -- Minimum fuel before returning home
     FUEL_REFUEL_LEVEL = 1000,   -- Refuel to at least this level
 
@@ -383,7 +384,21 @@ local function depositItems()
 end
 
 local function shouldDeposit()
-    return countFullSlots() >= CONFIG.DEPOSIT_THRESHOLD
+    -- Check if inventory is getting full
+    if countFullSlots() >= CONFIG.DEPOSIT_THRESHOLD then
+        return true
+    end
+    
+    -- Check if we have enough ancient debris to deposit
+    local debrisCount = 0
+    for slot = 1, 16 do
+        local item = turtle.getItemDetail(slot)
+        if item and item.name == "minecraft:ancient_debris" then
+            debrisCount = debrisCount + item.count
+        end
+    end
+    
+    return debrisCount >= CONFIG.DEPOSIT_DEBRIS_COUNT
 end
 
 -- ======= Fuel Management =======
