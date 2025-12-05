@@ -13,9 +13,9 @@
 --- Ensure turtle has fuel, pickaxe, scanner, and ender storage in inventory
 --- Run: netherite/miner
 ---
----@version 1.3.1
+---@version 1.3.2
 
-local MINER_VERSION = "1.3.1"
+local MINER_VERSION = "1.3.2"
 local MINER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/netherite/miner.lua"
 
 if not package.path:find("lib") then
