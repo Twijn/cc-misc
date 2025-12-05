@@ -66,7 +66,7 @@ local CONFIG = {
     DEFAULT_SWORD = "minecraft:diamond_sword",
 
     -- Tracker settings
-    TRACKER_SYNC_INTERVAL = 30,  -- Seconds between tracker syncs
+    TRACKER_SYNC_INTERVAL = 20,  -- Seconds between tracker syncs
 }
 
 -- ======= State Management =======
@@ -190,9 +190,13 @@ local enderStorage = nil
 
 local function setupPeripherals()
     -- Find plethora scanner
-    scanner = attach.find("plethora:scanner")
+    local debugInfo
+    scanner, debugInfo = attach.find("plethora:scanner")
     if not scanner then
         log.error("Plethora scanner not found! Please equip a scanner module.")
+        if debugInfo then
+            log.error("Debug info: " .. debugInfo)
+        end
         return false
     end
     log.info("Scanner found and ready")
@@ -243,7 +247,7 @@ end
 ---@return boolean isAbsolute Whether the position is absolute (GPS) or relative
 local function getBestPosition()
     local gpsX, gpsY, gpsZ = getGPSPosition()
-    if gpsX then
+    if gpsX and gpsY and gpsZ then
         return gpsX, gpsY, gpsZ, true
     end
     return pos.x, pos.y, pos.z, false

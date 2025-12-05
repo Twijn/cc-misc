@@ -393,28 +393,66 @@ end
 ---Find and wrap a peripheral by type, equipping it as a tool if necessary
 ---@param peripheralType string The type of peripheral to find (e.g., "modem", "workbench")
 ---@return table|nil # A proxy table with all peripheral methods, or nil if not found
+---@return string|nil # Error message if peripheral was not found
 function module.find(peripheralType)
+    local debugInfo = {
+        requestedType = peripheralType,
+        attachedPeripherals = {},
+        inventoryItems = {},
+        equippedLeft = turtle.getEquippedLeft(),
+        equippedRight = turtle.getEquippedRight(),
+    }
+
     -- 1. First look for an already-attached peripheral
     for _, side in ipairs({"left","right","front","back","top","bottom"}) do
         if peripheral.isPresent(side) then
-            if peripheralTypeMatches(peripheral.getType(side), peripheralType) then
+            local pType = peripheral.getType(side)
+            debugInfo.attachedPeripherals[side] = pType
+            if peripheralTypeMatches(pType, peripheralType) then
                 return wrapPeripheralInternal(peripheralType, side)
             end
         end
     end
 
-    -- 2. Try to equip it as a tool (wireless modem behavior)
-    local equippedSide = equipPeripheralTool(peripheralType)
-    if equippedSide then
-        -- Newly equipped tool will expose a peripheral on that side
-        if peripheral.isPresent(equippedSide) and
-           peripheralTypeMatches(peripheral.getType(equippedSide), peripheralType) then
-            return wrapPeripheralInternal(peripheralType, equippedSide)
+    -- 2. Collect inventory info for debugging
+    for slot = 1, 16 do
+        local stack = turtle.getItemDetail(slot)
+        if stack then
+            debugInfo.inventoryItems[slot] = stack.name
         end
     end
 
-    -- 3. Nothing found
-    return nil
+    -- 3. Try to equip it as a tool (wireless modem behavior)
+    local equippedSide = equipPeripheralTool(peripheralType)
+    if equippedSide then
+        -- Newly equipped tool will expose a peripheral on that side
+        if peripheral.isPresent(equippedSide) then
+            local equippedType = peripheral.getType(equippedSide)
+            debugInfo.equippedPeripheralType = equippedType
+            debugInfo.equippedSide = equippedSide
+            if peripheralTypeMatches(equippedType, peripheralType) then
+                return wrapPeripheralInternal(peripheralType, equippedSide)
+            else
+                -- Equipped something but type doesn't match
+                local errMsg = string.format(
+                    "Peripheral type mismatch: requested '%s', equipped '%s' on %s",
+                    peripheralType, equippedType, equippedSide
+                )
+                debugInfo.error = errMsg
+                return nil, textutils.serialiseJSON(debugInfo)
+            end
+        else
+            debugInfo.error = "Equipped item to " .. equippedSide .. " but no peripheral detected"
+            return nil, textutils.serialiseJSON(debugInfo)
+        end
+    end
+
+    -- 4. Nothing found - build detailed error message
+    local patterns = peripheralItemPatterns[peripheralType:lower()]
+    debugInfo.searchPatterns = patterns or {peripheralType:lower()}
+    debugInfo.error = "No matching peripheral found in attached peripherals or inventory"
+    
+    return nil, textutils.serialiseJSON(debugInfo)
 end
 
 
