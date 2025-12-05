@@ -13,9 +13,9 @@
 --- Ensure turtle has fuel, pickaxe, scanner, and ender storage in inventory
 --- Run: netherite/miner
 ---
----@version 1.2.0
+---@version 1.2.1
 
-local MINER_VERSION = "1.2.0"
+local MINER_VERSION = "1.2.1"
 local MINER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/netherite/miner.lua"
 
 if not package.path:find("lib") then
@@ -342,15 +342,11 @@ local function depositItems()
         return false
     end
 
-    -- Wrap the ender storage
-    local chest = peripheral.wrap("top")
-    if not chest then
-        log.error("Failed to wrap ender storage")
-        turtle.digUp()  -- Pick it back up
-        return false
-    end
+    -- Small delay to ensure block is placed
+    sleep(0.1)
 
     -- Deposit all items except tools and the ender storage
+    -- Note: Ender storage doesn't expose a peripheral, so we just use turtle.dropUp()
     local deposited = 0
     for slot = 1, 16 do
         local item = turtle.getItemDetail(slot)
