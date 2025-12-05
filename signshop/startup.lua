@@ -58,8 +58,11 @@ else
     print("Starting SignShop Server...")
     start("disk/server")
     
-    -- Clear screen and start command interface
+    -- Clear screen and start configuration UI
+    sleep(1) -- Give server time to start
     term.clear()
     term.setCursorPos(1, 1)
-    shell.run("disk/cmd")
+    
+    local config = require("config")
+    config.run()
 end
