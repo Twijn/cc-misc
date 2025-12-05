@@ -13,14 +13,14 @@
 ---local name = s.string("server_name", "MyServer")
 ---local enabled = s.boolean("enabled")
 ---
----@version 2.0.0
+---@version 2.0.1
 -- @module s
 
-local VERSION = "2.0.0"
+local VERSION = "2.0.1"
 
 local module = {}
 
-local tables = require("/lib/tables")
+local tables = require("lib.tables")
 
 local sides = {"top","bottom","front","back","left","right"}
 
