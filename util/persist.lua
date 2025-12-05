@@ -171,6 +171,20 @@ return function(fileName, useSerialize)
     persistModule.getAll = function()
         return object
     end
+
+    ---Reload data from disk (useful when another process may have modified the file)
+    persistModule.reload = function()
+        if fs.exists(fileName) then
+            local f = fs.open(fileName, "r")
+            local fileContent = f.readAll()
+            f.close()
+            
+            local success, result = pcall(textutils[useSerialize and "unserialize" or "unserializeJSON"], fileContent)
+            if success and result ~= nil then
+                object = result
+            end
+        end
+    end
     
     ---Module version
     persistModule.VERSION = VERSION

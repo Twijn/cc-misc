@@ -67,10 +67,12 @@ local function pingLoop()
 end
 
 manager.getAisles = function()
+    aisles.reload()  -- Reload from disk in case server updated
     return aisles.getAll()
 end
 
 manager.getAisle = function(name)
+    aisles.reload()  -- Reload from disk in case server updated
     return aisles.get(name)
 end
 
