@@ -393,6 +393,14 @@ end
 --- Display the products list with interactive menu
 showProducts = function()
     while true do
+        -- Show loading screen
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.yellow)
+        print("Loading products...")
+        term.setTextColor(colors.gray)
+        print("Please wait...")
+        
         local options = getProductOptions()
         
         if #options == 0 then
@@ -528,6 +536,14 @@ end
 ---@param title string Title for selection menu
 ---@return table|nil product The selected product or nil
 local function selectProduct(title)
+    -- Show loading screen
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setTextColor(colors.yellow)
+    print("Loading products...")
+    term.setTextColor(colors.gray)
+    print("Please wait...")
+    
     local options = getProductOptions()
     
     if #options == 0 then
@@ -649,10 +665,23 @@ end
 local function getSignOptions()
     local signs = table.pack(peripheral.find("minecraft:sign"))
     local options = {}
+    local signData = {}
     
+    -- Read all sign texts in parallel for better performance
+    local tasks = {}
+    for i, sign in ipairs(signs) do
+        tasks[i] = function()
+            signData[i] = sign.getSignText()
+        end
+    end
+    if #tasks > 0 then
+        parallel.waitForAll(table.unpack(tasks))
+    end
+    
+    -- Process sign data (no peripheral calls, fast)
     for i, sign in ipairs(signs) do
         local signName = peripheral.getName(sign)
-        local data = sign.getSignText()
+        local data = signData[i]
         local meta = data[4]
         local product = productManager.get(meta)
         
@@ -829,6 +858,14 @@ end
 --- View all signs with interactive menu
 local function viewSigns()
     while true do
+        -- Show loading screen
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.yellow)
+        print("Scanning signs...")
+        term.setTextColor(colors.gray)
+        print("Please wait...")
+        
         local signOptions = getSignOptions()
         
         if #signOptions == 0 then
@@ -938,6 +975,14 @@ end
 --- Display the aisles list with interactive menu
 local function showAisles()
     while true do
+        -- Show loading screen
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.yellow)
+        print("Loading aisles...")
+        term.setTextColor(colors.gray)
+        print("Please wait...")
+        
         local aisles = aisleManager.getAisles()
         
         if not aisles or not next(aisles) then
@@ -1198,7 +1243,10 @@ local function rescanInventory()
     term.setCursorPos(1, 1)
     term.setTextColor(colors.yellow)
     print("Rescanning inventory...")
+    term.setTextColor(colors.gray)
+    print("This may take a moment...")
     term.setTextColor(colors.white)
+    print()
     
     inventoryManager.rescan()
     
