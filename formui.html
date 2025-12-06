@@ -246,7 +246,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>formui <span class="version-badge">v0.2.0</span></h1>
+        <h1>formui <span class="version-badge">v0.3.0</span></h1>
         <p>A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, checkbox/toggle fields, multi-select dropdowns, list fields with item management, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.</p>
     </div>
     
@@ -411,7 +411,7 @@ end</code></pre>
         <div class='returns'><strong>Returns:</strong> fun(): any # Function that returns the field's final value after form submission</div>
     </div>
     <div class='function'>
-        <h3><code>FormUI:text(label, default?, validator?)</code></h3>
+        <h3><code>FormUI:text(label, default?, validator?, allowEmpty?)</code></h3>
         <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L169' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a text input field</p>
         <div class='params'>
@@ -420,13 +420,14 @@ end</code></pre>
                 <li><code>label</code> (string): The field label</li>
                 <li><code>default?</code> (string): Default value</li>
                 <li><code>validator?</code> (ValidationFunction): Custom validation function</li>
+                <li><code>allowEmpty?</code> (boolean): Whether empty values are allowed (default: false)</li>
             </ul>
         </div>
         <div class='returns'><strong>Returns:</strong> fun(): string # Function to get the field value after submission</div>
     </div>
     <div class='function'>
         <h3><code>FormUI:number(label, default?, validator?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L185' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L191' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a number input field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -440,7 +441,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:select(label, options?, defaultIndex?, validator?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L201' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L207' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a select dropdown field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -455,7 +456,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:peripheral(label, filterType?, validator?, defaultValue?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L219' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L225' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a peripheral selector field that automatically detects peripherals</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -470,7 +471,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:label(text)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L252' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L258' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a non-interactive label for display purposes</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -482,7 +483,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:button(text, action?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L265' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L271' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a button that can trigger actions</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -495,7 +496,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:checkbox(label, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L280' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L286' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a checkbox/toggle field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -508,7 +509,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:multiselect(label, options, defaultIndices?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L295' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L301' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a multi-select dropdown field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -522,7 +523,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:list(label, default?, itemType?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L322' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L328' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add a list field (string or number list, with item reordering)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -536,12 +537,12 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:addSubmitCancel()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L347' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L353' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Add standard Submit and Cancel buttons to the form</p>
     </div>
     <div class='function'>
         <h3><code>FormUI:validateField(i)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L353' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L359' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Validate a specific field by index</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -553,13 +554,13 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:isValid()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L367' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L373' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Validate all fields in the form</p>
         <div class='returns'><strong>Returns:</strong> boolean # True if all fields are valid</div>
     </div>
     <div class='function'>
         <h3><code>FormUI:get(label)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L381' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L387' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get the current value of a field by label</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -571,7 +572,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:setValue(label, value)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L405' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L411' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Set the value of a field by label</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -584,12 +585,12 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:draw()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L452' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L458' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Draw the form to the terminal</p>
     </div>
     <div class='function'>
         <h3><code>FormUI:edit(index)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L604' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L610' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Edit a field at the specified index</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -601,7 +602,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:nextSelectableField(from)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L813' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L830' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Find the next selectable field index (skips labels)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -613,7 +614,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:prevSelectableField(from)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L831' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L848' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Find the previous selectable field index (skips labels)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -625,7 +626,7 @@ end</code></pre>
     </div>
     <div class='function'>
         <h3><code>FormUI:run()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L849' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L866' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Run the form's main input loop</p>
         <div class='returns'><strong>Returns:</strong> FormResult? result Table of field values indexed by label, or nil if cancelled</div>
     </div>

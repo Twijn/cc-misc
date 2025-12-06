@@ -1163,7 +1163,7 @@
     },
     "formui": {
       "name": "formui",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "description": "A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, checkbox/toggle fields, multi-select dropdowns, list fields with item management, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/formui.lua",
@@ -1212,6 +1212,11 @@
               "name": "validator?",
               "type": "ValidationFunction",
               "description": "Custom validation function"
+            },
+            {
+              "name": "allowEmpty?",
+              "type": "boolean",
+              "description": "Whether empty values are allowed (default: false)"
             }
           ],
           "returns": "fun(): string # Function to get the field value after submission",
@@ -1239,7 +1244,7 @@
           ],
           "returns": "fun(): number # Function to get the field value after submission",
           "description": "Add a number input field",
-          "line": 185
+          "line": 191
         },
         {
           "name": "FormUI:select",
@@ -1267,7 +1272,7 @@
           ],
           "returns": "fun(): string # Function to get the selected option after submission",
           "description": "Add a select dropdown field",
-          "line": 201
+          "line": 207
         },
         {
           "name": "FormUI:peripheral",
@@ -1295,7 +1300,7 @@
           ],
           "returns": "fun(): string # Function to get the selected peripheral name after submission",
           "description": "Add a peripheral selector field that automatically detects peripherals",
-          "line": 219
+          "line": 225
         },
         {
           "name": "FormUI:label",
@@ -1308,7 +1313,7 @@
           ],
           "returns": "fun(): string # Function to get the label text (always returns the same text)",
           "description": "Add a non-interactive label for display purposes",
-          "line": 252
+          "line": 258
         },
         {
           "name": "FormUI:button",
@@ -1326,7 +1331,7 @@
           ],
           "returns": "fun(): string # Function to get the button text",
           "description": "Add a button that can trigger actions",
-          "line": 265
+          "line": 271
         },
         {
           "name": "FormUI:checkbox",
@@ -1344,7 +1349,7 @@
           ],
           "returns": "fun(): boolean # Function to get the field value after submission",
           "description": "Add a checkbox/toggle field",
-          "line": 280
+          "line": 286
         },
         {
           "name": "FormUI:multiselect",
@@ -1367,7 +1372,7 @@
           ],
           "returns": "fun(): string[] # Function to get selected options after submission",
           "description": "Add a multi-select dropdown field",
-          "line": 295
+          "line": 301
         },
         {
           "name": "FormUI:list",
@@ -1390,14 +1395,14 @@
           ],
           "returns": "fun(): table # Function to get the list after submission",
           "description": "Add a list field (string or number list, with item reordering)",
-          "line": 322
+          "line": 328
         },
         {
           "name": "FormUI:addSubmitCancel",
           "params": [],
           "returns": "",
           "description": "Add standard Submit and Cancel buttons to the form",
-          "line": 347
+          "line": 353
         },
         {
           "name": "FormUI:validateField",
@@ -1410,14 +1415,14 @@
           ],
           "returns": "string? error Error message if validation failed",
           "description": "Validate a specific field by index",
-          "line": 353
+          "line": 359
         },
         {
           "name": "FormUI:isValid",
           "params": [],
           "returns": "boolean # True if all fields are valid",
           "description": "Validate all fields in the form",
-          "line": 367
+          "line": 373
         },
         {
           "name": "FormUI:get",
@@ -1430,7 +1435,7 @@
           ],
           "returns": "any # The field's current value, or nil if not found",
           "description": "Get the current value of a field by label",
-          "line": 381
+          "line": 387
         },
         {
           "name": "FormUI:setValue",
@@ -1448,14 +1453,14 @@
           ],
           "returns": "boolean # True if field was found and updated, false otherwise",
           "description": "Set the value of a field by label",
-          "line": 405
+          "line": 411
         },
         {
           "name": "FormUI:draw",
           "params": [],
           "returns": "",
           "description": "Draw the form to the terminal",
-          "line": 452
+          "line": 458
         },
         {
           "name": "FormUI:edit",
@@ -1468,7 +1473,7 @@
           ],
           "returns": "string? action Action identifier if a button was pressed",
           "description": "Edit a field at the specified index",
-          "line": 604
+          "line": 610
         },
         {
           "name": "FormUI:nextSelectableField",
@@ -1481,7 +1486,7 @@
           ],
           "returns": "number # Next selectable field index (wraps around)",
           "description": "Find the next selectable field index (skips labels)",
-          "line": 813
+          "line": 830
         },
         {
           "name": "FormUI:prevSelectableField",
@@ -1494,18 +1499,18 @@
           ],
           "returns": "number # Previous selectable field index (wraps around)",
           "description": "Find the previous selectable field index (skips labels)",
-          "line": 831
+          "line": 848
         },
         {
           "name": "FormUI:run",
           "params": [],
           "returns": "FormResult? result Table of field values indexed by label, or nil if cancelled",
           "description": "Run the form's main input loop",
-          "line": 849
+          "line": 866
         }
       ],
       "classes": []
     }
   },
-  "updated": "2025-12-05T07:33:13Z"
+  "updated": "2025-12-06T23:55:47Z"
 }

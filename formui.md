@@ -45,7 +45,7 @@ Add a field to the form and return a getter function
 
 **Returns:** fun(): any # Function that returns the field's final value after form submission
 
-### `FormUI:text(label, default?, validator?)`
+### `FormUI:text(label, default?, validator?, allowEmpty?)`
 
 Add a text input field
 
@@ -54,6 +54,7 @@ Add a text input field
 - `label` (string): The field label
 - `default?` (string): Default value
 - `validator?` (ValidationFunction): Custom validation function
+- `allowEmpty?` (boolean): Whether empty values are allowed (default: false)
 
 **Returns:** fun(): string # Function to get the field value after submission
 
