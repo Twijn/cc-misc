@@ -45,7 +45,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.2.0"
+local VERSION = "0.3.0"
 local FormUI = { _v = VERSION }
 FormUI.__index = FormUI
 
@@ -170,13 +170,19 @@ end
 ---@param label string The field label
 ---@param default? string Default value
 ---@param validator? ValidationFunction Custom validation function
+---@param allowEmpty? boolean Whether empty values are allowed (default: false)
 ---@return fun(): string # Function to get the field value after submission
-function FormUI:text(label, default, validator)
+function FormUI:text(label, default, validator, allowEmpty)
+    local allowEmptyValue = allowEmpty == true
     return self:addField({
         type = "text",
         label = label,
         value = default or "",
+        allowEmpty = allowEmptyValue,
         validate = validator or function(v)
+            if allowEmptyValue then
+                return true
+            end
             return v ~= nil and v ~= "", "Text cannot be empty"
         end
     })
@@ -622,10 +628,14 @@ function FormUI:edit(index)
     self.errors[f.label] = nil
 
     if f.type == "text" or f.type == "number" then
-        print("Enter value for " .. f.label .. ": ")
+        local prompt = "Enter value for " .. f.label
+        if f.allowEmpty then
+            prompt = prompt .. " (leave blank to clear)"
+        end
+        print(prompt .. ": ")
         local input = read()
-        if input and input ~= "" then
-            if f.type == "number" then
+        if f.type == "number" then
+            if input and input ~= "" then
                 input = tonumber(input)
                 if input then
                     f.value = input
@@ -634,8 +644,15 @@ function FormUI:edit(index)
                     print("Input must be a number!")
                     sleep(1)
                 end
-            else
-                f.value = input
+            end
+        else
+            -- For text fields, allow empty if allowEmpty is true
+            if input ~= nil then
+                if input == "" and f.allowEmpty then
+                    f.value = ""
+                elseif input ~= "" then
+                    f.value = input
+                end
             end
         end
     elseif f.type == "select" or f.type == "peripheral" then

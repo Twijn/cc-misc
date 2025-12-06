@@ -350,7 +350,7 @@ viewProductDetails = function(product)
             
             local metaField = form:text("Meta (unique ID)", product.meta)
             local line1Field = form:text("Line 1 (name)", product.line1)
-            local line2Field = form:text("Line 2 (desc)", product.line2)
+            local line2Field = form:text("Line 2 (desc)", product.line2, nil, true)
             local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
             local aisleField = form:text("Aisle Name", product.aisleName)
             local modidField = form:text("Mod ID", product.modid or "")
@@ -480,7 +480,7 @@ addProduct = function()
     
     local metaField = form:text("Meta (unique ID)", "")
     local line1Field = form:text("Line 1 (name)", "")
-    local line2Field = form:text("Line 2 (desc)", "")
+    local line2Field = form:text("Line 2 (desc)", "", nil, true)
     local costField = form:number("Cost (KRO)", 0.001, formui.validation.number_range(0.001, 999999))
     local aisleField = form:text("Aisle Name", aisleNames[1] or "")
     local modidField = form:text("Mod ID (e.g., minecraft:diamond)", "")
@@ -563,7 +563,7 @@ local function editProduct()
     
     local metaField = form:text("Meta (unique ID)", product.meta)
     local line1Field = form:text("Line 1 (name)", product.line1)
-    local line2Field = form:text("Line 2 (desc)", product.line2)
+    local line2Field = form:text("Line 2 (desc)", product.line2, nil, true)
     local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
     local aisleField = form:text("Aisle Name", product.aisleName)
     local modidField = form:text("Mod ID", product.modid or "")
@@ -787,7 +787,7 @@ local function viewSignDetails(signOpt)
             
             local metaField = form:text("Meta (unique ID)", product.meta)
             local line1Field = form:text("Line 1 (name)", product.line1)
-            local line2Field = form:text("Line 2 (desc)", product.line2)
+            local line2Field = form:text("Line 2 (desc)", product.line2, nil, true)
             local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
             local aisleField = form:text("Aisle Name", product.aisleName)
             local modidField = form:text("Mod ID", product.modid or "")
@@ -1041,91 +1041,150 @@ local function showAisles()
             -- View aisle details
             for _, opt in ipairs(aisleOptions) do
                 if opt.action == action then
-                    -- Show aisle details
-                    term.clear()
-                    term.setCursorPos(1, 1)
-                    
                     local w, h = term.getSize()
                     local aisle = opt.aisle
+                    local scroll = 0
                     
-                    term.setTextColor(colors.yellow)
-                    print("=== Aisle: " .. opt.aisleName .. " ===")
-                    term.setTextColor(colors.gray)
-                    print(string.rep("-", w))
-                    print()
-                    
-                    -- Status
-                    term.setTextColor(colors.lightBlue)
-                    write("Status: ")
-                    if opt.status == "online" then
-                        term.setTextColor(colors.green)
-                        print("Online")
-                    elseif opt.status == "stale" then
-                        term.setTextColor(colors.yellow)
-                        print("Stale")
-                    elseif opt.status == "offline" then
-                        term.setTextColor(colors.red)
-                        print("Offline")
-                    else
-                        term.setTextColor(colors.gray)
-                        print("Unknown")
-                    end
-                    
-                    -- Turtle ID
-                    if aisle.self then
-                        term.setTextColor(colors.lightBlue)
-                        write("Turtle: ")
-                        term.setTextColor(colors.white)
-                        print(aisle.self)
-                    end
-                    
-                    -- Last seen
-                    if aisle.lastSeen then
-                        local ago = os.epoch("utc") - aisle.lastSeen
-                        term.setTextColor(colors.lightBlue)
-                        write("Last seen: ")
-                        term.setTextColor(colors.white)
-                        if ago < 1000 then
-                            print("just now")
-                        elseif ago < 60000 then
-                            print(math.floor(ago / 1000) .. " seconds ago")
+                    -- Build content lines
+                    local function buildContentLines()
+                        local lines = {}
+                        
+                        -- Status
+                        local statusColor, statusText
+                        if opt.status == "online" then
+                            statusColor = colors.green
+                            statusText = "Online"
+                        elseif opt.status == "stale" then
+                            statusColor = colors.yellow
+                            statusText = "Stale"
+                        elseif opt.status == "offline" then
+                            statusColor = colors.red
+                            statusText = "Offline"
                         else
-                            print(math.floor(ago / 60000) .. " minutes ago")
+                            statusColor = colors.gray
+                            statusText = "Unknown"
                         end
-                    end
-                    
-                    -- Products in this aisle
-                    print()
-                    term.setTextColor(colors.yellow)
-                    print("Products in this aisle:")
-                    term.setTextColor(colors.white)
-                    
-                    local products = productManager.getAll()
-                    local aisleProducts = {}
-                    if products then
-                        for meta, product in pairs(products) do
-                            if product.aisleName == opt.aisleName then
-                                table.insert(aisleProducts, product)
+                        table.insert(lines, { label = "Status: ", value = statusText, labelColor = colors.lightBlue, valueColor = statusColor })
+                        
+                        -- Turtle ID
+                        if aisle.self then
+                            table.insert(lines, { label = "Turtle: ", value = tostring(aisle.self), labelColor = colors.lightBlue, valueColor = colors.white })
+                        end
+                        
+                        -- Last seen
+                        if aisle.lastSeen then
+                            local ago = os.epoch("utc") - aisle.lastSeen
+                            local lastSeenText
+                            if ago < 1000 then
+                                lastSeenText = "just now"
+                            elseif ago < 60000 then
+                                lastSeenText = math.floor(ago / 1000) .. " seconds ago"
+                            else
+                                lastSeenText = math.floor(ago / 60000) .. " minutes ago"
+                            end
+                            table.insert(lines, { label = "Last seen: ", value = lastSeenText, labelColor = colors.lightBlue, valueColor = colors.white })
+                        end
+                        
+                        -- Blank line
+                        table.insert(lines, { text = "", color = colors.white })
+                        
+                        -- Products header
+                        table.insert(lines, { text = "Products in this aisle:", color = colors.yellow })
+                        
+                        -- Get products
+                        local products = productManager.getAll()
+                        local aisleProducts = {}
+                        if products then
+                            for meta, product in pairs(products) do
+                                if product.aisleName == opt.aisleName then
+                                    table.insert(aisleProducts, product)
+                                end
                             end
                         end
+                        
+                        if #aisleProducts == 0 then
+                            table.insert(lines, { text = "  (none)", color = colors.gray })
+                        else
+                            table.sort(aisleProducts, function(a, b)
+                                return productManager.getName(a) < productManager.getName(b)
+                            end)
+                            for _, product in ipairs(aisleProducts) do
+                                local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+                                table.insert(lines, { text = string.format("  %s (x%d)", productManager.getName(product), stock), color = colors.white })
+                            end
+                        end
+                        
+                        return lines
                     end
                     
-                    if #aisleProducts == 0 then
+                    while true do
+                        term.clear()
+                        term.setCursorPos(1, 1)
+                        
+                        local headerHeight = 3  -- title + separator + blank
+                        local footerHeight = 2  -- help text
+                        local visibleHeight = h - headerHeight - footerHeight
+                        
+                        -- Draw header
+                        term.setTextColor(colors.yellow)
+                        print("=== Aisle: " .. opt.aisleName .. " ===")
                         term.setTextColor(colors.gray)
-                        print("  (none)")
-                    else
-                        table.sort(aisleProducts, function(a, b)
-                            return productManager.getName(a) < productManager.getName(b)
-                        end)
-                        for _, product in ipairs(aisleProducts) do
-                            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
-                            print(string.format("  %s (x%d)", productManager.getName(product), stock))
+                        print(string.rep("-", w))
+                        print()
+                        
+                        local contentLines = buildContentLines()
+                        local totalLines = #contentLines
+                        
+                        -- Clamp scroll
+                        scroll = math.max(0, math.min(scroll, math.max(0, totalLines - visibleHeight)))
+                        
+                        -- Draw visible content
+                        for i = scroll + 1, math.min(totalLines, scroll + visibleHeight) do
+                            local line = contentLines[i]
+                            if line.label then
+                                term.setTextColor(line.labelColor)
+                                write(line.label)
+                                term.setTextColor(line.valueColor)
+                                print(line.value)
+                            else
+                                term.setTextColor(line.color)
+                                print(line.text)
+                            end
+                        end
+                        
+                        -- Draw scroll indicators
+                        term.setTextColor(colors.gray)
+                        if scroll > 0 then
+                            term.setCursorPos(w, headerHeight + 1)
+                            write("^")
+                        end
+                        if scroll + visibleHeight < totalLines then
+                            term.setCursorPos(w, h - footerHeight)
+                            write("v")
+                        end
+                        
+                        -- Draw footer
+                        term.setCursorPos(1, h - 1)
+                        term.setTextColor(colors.gray)
+                        print("Up/Down: Scroll | Q: Back")
+                        
+                        local e, key = os.pullEvent("key")
+                        if key == keys.q then
+                            break
+                        elseif key == keys.up then
+                            scroll = scroll - 1
+                        elseif key == keys.down then
+                            scroll = scroll + 1
+                        elseif key == keys.pageUp then
+                            scroll = scroll - (visibleHeight - 1)
+                        elseif key == keys.pageDown then
+                            scroll = scroll + (visibleHeight - 1)
+                        elseif key == keys.home then
+                            scroll = 0
+                        elseif key == keys["end"] then
+                            scroll = totalLines - visibleHeight
                         end
                     end
-                    
-                    term.setTextColor(colors.gray)
-                    print("\nPress any key to continue...")
-                    os.pullEvent("key")
                     break
                 end
             end
