@@ -11,6 +11,7 @@
 --- - Automatic dependency resolution
 --- - Visual indicators for selections and requirements
 --- - Install/update libraries directly from the API
+--- - Detailed logging for debugging (stored in log/ directory)
 ---
 ---@usage
 ---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua
@@ -20,32 +21,183 @@
 ---
 -- @module installer
 
-local VERSION = "3.1.0"
+local VERSION = "3.2.0"
 local GITHUB_RAW_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
 local API_URL = "https://ccmisc.twijn.dev/api/all.json"
+local LOG_DIR = "log"
+local LOG_FILE = nil -- Will be set on init
 
 -- Available libraries (loaded from API or fallback)
 local LIBRARIES = nil
 local API_DATA = nil -- Full API data with detailed information
+
+---Simple logging system that stores messages for later viewing
+local installLog = {}
+
+---Generate a file-safe date string for log filenames
+---@return string # Date string in YYYY-MM-DD format
+local function fileDate()
+    return os.date("%Y-%m-%d")
+end
+
+---Generate a human-readable timestamp for log entries
+---@return string # Timestamp string in HH:MM:SS format
+local function displayTime()
+    return os.date("%H:%M:%S")
+end
+
+---Log a message with a specific level
+---@param level string Log level (info, warn, error, debug)
+---@param msg string The message to log
+local function logMessage(level, msg)
+    local entry = {
+        time = displayTime(),
+        level = level,
+        message = msg
+    }
+    table.insert(installLog, entry)
+    
+    -- Also write to log file
+    if not fs.exists(LOG_DIR) then
+        fs.makeDir(LOG_DIR)
+    end
+    
+    if not LOG_FILE then
+        LOG_FILE = LOG_DIR .. "/installer-" .. fileDate() .. ".txt"
+    end
+    
+    local f = fs.open(LOG_FILE, "a")
+    if f then
+        f.writeLine(string.format("[%s] [%s] %s", entry.time, level:upper(), msg))
+        f.close()
+    end
+end
+
+---Log info level message
+---@param msg string The message to log
+local function logInfo(msg)
+    logMessage("info", msg)
+end
+
+---Log warning level message
+---@param msg string The message to log
+local function logWarn(msg)
+    logMessage("warn", msg)
+end
+
+---Log error level message
+---@param msg string The message to log
+local function logError(msg)
+    logMessage("error", msg)
+end
+
+---Log debug level message
+---@param msg string The message to log
+local function logDebug(msg)
+    logMessage("debug", msg)
+end
+
+---Show installation log in a scrollable view
+local function showLog()
+    local scroll = 0
+    local w, h = term.getSize()
+    local maxVisibleLines = h - 4
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        -- Header
+        term.setTextColor(colors.yellow)
+        print("Installation Log (" .. #installLog .. " entries)")
+        term.setTextColor(colors.lightGray)
+        print("Up/Down: Scroll | Q: Close | S: Save to file")
+        term.setTextColor(colors.white)
+        print()
+        
+        -- Display log entries
+        local startIdx = scroll + 1
+        local endIdx = math.min(startIdx + maxVisibleLines - 1, #installLog)
+        
+        for i = startIdx, endIdx do
+            local entry = installLog[i]
+            if entry then
+                -- Color based on level
+                if entry.level == "error" then
+                    term.setTextColor(colors.red)
+                elseif entry.level == "warn" then
+                    term.setTextColor(colors.yellow)
+                elseif entry.level == "debug" then
+                    term.setTextColor(colors.gray)
+                else
+                    term.setTextColor(colors.white)
+                end
+                
+                local line = string.format("[%s] %s", entry.time, entry.message)
+                if #line > w then
+                    line = line:sub(1, w)
+                end
+                print(line)
+            end
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h)
+        term.setTextColor(colors.gray)
+        if #installLog > 0 then
+            write(string.format("Line %d-%d of %d", startIdx, endIdx, #installLog))
+        else
+            write("No log entries")
+        end
+        if LOG_FILE then
+            term.setCursorPos(w - #LOG_FILE, h)
+            write(LOG_FILE)
+        end
+        term.setTextColor(colors.white)
+        
+        -- Handle input
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            scroll = math.max(0, scroll - 1)
+        elseif key == keys.down then
+            scroll = math.min(math.max(0, #installLog - maxVisibleLines), scroll + 1)
+        elseif key == keys.q then
+            break
+        elseif key == keys.s then
+            -- Already saved to file
+            term.setCursorPos(1, h - 1)
+            term.setTextColor(colors.green)
+            term.clearLine()
+            write("Log saved to: " .. (LOG_FILE or "log/installer-*.txt"))
+            term.setTextColor(colors.white)
+            sleep(1.5)
+        end
+    end
+end
 
 ---Load libraries from API
 ---@return boolean Success
 local function loadLibrariesFromAPI()
     term.setTextColor(colors.lightGray)
     print("Loading library information from API...")
+    logInfo("Fetching library data from " .. API_URL)
     term.setTextColor(colors.white)
     
     local response = http.get(API_URL)
     if not response then
+        logError("Failed to connect to API: " .. API_URL)
         return false
     end
     
     local content = response.readAll()
     response.close()
+    logDebug("Received " .. #content .. " bytes from API")
     
     -- Parse JSON
     local data = textutils.unserializeJSON(content)
     if not data or not data.libraries then
+        logError("Failed to parse API response - invalid JSON or missing 'libraries' key")
         return false
     end
     
@@ -61,11 +213,13 @@ local function loadLibrariesFromAPI()
             description = info.description or "No description available",
             deps = info.dependencies or {}
         })
+        logDebug("Loaded library: " .. name .. " v" .. (info.version or "unknown"))
     end
     
     -- Sort by name
     table.sort(LIBRARIES, function(a, b) return a.name < b.name end)
     
+    logInfo("Successfully loaded " .. #LIBRARIES .. " libraries from API")
     return true
 end
 
@@ -612,30 +766,37 @@ end
 ---Download and install a file
 ---@param url string The URL to download from
 ---@param filepath string The local file path to save to
+---@param libName string? Optional library name for logging
 ---@return boolean Success
-local function downloadFile(url, filepath)
+local function downloadFile(url, filepath, libName)
+    logDebug("Downloading: " .. url)
     local response = http.get(url)
     if not response then
+        logError("HTTP request failed for " .. url)
         return false
     end
     
     local content = response.readAll()
     response.close()
+    logDebug("Downloaded " .. #content .. " bytes")
     
     -- Create directory if needed
     local dir = fs.getDir(filepath)
     if dir ~= "" and not fs.exists(dir) then
+        logDebug("Creating directory: " .. dir)
         fs.makeDir(dir)
     end
     
     local file = fs.open(filepath, "w")
     if not file then
+        logError("Failed to open file for writing: " .. filepath)
         return false
     end
     
     file.write(content)
     file.close()
     
+    logInfo("Saved " .. (libName or "file") .. " to " .. filepath .. " (" .. #content .. " bytes)")
     return true
 end
 
@@ -702,12 +863,16 @@ local function installLibraries(libraries, installDir, skipClear, originalSelect
     -- Check existing libraries
     local status = checkLibraryStatus(libraries)
     
+    logInfo("Starting installation of " .. #libraries .. " libraries to " .. installDir)
+    
     if not skipClear then
         clearScreen()
     end
     
     term.setTextColor(colors.yellow)
     print("Installing/Updating Libraries")
+    term.setTextColor(colors.lightGray)
+    print("Target directory: " .. installDir)
     term.setTextColor(colors.white)
     print()
     
@@ -721,6 +886,7 @@ local function installLibraries(libraries, installDir, skipClear, originalSelect
         for _, name in ipairs(libraries) do
             if not origSet[name] then
                 table.insert(addedDeps, name)
+                logInfo("Auto-adding dependency: " .. name)
             end
         end
         if #addedDeps > 0 then
@@ -734,29 +900,42 @@ local function installLibraries(libraries, installDir, skipClear, originalSelect
     local success = 0
     local failed = 0
     
-    for _, lib in ipairs(libraries) do
+    for i, lib in ipairs(libraries) do
         local url = getDownloadURL(lib)
         local info = status[lib]
+        local libInfo = getLibraryInfo(lib)
+        local latestVersion = libInfo and libInfo.version or "unknown"
         
-        -- Determine target path
+        -- Determine target path and action
         local filepath
+        local action
+        local reason
+        
         if info.exists then
             filepath = info.path -- Update in place
+            action = "Updating"
+            reason = (info.version or "unknown") .. " -> " .. latestVersion
+            logInfo("Updating " .. lib .. ": " .. reason .. " at " .. filepath)
             term.setTextColor(colors.yellow)
-            write("Updating " .. lib .. "... ")
         else
             filepath = installDir .. "/" .. lib .. ".lua"
+            action = "Installing"
+            reason = "v" .. latestVersion
+            logInfo("Installing " .. lib .. " " .. reason .. " to " .. filepath)
             term.setTextColor(colors.lightGray)
-            write("Installing " .. lib .. "... ")
         end
         
-        if downloadFile(url, filepath) then
+        -- Display progress with details
+        write(string.format("[%d/%d] %s %s (%s)... ", i, #libraries, action, lib, reason))
+        
+        if downloadFile(url, filepath, lib) then
             term.setTextColor(colors.green)
             print("OK")
             success = success + 1
         else
             term.setTextColor(colors.red)
             print("FAILED")
+            logError("Failed to download " .. lib .. " from " .. url)
             failed = failed + 1
         end
     end
@@ -767,9 +946,11 @@ local function installLibraries(libraries, installDir, skipClear, originalSelect
     if failed == 0 then
         term.setTextColor(colors.green)
         print("All libraries processed successfully!")
+        logInfo("Installation complete: " .. success .. " libraries installed/updated")
     else
         term.setTextColor(colors.yellow)
         print(string.format("Complete: %d succeeded, %d failed", success, failed))
+        logWarn("Installation finished with errors: " .. success .. " succeeded, " .. failed .. " failed")
     end
     
     term.setTextColor(colors.white)
@@ -782,6 +963,8 @@ local function deleteLibraries(libraries)
         return
     end
     
+    logInfo("Starting uninstallation of " .. #libraries .. " libraries")
+    
     print()
     term.setTextColor(colors.red)
     print("Uninstalling Libraries")
@@ -791,11 +974,12 @@ local function deleteLibraries(libraries)
     local success = 0
     local failed = 0
     
-    for _, lib in ipairs(libraries) do
+    for i, lib in ipairs(libraries) do
         local path = findExistingLibrary(lib)
         if path then
             term.setTextColor(colors.red)
-            write("Uninstalling " .. lib .. " from " .. path .. "... ")
+            write(string.format("[%d/%d] Removing %s from %s... ", i, #libraries, lib, path))
+            logInfo("Removing " .. lib .. " from " .. path)
             
             local ok, err = pcall(function()
                 fs.delete(path)
@@ -808,11 +992,13 @@ local function deleteLibraries(libraries)
             else
                 term.setTextColor(colors.red)
                 print("FAILED: " .. tostring(err))
+                logError("Failed to delete " .. lib .. ": " .. tostring(err))
                 failed = failed + 1
             end
         else
             term.setTextColor(colors.yellow)
             print("Skipping " .. lib .. " (not found)")
+            logWarn("Cannot uninstall " .. lib .. ": file not found")
         end
     end
     
@@ -822,9 +1008,11 @@ local function deleteLibraries(libraries)
     if failed == 0 and success > 0 then
         term.setTextColor(colors.green)
         print("All libraries uninstalled successfully!")
+        logInfo("Uninstallation complete: " .. success .. " libraries removed")
     elseif success > 0 then
         term.setTextColor(colors.yellow)
         print(string.format("Uninstall complete: %d succeeded, %d failed", success, failed))
+        logWarn("Uninstallation finished with errors: " .. success .. " succeeded, " .. failed .. " failed")
     end
     
     term.setTextColor(colors.white)
@@ -841,10 +1029,13 @@ local function main(...)
         return
     end
     
+    logInfo("CC-Misc Installer v" .. VERSION .. " started")
+    
     -- Load libraries from API or fallback
     clearScreen()
     if not loadLibrariesFromAPI() then
         printColored("Warning: Could not load from API, using offline library list", colors.yellow)
+        logWarn("Could not load from API, using offline library list")
         sleep(1.5)
         loadFallbackLibraries()
     else
@@ -864,9 +1055,11 @@ local function main(...)
     for _, arg in ipairs(args) do
         if validLibs[arg] then
             table.insert(preselected, arg)
+            logInfo("Pre-selected from args: " .. arg)
         else
             -- Show warning for invalid library names
             printColored("Warning: Unknown library '" .. arg .. "' - ignoring", colors.yellow)
+            logWarn("Unknown library from args: " .. arg)
             sleep(1)
         end
     end
@@ -876,6 +1069,7 @@ local function main(...)
     if not selected then
         clearScreen()
         printColored("Cancelled.", colors.yellow)
+        logInfo("Installation cancelled by user")
         return
     end
     
@@ -884,6 +1078,7 @@ local function main(...)
     if fs.exists("disk") and fs.isDir("disk") then
         installDir = "disk/lib"
     end
+    logInfo("Installation directory: " .. installDir)
     
     -- Clear screen before operations
     clearScreen()
@@ -902,7 +1097,24 @@ local function main(...)
     if (not toDelete or #toDelete == 0) and #selected == 0 then
         clearScreen()
         printColored("No changes to make.", colors.yellow)
+        logInfo("No changes to make")
     end
+    
+    -- Offer to view logs
+    print()
+    term.setTextColor(colors.lightGray)
+    print("Press L to view log, or any other key to exit")
+    if LOG_FILE then
+        print("Log saved to: " .. LOG_FILE)
+    end
+    term.setTextColor(colors.white)
+    
+    local _, key = os.pullEvent("key")
+    if key == keys.l then
+        showLog()
+    end
+    
+    logInfo("Installer finished")
 end
 
 -- Run the main function

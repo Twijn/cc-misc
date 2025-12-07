@@ -45,7 +45,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.3.0"
+local VERSION = "0.3.1"
 local FormUI = { _v = VERSION }
 FormUI.__index = FormUI
 
@@ -630,30 +630,43 @@ function FormUI:edit(index)
     if f.type == "text" or f.type == "number" then
         local prompt = "Enter value for " .. f.label
         if f.allowEmpty then
-            prompt = prompt .. " (leave blank to clear)"
+            prompt = prompt .. " (empty to clear, Ctrl to cancel)"
+        else
+            prompt = prompt .. " (Ctrl to cancel)"
         end
-        print(prompt .. ": ")
-        local input = read()
+        term.setTextColor(colors.white)
+        write(prompt .. ": ")
+        -- Pre-fill with current value for better UX
+        local currentValue = tostring(f.value)
+        local input = read(nil, nil, nil, currentValue)
+        
+        -- If input is nil, user cancelled (Ctrl+T or similar)
+        if input == nil then
+            return -- Keep existing value
+        end
+        
         if f.type == "number" then
-            if input and input ~= "" then
-                input = tonumber(input)
-                if input then
-                    f.value = input
+            if input ~= "" then
+                local num = tonumber(input)
+                if num then
+                    f.value = num
                 else
                     term.setTextColor(colors.red)
                     print("Input must be a number!")
                     sleep(1)
                 end
+            elseif f.allowEmpty then
+                f.value = 0 -- For numbers, empty means 0 if allowed
             end
+            -- If input is "" and allowEmpty is false, keep existing value
         else
-            -- For text fields, allow empty if allowEmpty is true
-            if input ~= nil then
-                if input == "" and f.allowEmpty then
-                    f.value = ""
-                elseif input ~= "" then
-                    f.value = input
-                end
+            -- For text fields, update value
+            if input == "" and f.allowEmpty then
+                f.value = ""
+            elseif input ~= "" then
+                f.value = input
             end
+            -- If input is "" and allowEmpty is false, keep existing value
         end
     elseif f.type == "select" or f.type == "peripheral" then
         local opts = f.options or {}

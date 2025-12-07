@@ -1,7 +1,7 @@
 --- SignShop Configuration UI ---
 --- Interactive configuration interface for SignShop using formui.
 ---
----@version 1.2.0
+---@version 1.3.0
 
 if not package.path:find("disk") then
     package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
@@ -14,7 +14,7 @@ local inventoryManager = require("managers.inventory")
 local aisleManager = require("managers.aisle")
 local signManager = require("managers.sign")
 
-local VERSION = ssVersion and ssVersion() or "1.2.0"
+local VERSION = ssVersion and ssVersion() or "unknown"
 
 local config = {}
 
