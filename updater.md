@@ -1,6 +1,6 @@
 # updater
 
-A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, and JSON API integration.
+A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, and detailed logging for debugging.
 
 ## Examples
 
@@ -15,9 +15,29 @@ end
 updater.update("s")
 -- Update all packages
 updater.updateAll()
+-- Enable verbose mode for debugging
+updater.setVerbose(true)
 ```
 
 ## Functions
+
+### `module.setVerbose(enabled)`
+
+Enable or disable verbose output
+
+**Parameters:**
+
+- `enabled` (boolean): Whether to enable verbose output
+
+### `module.getLog()`
+
+Get the current log entries
+
+**Returns:** table Array of log entries
+
+### `module.clearLog()`
+
+Clear the log
 
 ### `module.getLibraries()`
 
@@ -88,4 +108,14 @@ Install a new library with its dependencies
 - `silent?` (boolean): Suppress output messages
 
 **Returns:** boolean Success
+
+### `module.showLog()`
+
+Show the update log in a scrollable view (interactive)
+
+### `module.getLogFile()`
+
+Get the log file path for the current day
+
+**Returns:** string Log file path
 

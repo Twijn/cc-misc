@@ -246,8 +246,8 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>updater <span class="version-badge">v1.0.1</span></h1>
-        <p>A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, and JSON API integration.</p>
+        <h1>updater <span class="version-badge">v1.1.0</span></h1>
+        <p>A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, and detailed logging for debugging.</p>
     </div>
     
     <div class="install-section">
@@ -378,17 +378,41 @@ end
 -- Update a specific package
 updater.update("s")
 -- Update all packages
-updater.updateAll()</code></pre>
+updater.updateAll()
+-- Enable verbose mode for debugging
+updater.setVerbose(true)</code></pre>
     <h2>Functions</h2>
     <div class='function'>
+        <h3><code>module.setVerbose(enabled)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L41' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Enable or disable verbose output</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>enabled</code> (boolean): Whether to enable verbose output</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>module.getLog()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L47' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Get the current log entries</p>
+        <div class='returns'><strong>Returns:</strong> table Array of log entries</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.clearLog()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L53' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Clear the log</p>
+    </div>
+    <div class='function'>
         <h3><code>module.getLibraries()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L156' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L230' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get information about all available libraries</p>
         <div class='returns'><strong>Returns:</strong> table|nil List of library info or nil on error</div>
     </div>
     <div class='function'>
         <h3><code>module.getLibraryInfo(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L162' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L236' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get information about a specific library</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -400,13 +424,13 @@ updater.updateAll()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.checkUpdates()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L169' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L243' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Check for updates to installed libraries</p>
         <div class='returns'><strong>Returns:</strong> table List of libraries with available updates</div>
     </div>
     <div class='function'>
         <h3><code>module.hasUpdate(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L201' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L275' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Check if a specific library has an update available</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -418,7 +442,7 @@ updater.updateAll()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.update(name, silent?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L223' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L297' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Install or update a library</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -431,7 +455,7 @@ updater.updateAll()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.updateAll(silent?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L270' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L362' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Update all installed libraries that have updates available</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -443,13 +467,13 @@ updater.updateAll()</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.listInstalled()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L308' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L425' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>List all installed libraries with their versions</p>
         <div class='returns'><strong>Returns:</strong> table List of {name, version, path} for installed libraries</div>
     </div>
     <div class='function'>
         <h3><code>module.install(name, silent?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L333' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L450' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Install a new library with its dependencies</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -459,6 +483,17 @@ updater.updateAll()</code></pre>
             </ul>
         </div>
         <div class='returns'><strong>Returns:</strong> boolean Success</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.showLog()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L512' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Show the update log in a scrollable view (interactive)</p>
+    </div>
+    <div class='function'>
+        <h3><code>module.getLogFile()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L579' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Get the log file path for the current day</p>
+        <div class='returns'><strong>Returns:</strong> string Log file path</div>
     </div>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
