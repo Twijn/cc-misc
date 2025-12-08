@@ -235,12 +235,49 @@ local showProducts
 --- View product details
 ---@param product table The product to view
 viewProductDetails = function(product)
+    local scroll = 0
+    
     while true do
         term.clear()
         term.setCursorPos(1, 1)
         
         local w, h = term.getSize()
+        local headerHeight = 3
+        local footerHeight = 2
+        local visibleHeight = h - headerHeight - footerHeight
         local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+        
+        -- Build content lines
+        local contentLines = {}
+        
+        table.insert(contentLines, { label = "Name: ", value = productManager.getName(product), labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { label = "Meta: ", value = product.meta, labelColor = colors.lightBlue, valueColor = colors.gray })
+        table.insert(contentLines, { text = "", color = colors.white })
+        table.insert(contentLines, { label = "Line 1: ", value = product.line1, labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { label = "Line 2: ", value = product.line2 or "", labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { text = "", color = colors.white })
+        table.insert(contentLines, { label = "Cost: ", value = string.format("%.03f KRO", product.cost), labelColor = colors.lightBlue, valueColor = colors.green })
+        table.insert(contentLines, { label = "Aisle: ", value = product.aisleName, labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { label = "Stock: ", value = tostring(stock), labelColor = colors.lightBlue, valueColor = stock > 0 and colors.green or colors.red })
+        table.insert(contentLines, { text = "", color = colors.white })
+        table.insert(contentLines, { label = "Mod ID: ", value = product.modid or "unknown", labelColor = colors.lightBlue, valueColor = colors.gray })
+        
+        if product.itemnbt then
+            table.insert(contentLines, { label = "NBT: ", value = product.itemnbt, labelColor = colors.lightBlue, valueColor = colors.gray })
+        end
+        
+        table.insert(contentLines, { text = "", color = colors.white })
+        table.insert(contentLines, { text = string.rep("-", w), color = colors.gray })
+        table.insert(contentLines, { text = "Actions:", color = colors.yellow })
+        table.insert(contentLines, { text = "  [E] Edit product", color = colors.white })
+        table.insert(contentLines, { text = "  [R] Refresh signs", color = colors.white })
+        table.insert(contentLines, { text = "  [D] Delete product", color = colors.white })
+        table.insert(contentLines, { text = "  [Q] Back to product list", color = colors.white })
+        
+        local totalLines = #contentLines
+        
+        -- Clamp scroll
+        scroll = math.max(0, math.min(scroll, math.max(0, totalLines - visibleHeight)))
         
         -- Title
         term.setTextColor(colors.yellow)
@@ -249,75 +286,46 @@ viewProductDetails = function(product)
         print(string.rep("-", w))
         print()
         
-        -- Product info
-        term.setTextColor(colors.lightBlue)
-        write("Name: ")
-        term.setTextColor(colors.white)
-        print(productManager.getName(product))
-        
-        term.setTextColor(colors.lightBlue)
-        write("Meta: ")
-        term.setTextColor(colors.gray)
-        print(product.meta)
-        
-        print()
-        term.setTextColor(colors.lightBlue)
-        write("Line 1: ")
-        term.setTextColor(colors.white)
-        print(product.line1)
-        
-        term.setTextColor(colors.lightBlue)
-        write("Line 2: ")
-        term.setTextColor(colors.white)
-        print(product.line2)
-        
-        print()
-        term.setTextColor(colors.lightBlue)
-        write("Cost: ")
-        term.setTextColor(colors.green)
-        print(string.format("%.03f KRO", product.cost))
-        
-        term.setTextColor(colors.lightBlue)
-        write("Aisle: ")
-        term.setTextColor(colors.white)
-        print(product.aisleName)
-        
-        term.setTextColor(colors.lightBlue)
-        write("Stock: ")
-        if stock > 0 then
-            term.setTextColor(colors.green)
-        else
-            term.setTextColor(colors.red)
-        end
-        print(stock)
-        
-        print()
-        term.setTextColor(colors.lightBlue)
-        write("Mod ID: ")
-        term.setTextColor(colors.gray)
-        print(product.modid or "unknown")
-        
-        if product.itemnbt then
-            term.setTextColor(colors.lightBlue)
-            write("NBT: ")
-            term.setTextColor(colors.gray)
-            print(product.itemnbt)
+        -- Draw visible content
+        for i = scroll + 1, math.min(totalLines, scroll + visibleHeight) do
+            local line = contentLines[i]
+            if line.label then
+                term.setTextColor(line.labelColor)
+                write(line.label)
+                term.setTextColor(line.valueColor)
+                print(line.value)
+            else
+                term.setTextColor(line.color)
+                print(line.text)
+            end
         end
         
-        -- Actions
-        print()
+        -- Draw scroll indicators
         term.setTextColor(colors.gray)
-        print(string.rep("-", w))
-        term.setTextColor(colors.yellow)
-        print("Actions:")
-        term.setTextColor(colors.white)
-        print("  [E] Edit product")
-        print("  [R] Refresh signs")
-        print("  [D] Delete product")
-        print("  [Q] Back to product list")
+        if scroll > 0 then
+            term.setCursorPos(w, headerHeight + 1)
+            write("^")
+        end
+        if scroll + visibleHeight < totalLines then
+            term.setCursorPos(w, h - footerHeight)
+            write("v")
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h - 1)
+        term.setTextColor(colors.gray)
+        print("Up/Down: Scroll | E/R/D/Q: Actions")
         
         local e, key = os.pullEvent("key")
-        if key == keys.q then
+        if key == keys.up then
+            scroll = scroll - 1
+        elseif key == keys.down then
+            scroll = scroll + 1
+        elseif key == keys.pageUp then
+            scroll = scroll - (visibleHeight - 1)
+        elseif key == keys.pageDown then
+            scroll = scroll + (visibleHeight - 1)
+        elseif key == keys.q then
             return nil
         elseif key == keys.r then
             term.clear()
@@ -733,12 +741,60 @@ end
 local function viewSignDetails(signOpt)
     local sign = signOpt.sign
     local data = sign.getSignText()
+    local scroll = 0
     
     while true do
         term.clear()
         term.setCursorPos(1, 1)
         
         local w, h = term.getSize()
+        local headerHeight = 3
+        local footerHeight = 2
+        local visibleHeight = h - headerHeight - footerHeight
+        
+        -- Build content lines
+        local contentLines = {}
+        
+        table.insert(contentLines, { label = "Peripheral: ", value = signOpt.signName, labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { text = "", color = colors.white })
+        table.insert(contentLines, { text = "Current Sign Text:", color = colors.yellow })
+        table.insert(contentLines, { text = string.rep("-", 20), color = colors.gray })
+        for i, line in ipairs(data) do
+            table.insert(contentLines, { text = line ~= "" and line or "(empty)", color = colors.white })
+        end
+        table.insert(contentLines, { text = string.rep("-", 20), color = colors.gray })
+        table.insert(contentLines, { text = "", color = colors.white })
+        
+        -- Product info
+        if signOpt.product then
+            local stock = inventoryManager.getItemStock(signOpt.product.modid, signOpt.product.itemnbt) or 0
+            table.insert(contentLines, { text = "Linked Product:", color = colors.green })
+            table.insert(contentLines, { text = "  Name: " .. productManager.getName(signOpt.product), color = colors.white })
+            table.insert(contentLines, { text = "  Meta: " .. signOpt.product.meta, color = colors.white })
+            table.insert(contentLines, { text = "  Cost: " .. signOpt.product.cost .. " KRO", color = colors.white })
+            table.insert(contentLines, { text = "  Aisle: " .. signOpt.product.aisleName, color = colors.white })
+            table.insert(contentLines, { text = "  Stock: " .. stock, color = stock > 0 and colors.green or colors.red })
+        elseif signOpt.meta and #signOpt.meta > 0 then
+            table.insert(contentLines, { text = "Unknown Product Meta: " .. signOpt.meta, color = colors.red })
+            table.insert(contentLines, { text = "This sign references a product that doesn't exist.", color = colors.gray })
+        else
+            table.insert(contentLines, { text = "No product linked to this sign.", color = colors.gray })
+        end
+        
+        -- Actions
+        table.insert(contentLines, { text = "", color = colors.white })
+        table.insert(contentLines, { text = string.rep("-", w), color = colors.gray })
+        table.insert(contentLines, { text = "Actions:", color = colors.yellow })
+        if signOpt.product then
+            table.insert(contentLines, { text = "  [R] Refresh this sign", color = colors.white })
+            table.insert(contentLines, { text = "  [E] Edit linked product", color = colors.white })
+        end
+        table.insert(contentLines, { text = "  [Q] Back to sign list", color = colors.white })
+        
+        local totalLines = #contentLines
+        
+        -- Clamp scroll
+        scroll = math.max(0, math.min(scroll, math.max(0, totalLines - visibleHeight)))
         
         -- Title
         term.setTextColor(colors.yellow)
@@ -747,62 +803,46 @@ local function viewSignDetails(signOpt)
         print(string.rep("-", w))
         print()
         
-        -- Sign info
-        term.setTextColor(colors.lightBlue)
-        write("Peripheral: ")
-        term.setTextColor(colors.white)
-        print(signOpt.signName)
-        print()
-        
-        -- Sign text preview
-        term.setTextColor(colors.yellow)
-        print("Current Sign Text:")
-        term.setTextColor(colors.gray)
-        print(string.rep("-", 20))
-        for i, line in ipairs(data) do
-            term.setTextColor(colors.white)
-            print(line ~= "" and line or "(empty)")
-        end
-        term.setTextColor(colors.gray)
-        print(string.rep("-", 20))
-        print()
-        
-        -- Product info
-        if signOpt.product then
-            term.setTextColor(colors.green)
-            print("Linked Product:")
-            term.setTextColor(colors.white)
-            print("  Name: " .. productManager.getName(signOpt.product))
-            print("  Meta: " .. signOpt.product.meta)
-            print("  Cost: " .. signOpt.product.cost .. " KRO")
-            print("  Aisle: " .. signOpt.product.aisleName)
-            local stock = inventoryManager.getItemStock(signOpt.product.modid, signOpt.product.itemnbt) or 0
-            print("  Stock: " .. stock)
-        elseif signOpt.meta and #signOpt.meta > 0 then
-            term.setTextColor(colors.red)
-            print("Unknown Product Meta: " .. signOpt.meta)
-            term.setTextColor(colors.gray)
-            print("This sign references a product that doesn't exist.")
-        else
-            term.setTextColor(colors.gray)
-            print("No product linked to this sign.")
+        -- Draw visible content
+        for i = scroll + 1, math.min(totalLines, scroll + visibleHeight) do
+            local line = contentLines[i]
+            if line.label then
+                term.setTextColor(line.labelColor)
+                write(line.label)
+                term.setTextColor(line.valueColor)
+                print(line.value)
+            else
+                term.setTextColor(line.color)
+                print(line.text)
+            end
         end
         
-        -- Actions
-        print()
+        -- Draw scroll indicators
         term.setTextColor(colors.gray)
-        print(string.rep("-", w))
-        term.setTextColor(colors.yellow)
-        print("Actions:")
-        term.setTextColor(colors.white)
-        if signOpt.product then
-            print("  [R] Refresh this sign")
-            print("  [E] Edit linked product")
+        if scroll > 0 then
+            term.setCursorPos(w, headerHeight + 1)
+            write("^")
         end
-        print("  [Q] Back to sign list")
+        if scroll + visibleHeight < totalLines then
+            term.setCursorPos(w, h - footerHeight)
+            write("v")
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h - 1)
+        term.setTextColor(colors.gray)
+        print("Up/Down: Scroll | R/E/Q: Actions")
         
         local e, key = os.pullEvent("key")
-        if key == keys.q then
+        if key == keys.up then
+            scroll = scroll - 1
+        elseif key == keys.down then
+            scroll = scroll + 1
+        elseif key == keys.pageUp then
+            scroll = scroll - (visibleHeight - 1)
+        elseif key == keys.pageDown then
+            scroll = scroll + (visibleHeight - 1)
+        elseif key == keys.q then
             return
         elseif key == keys.r and signOpt.product then
             term.clear()
