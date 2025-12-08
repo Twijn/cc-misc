@@ -27,6 +27,7 @@
 ---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
+---@version 0.3.2
 -- @module formui
 
 ---@class FormField
@@ -45,7 +46,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.3.1"
+local VERSION = "0.3.2"
 local FormUI = { _v = VERSION }
 FormUI.__index = FormUI
 
@@ -630,18 +631,20 @@ function FormUI:edit(index)
     if f.type == "text" or f.type == "number" then
         local prompt = "Enter value for " .. f.label
         if f.allowEmpty then
-            prompt = prompt .. " (empty to clear, Ctrl to cancel)"
-        else
-            prompt = prompt .. " (Ctrl to cancel)"
+            prompt = prompt .. " (empty to clear)"
         end
         term.setTextColor(colors.white)
-        write(prompt .. ": ")
+        print(prompt .. ":")
+        term.setTextColor(colors.lightGray)
+        print("(Press Enter to confirm, or type \\c to cancel)")
+        term.setTextColor(colors.white)
+        write("> ")
         -- Pre-fill with current value for better UX
         local currentValue = tostring(f.value)
         local input = read(nil, nil, nil, currentValue)
         
-        -- If input is nil, user cancelled (Ctrl+T or similar)
-        if input == nil then
+        -- Check for cancel command
+        if input == "\\c" or input == nil then
             return -- Keep existing value
         end
         
