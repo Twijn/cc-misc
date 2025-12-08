@@ -59,19 +59,26 @@ function module.init(config)
     
     -- Find wireless modem
     modem = peripheral.find("modem", function(name, wrapped)
-        return wrapped.isWireless and wrapped.isWireless()
+        -- Check if it's a wireless modem
+        if wrapped.isWireless then
+            return wrapped.isWireless()
+        end
+        -- Fallback: assume it's wireless if we can't check
+        return true
     end)
+    
+    -- If no modem found with filter, try finding any modem
+    if not modem then
+        modem = peripheral.find("modem")
+    end
     
     if not modem then
         return false
     end
     
-    -- Open channels
-    if isController then
-        modem.open(replyChannel)
-    else
-        modem.open(channel)
-    end
+    -- Open channels - both devices listen on both channels for reliability
+    modem.open(channel)
+    modem.open(replyChannel)
     
     return true
 end

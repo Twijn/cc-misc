@@ -513,21 +513,18 @@ end
 -- ======= Message Handlers =======
 
 local function handleStatus(message, senderId, senderLabel)
-    -- Update turtle data
-    if turtles[senderId] then
-        turtles[senderId].data = message.data
-        turtles[senderId].lastSeen = os.epoch("utc")
-    end
+    -- Refresh our local turtle list from comms module
+    refreshTurtles()
     
     -- Update selected turtle if it's this one
     if selectedTurtle and selectedTurtle.id == senderId then
-        selectedTurtle.data = message.data
-        selectedTurtle.lastSeen = os.epoch("utc")
+        selectedTurtle = turtles[senderId]
     end
 end
 
 local function handlePong(message, senderId, senderLabel)
-    log.info("Pong from " .. (senderLabel or senderId))
+    -- Refresh turtle list when we get a pong
+    refreshTurtles()
 end
 
 local function handleComplete(message, senderId, senderLabel)
@@ -604,7 +601,12 @@ local function main()
     print("")
     print("Searching for turtles...")
     comms.ping()
-    sleep(1)
+    
+    -- Wait for responses while actively receiving messages
+    local searchEndTime = os.epoch("utc") + 2000 -- 2 seconds
+    while os.epoch("utc") < searchEndTime do
+        comms.receive(0.1)
+    end
     
     refreshTurtles()
     local turtleList = getTurtleList()
