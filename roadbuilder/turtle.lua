@@ -226,6 +226,29 @@ local function placeRoadBlock()
     
     -- Select and place road block
     if inventory.selectRoadBlock() then
+        -- Check if we're placing a slab - slabs need special handling to be placed on top half
+        local itemDetail = turtle.getItemDetail()
+        local isSlab = itemDetail and itemDetail.name and itemDetail.name:find("slab")
+        
+        if isSlab then
+            -- For slabs, move down first then place forward against the block below
+            -- This ensures the slab is placed on the top half
+            if down() then
+                turnAround()
+                if turtle.place() then
+                    turnAround()
+                    up()
+                    local stats = state.get("stats")
+                    stats.blocks_placed = stats.blocks_placed + 1
+                    state.set("stats", stats)
+                    return true
+                end
+                turnAround()
+                up()
+            end
+            -- Fallback to normal placement if special handling fails
+        end
+        
         if turtle.placeDown() then
             local stats = state.get("stats")
             stats.blocks_placed = stats.blocks_placed + 1
