@@ -514,7 +514,7 @@ end
 
 local function handleStatus(message, senderId, senderLabel)
     -- Refresh our local turtle list from comms module
-    log.debug("Received STATUS from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
+    log.info("Received STATUS from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
     refreshTurtles()
     
     -- Update selected turtle if it's this one
