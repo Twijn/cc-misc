@@ -590,6 +590,20 @@ local function handleCommand(message, senderId, senderLabel)
     elseif cmd == comms.COMMANDS.SET_HOME then
         result.home = setHome()
         
+    elseif cmd == comms.COMMANDS.UPDATE then
+        -- Update command - run update script headlessly and restart
+        debugLog("info", "Update command received, downloading update...")
+        comms.sendComplete(cmd, {status = "updating"}, senderId)
+        comms.close()
+        
+        -- Run update script
+        local updateUrl = "https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/update.lua"
+        shell.run("wget", "run", updateUrl)
+        
+        -- Restart the turtle
+        os.reboot()
+        return -- Won't reach here due to reboot
+        
     else
         debugLog("warn", "Unknown command: " .. cmd)
         success = false

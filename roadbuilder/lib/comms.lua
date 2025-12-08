@@ -36,6 +36,7 @@ module.COMMANDS = {
     DEPOSIT = "deposit",
     GO_HOME = "go_home",
     SET_HOME = "set_home",
+    UPDATE = "update",
 }
 
 -- Internal state

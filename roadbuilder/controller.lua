@@ -59,6 +59,9 @@ local currentView = "main" -- main, turtle_list, turtle_detail, command
 local screenW, screenH = term.getSize()
 local isPocket = pocket ~= nil
 
+-- Input mode (prevents display refresh during prompts)
+local inputMode = false
+
 -- ======= UI Helpers =======
 
 local function clearScreen()
@@ -207,6 +210,63 @@ local function stopTurtle()
     end
 end
 
+-- ======= Update Functions =======
+
+--- Update all connected turtles
+local function updateAllTurtles()
+    local turtleList = getTurtleList()
+    for _, turtle in ipairs(turtleList) do
+        comms.sendCommand(turtle.id, comms.COMMANDS.UPDATE, {})
+    end
+    return #turtleList
+end
+
+--- Update controller and restart
+local function updateController()
+    clearScreen()
+    drawHeader("Updating Controller")
+    
+    term.setCursorPos(2, 4)
+    term.write("Downloading update...")
+    
+    -- Run the update script headlessly
+    local success = shell.run("wget", "run", config.UPDATER.BASE_URL .. "update.lua")
+    
+    if success then
+        term.setCursorPos(2, 6)
+        setColor(colors.lime)
+        term.write("Update complete! Restarting...")
+        setColor(colors.white)
+        sleep(1)
+        os.reboot()
+    else
+        term.setCursorPos(2, 6)
+        setColor(colors.red)
+        term.write("Update failed!")
+        setColor(colors.white)
+        sleep(2)
+    end
+end
+
+--- Build with all turtles - each turtle builds one lane
+---@param distance number Distance to build
+local function buildWithAllTurtles(distance)
+    local turtleList = getTurtleList()
+    if #turtleList == 0 then
+        return false
+    end
+    
+    -- Send build command to all turtles with width=1 (each turtle is one lane)
+    for _, turtle in ipairs(turtleList) do
+        comms.sendCommand(turtle.id, comms.COMMANDS.BUILD_FORWARD, {
+            distance = distance,
+            width = 1, -- Each turtle only builds 1 lane (its own)
+        })
+    end
+    
+    return #turtleList
+end
+
 -- ======= Views =======
 
 local function drawMainMenu()
@@ -256,13 +316,15 @@ local function drawMainMenu()
     end
     
     -- Draw menu options
-    y = screenH - 4
+    y = screenH - 6
     setColor(colors.lightBlue)
     term.setCursorPos(2, y)
-    term.write("[1-9] Select turtle")
+    term.write("[1-9] Select turtle  [A] Build All")
     term.setCursorPos(2, y + 1)
     term.write("[R] Refresh  [P] Ping all")
     term.setCursorPos(2, y + 2)
+    term.write("[U] Update All  [C] Update Controller")
+    term.setCursorPos(2, y + 3)
     term.write("[Q] Quit")
     setColor(colors.white)
     
@@ -399,6 +461,7 @@ local function drawTurtleDetail()
 end
 
 local function promptNumber(prompt, default)
+    inputMode = true
     clearScreen()
     drawHeader("Enter Value")
     
@@ -407,16 +470,118 @@ local function promptNumber(prompt, default)
     term.write(prompt)
     term.setCursorPos(2, 6)
     term.write("Default: " .. tostring(default or 0))
-    term.setCursorPos(2, 8)
+    term.setCursorPos(2, 7)
+    setColor(colors.lightGray)
+    term.write("(Press Enter for default, Esc to cancel)")
+    term.setCursorPos(2, 9)
+    setColor(colors.white)
     term.write("> ")
     
     setColor(colors.yellow)
-    local input = read()
+    term.setCursorBlink(true)
+    
+    local input = ""
+    local cursorX = 4
+    
+    while true do
+        term.setCursorPos(cursorX, 9)
+        local event, param = os.pullEvent()
+        
+        if event == "char" then
+            -- Only allow numbers and minus sign
+            if param:match("[0-9%-]") then
+                input = input .. param
+                term.write(param)
+                cursorX = cursorX + 1
+            end
+        elseif event == "key" then
+            if param == keys.enter or param == keys.numPadEnter then
+                break
+            elseif param == keys.backspace then
+                if #input > 0 then
+                    input = input:sub(1, -2)
+                    cursorX = cursorX - 1
+                    term.setCursorPos(cursorX, 9)
+                    term.write(" ")
+                end
+            elseif param == keys.escape then
+                term.setCursorBlink(false)
+                setColor(colors.white)
+                inputMode = false
+                return nil
+            end
+        end
+    end
+    
+    term.setCursorBlink(false)
     setColor(colors.white)
+    inputMode = false
     
     local num = tonumber(input)
     if num then
         return num
+    end
+    return default
+end
+
+local function promptString(prompt, default)
+    inputMode = true
+    clearScreen()
+    drawHeader("Enter Value")
+    
+    setColor(colors.white)
+    term.setCursorPos(2, 4)
+    term.write(prompt)
+    if default then
+        term.setCursorPos(2, 6)
+        term.write("Default: " .. tostring(default))
+    end
+    term.setCursorPos(2, 7)
+    setColor(colors.lightGray)
+    term.write("(Press Enter to confirm, Esc to cancel)")
+    term.setCursorPos(2, 9)
+    setColor(colors.white)
+    term.write("> ")
+    
+    setColor(colors.yellow)
+    term.setCursorBlink(true)
+    
+    local input = ""
+    local cursorX = 4
+    
+    while true do
+        term.setCursorPos(cursorX, 9)
+        local event, param = os.pullEvent()
+        
+        if event == "char" then
+            input = input .. param
+            term.write(param)
+            cursorX = cursorX + 1
+        elseif event == "key" then
+            if param == keys.enter or param == keys.numPadEnter then
+                break
+            elseif param == keys.backspace then
+                if #input > 0 then
+                    input = input:sub(1, -2)
+                    cursorX = cursorX - 1
+                    term.setCursorPos(cursorX, 9)
+                    term.write(" ")
+                end
+            elseif param == keys.escape then
+                term.setCursorBlink(false)
+                setColor(colors.white)
+                inputMode = false
+                return nil
+            end
+        end
+    end
+    
+    term.setCursorBlink(false)
+    setColor(colors.white)
+    inputMode = false
+    
+    if #input > 0 then
+        return input
     end
     return default
 end
@@ -436,6 +601,42 @@ local function handleMainMenuKey(key)
         refreshTurtles()
     elseif key == keys.p then
         comms.ping()
+    elseif key == keys.a then
+        -- Build with all turtles
+        if #turtleList > 0 then
+            local distance = promptNumber("Enter distance (all " .. #turtleList .. " turtles):", 10)
+            if distance and distance > 0 then
+                local count = buildWithAllTurtles(distance)
+                if count > 0 then
+                    clearScreen()
+                    drawHeader("Building")
+                    setColor(colors.lime)
+                    centerText(6, "Building " .. distance .. " blocks with " .. count .. " turtles")
+                    setColor(colors.lightGray)
+                    centerText(8, "(Width = " .. count .. " total)")
+                    setColor(colors.white)
+                    sleep(2)
+                end
+            end
+        end
+    elseif key == keys.u then
+        -- Update all turtles
+        clearScreen()
+        drawHeader("Updating Turtles")
+        term.setCursorPos(2, 4)
+        term.write("Sending update command to all turtles...")
+        local count = updateAllTurtles()
+        term.setCursorPos(2, 6)
+        setColor(colors.lime)
+        term.write("Update sent to " .. count .. " turtle(s)")
+        setColor(colors.lightGray)
+        term.setCursorPos(2, 8)
+        term.write("Turtles will restart after updating.")
+        setColor(colors.white)
+        sleep(3)
+    elseif key == keys.c then
+        -- Update controller
+        updateController()
     elseif key == keys.q then
         running = false
     end
@@ -489,13 +690,7 @@ local function handleTurtleDetailKey(key)
         
     elseif key == keys.t then
         -- Set block type - show current inventory blocks
-        clearScreen()
-        drawHeader("Set Block Type")
-        term.setCursorPos(2, 4)
-        term.write("Enter block ID (e.g. minecraft:stone):")
-        term.setCursorPos(2, 6)
-        term.write("> ")
-        local blockType = read()
+        local blockType = promptString("Enter block ID (e.g. minecraft:stone):", nil)
         if blockType and #blockType > 0 then
             setBlockType(blockType)
         end
@@ -558,12 +753,14 @@ end
 
 local function displayLoop()
     while running do
-        refreshTurtles()
-        
-        if currentView == "main" then
-            drawMainMenu()
-        elseif currentView == "turtle_detail" then
-            drawTurtleDetail()
+        if not inputMode then
+            refreshTurtles()
+            
+            if currentView == "main" then
+                drawMainMenu()
+            elseif currentView == "turtle_detail" then
+                drawTurtleDetail()
+            end
         end
         
         sleep(config.DISPLAY.REFRESH_RATE)
