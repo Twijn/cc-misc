@@ -200,7 +200,7 @@
     },
     {
       "name": "formui",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "description": "A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, checkbox/toggle fields, multi-select dropdowns, list fields with item management, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/formui.lua",
@@ -231,5 +231,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-12-07T01:22:30Z"
+  "updated": "2025-12-08T00:09:19Z"
 }
