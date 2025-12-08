@@ -587,8 +587,11 @@ local function handleCommand(message, senderId, senderLabel)
 end
 
 local function handlePing(message, senderId, senderLabel)
+    log.info("Received PING from controller #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
+    log.info("Sending PONG and status...")
     comms.pong(senderId)
     comms.sendStatus(getFullStatus())
+    log.info("Response sent!")
 end
 
 local function handleStop(message, senderId, senderLabel)
@@ -631,7 +634,7 @@ local function messageLoop()
     end
 end
 
-local function main()
+local function main(args)
     term.clear()
     term.setCursorPos(1, 1)
     
@@ -639,6 +642,13 @@ local function main()
     print("  RBC Turtle v" .. TURTLE_VERSION)
     print("================================")
     print("")
+    
+    -- Check for debug flag
+    args = args or {}
+    if args[1] == "--debug" or args[1] == "-d" then
+        comms.DEBUG = true
+        print("Debug mode enabled")
+    end
     
     -- Check for updates
     if updater and config.UPDATER and config.UPDATER.CHECK_ON_STARTUP then
@@ -654,6 +664,7 @@ local function main()
         return
     end
     log.info("Wireless modem ready on channel " .. config.NETWORK.CHANNEL)
+    log.info("Turtle ID: " .. os.getComputerID())
     
     -- Register message handlers
     comms.onMessage(comms.MSG_TYPE.PING, handlePing)
@@ -715,4 +726,4 @@ local function main()
     log.info("RBC turtle stopped")
 end
 
-main()
+main({...})

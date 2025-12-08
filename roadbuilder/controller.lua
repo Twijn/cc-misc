@@ -514,6 +514,7 @@ end
 
 local function handleStatus(message, senderId, senderLabel)
     -- Refresh our local turtle list from comms module
+    log.debug("Received STATUS from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
     refreshTurtles()
     
     -- Update selected turtle if it's this one
@@ -524,6 +525,7 @@ end
 
 local function handlePong(message, senderId, senderLabel)
     -- Refresh turtle list when we get a pong
+    log.info("Received PONG from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
     refreshTurtles()
 end
 
@@ -567,7 +569,7 @@ local function messageLoop()
     end
 end
 
-local function main()
+local function main(args)
     clearScreen()
     
     print("================================")
@@ -581,6 +583,13 @@ local function main()
         print("Checking for updates...")
     end
     
+    -- Check for debug flag
+    args = args or {}
+    if args[1] == "--debug" or args[1] == "-d" then
+        comms.DEBUG = true
+        print("Debug mode enabled")
+    end
+    
     -- Initialize communications
     print("Initializing wireless modem...")
     if not comms.init(config.NETWORK) then
@@ -590,7 +599,8 @@ local function main()
         setColor(colors.white)
         return
     end
-    print("Modem ready on channel " .. config.NETWORK.REPLY_CHANNEL)
+    print("Modem ready on channel " .. config.NETWORK.CHANNEL .. " (reply: " .. config.NETWORK.REPLY_CHANNEL .. ")")
+    print("Controller ID: " .. os.getComputerID())
     
     -- Register message handlers
     comms.onMessage(comms.MSG_TYPE.STATUS, handleStatus)
@@ -626,4 +636,4 @@ local function main()
     print("RBC Controller stopped")
 end
 
-main()
+main({...})

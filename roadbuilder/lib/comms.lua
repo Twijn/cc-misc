@@ -48,6 +48,16 @@ local isController = not turtle
 local messageHandlers = {}
 local connectedTurtles = {}
 
+-- Debug mode - set to true to see all messages
+module.DEBUG = false
+
+local function debugLog(msg)
+    if module.DEBUG then
+        local timestamp = string.format("[%.2f]", os.epoch("utc") / 1000 % 1000)
+        print(timestamp .. " [COMMS] " .. msg)
+    end
+end
+
 ---Initialize the communications module
 ---@param config table Configuration with CHANNEL and REPLY_CHANNEL
 ---@return boolean success True if modem found and opened
@@ -57,7 +67,21 @@ function module.init(config)
         replyChannel = config.REPLY_CHANNEL or replyChannel
     end
     
+    debugLog("Initializing comms...")
+    debugLog("Device ID: " .. deviceId .. ", Label: " .. deviceLabel)
+    debugLog("Is controller: " .. tostring(isController))
+    debugLog("Channel: " .. channel .. ", Reply: " .. replyChannel)
+    
     -- Find wireless modem
+    local allModems = {peripheral.find("modem")}
+    debugLog("Found " .. #allModems .. " modem(s) total")
+    
+    for i, m in ipairs(allModems) do
+        local name = peripheral.getName(m)
+        local wireless = m.isWireless and m.isWireless() or false
+        debugLog("  Modem " .. i .. ": " .. name .. " (wireless: " .. tostring(wireless) .. ")")
+    end
+    
     modem = peripheral.find("modem", function(name, wrapped)
         -- Check if it's a wireless modem
         if wrapped.isWireless then
@@ -69,16 +93,23 @@ function module.init(config)
     
     -- If no modem found with filter, try finding any modem
     if not modem then
+        debugLog("No wireless modem found, trying any modem...")
         modem = peripheral.find("modem")
     end
     
     if not modem then
+        debugLog("ERROR: No modem found!")
         return false
     end
+    
+    local modemName = peripheral.getName(modem)
+    local isWireless = modem.isWireless and modem.isWireless() or "unknown"
+    debugLog("Using modem: " .. modemName .. " (wireless: " .. tostring(isWireless) .. ")")
     
     -- Open channels - both devices listen on both channels for reliability
     modem.open(channel)
     modem.open(replyChannel)
+    debugLog("Opened channels " .. channel .. " and " .. replyChannel)
     
     return true
 end
@@ -112,7 +143,10 @@ end
 ---@param data table Additional data to send
 ---@param targetId number|nil Specific target device ID (nil for broadcast)
 function module.send(msgType, data, targetId)
-    if not modem then return false end
+    if not modem then 
+        debugLog("SEND FAILED: No modem!")
+        return false 
+    end
     
     local message = {
         type = msgType,
@@ -125,6 +159,8 @@ function module.send(msgType, data, targetId)
     
     local targetChannel = isController and channel or replyChannel
     local sendChannel = isController and replyChannel or channel
+    
+    debugLog("SEND: " .. msgType .. " -> ch" .. targetChannel .. (targetId and (" to #" .. targetId) or " (broadcast)"))
     
     modem.transmit(targetChannel, sendChannel, message)
     return true
@@ -191,16 +227,21 @@ end
 local function processMessage(message)
     -- Validate message structure
     if type(message) ~= "table" or not message.type then
+        debugLog("RECV: Invalid message (not a table or no type)")
         return
     end
     
+    debugLog("RECV: " .. message.type .. " from #" .. (message.senderId or "?") .. " (" .. (message.senderLabel or "?") .. ")")
+    
     -- Check if message is for us
     if message.targetId and message.targetId ~= deviceId then
+        debugLog("  -> Ignored (target: #" .. message.targetId .. ", we are #" .. deviceId .. ")")
         return
     end
     
     -- Track connected turtles (for controller)
     if isController and message.senderId then
+        debugLog("  -> Tracking turtle #" .. message.senderId)
         connectedTurtles[message.senderId] = {
             id = message.senderId,
             label = message.senderLabel,
@@ -212,9 +253,12 @@ local function processMessage(message)
     -- Call registered handlers
     local handlers = messageHandlers[message.type]
     if handlers then
+        debugLog("  -> " .. #handlers .. " handler(s) for " .. message.type)
         for _, handler in ipairs(handlers) do
             handler(message, message.senderId, message.senderLabel)
         end
+    else
+        debugLog("  -> No handlers for " .. message.type)
     end
     
     -- Also call wildcard handlers
