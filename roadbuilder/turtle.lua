@@ -61,6 +61,21 @@ local currentTask = nil
 local taskProgress = 0
 local taskTotal = 0
 
+-- Debug mode (enabled with --debug flag)
+local DEBUG = false
+
+local function debugLog(level, msg)
+    if DEBUG then
+        if level == "info" then
+            log.info(msg)
+        elseif level == "warn" then
+            log.warn(msg)
+        elseif level == "error" then
+            log.error(msg)
+        end
+    end
+end
+
 -- ======= Position Management =======
 local function syncPositionFromGPS()
     gpsLib.setTimeout(config.NETWORK.GPS_TIMEOUT)
@@ -68,7 +83,7 @@ local function syncPositionFromGPS()
     if x then
         gpsLib.setPosition(x, y, z)
         state.set("position", {x = x, y = y, z = z})
-        log.info(string.format("GPS synced: %.0f, %.0f, %.0f", x, y, z))
+        debugLog("info", string.format("GPS synced: %.0f, %.0f, %.0f", x, y, z))
         return true
     end
     -- Fall back to stored position
@@ -81,7 +96,7 @@ local function detectAndSaveFacing()
     local facing = gpsLib.detectFacing()
     if facing then
         state.set("facing", facing)
-        log.info("Facing detected: " .. gpsLib.getFacingName())
+        debugLog("info", "Facing detected: " .. gpsLib.getFacingName())
         return true
     end
     -- Fall back to stored facing
@@ -249,7 +264,7 @@ local function buildRoad(distance, direction)
     
     -- Check fuel
     if turtle.getFuelLevel() < config.FUEL.MINIMUM then
-        log.warn("Low fuel! Attempting to refuel...")
+        debugLog("warn", "Low fuel! Attempting to refuel...")
         inventory.scan(config.FUEL.ITEMS)
         inventory.refuel(config.FUEL.TARGET, config.FUEL.ITEMS)
     end
@@ -270,7 +285,7 @@ local function buildRoad(distance, direction)
             end
             
             if not moved then
-                log.warn("Blocked at segment " .. i)
+                debugLog("warn", "Blocked at segment " .. i)
                 break
             end
         end
@@ -278,9 +293,9 @@ local function buildRoad(distance, direction)
         -- Check inventory
         local invStatus = inventory.getStatus()
         if invStatus.roadBlockCount < 10 then
-            log.warn("Low on road blocks!")
+            debugLog("warn", "Low on road blocks!")
             if config.ENDER_STORAGE.ENABLED and invStatus.hasEnderStorage then
-                log.info("Refilling from ender storage...")
+                debugLog("info", "Refilling from ender storage...")
                 if inventory.placeEnderStorageUp() then
                     inventory.refillRoadBlocksUp()
                     inventory.pickUpEnderStorageUp()
@@ -357,18 +372,18 @@ end
 -- ======= Ender Storage Operations =======
 
 local function depositDebris()
-    log.info("Depositing debris to ender storage...")
+    debugLog("info", "Depositing debris to ender storage...")
     inventory.scan(config.FUEL.ITEMS)
     
     if not inventory.getEnderStorageSlot() then
-        log.warn("No ender storage found!")
+        debugLog("warn", "No ender storage found!")
         return 0
     end
     
     if inventory.placeEnderStorageUp() then
         local deposited = inventory.depositDebrisUp()
         inventory.pickUpEnderStorageUp()
-        log.info("Deposited " .. deposited .. " items")
+        debugLog("info", "Deposited " .. deposited .. " items")
         return deposited
     end
     
@@ -376,11 +391,11 @@ local function depositDebris()
 end
 
 local function refillBlocks()
-    log.info("Refilling road blocks from ender storage...")
+    debugLog("info", "Refilling road blocks from ender storage...")
     inventory.scan(config.FUEL.ITEMS)
     
     if not inventory.getEnderStorageSlot() then
-        log.warn("No ender storage found!")
+        debugLog("warn", "No ender storage found!")
         return 0
     end
     
@@ -388,7 +403,7 @@ local function refillBlocks()
         local refilled = inventory.refillRoadBlocksUp()
         inventory.pickUpEnderStorageUp()
         inventory.scan(config.FUEL.ITEMS)
-        log.info("Refilled " .. refilled .. " blocks")
+        debugLog("info", "Refilled " .. refilled .. " blocks")
         return refilled
     end
     
@@ -406,14 +421,14 @@ local function setHome()
         facing = gpsLib.getFacing(),
     }
     state.set("home", home)
-    log.info("Home set at " .. pos.x .. ", " .. pos.y .. ", " .. pos.z)
+    debugLog("info", "Home set at " .. pos.x .. ", " .. pos.y .. ", " .. pos.z)
     return home
 end
 
 local function goHome()
     local home = state.get("home")
     if not home then
-        log.warn("No home position set!")
+        debugLog("warn", "No home position set!")
         return false
     end
     
@@ -464,7 +479,7 @@ local function goHome()
     turnToFace(home.facing)
     
     currentTask = nil
-    log.info("Arrived at home")
+    debugLog("info", "Arrived at home")
     return true
 end
 
@@ -503,7 +518,7 @@ local function handleCommand(message, senderId, senderLabel)
     local cmd = message.data.command
     local params = message.data.params or {}
     
-    log.info("Received command: " .. cmd .. " from " .. (senderLabel or senderId))
+    debugLog("info", "Received command: " .. cmd .. " from " .. (senderLabel or senderId))
     comms.sendAck(comms.MSG_TYPE.COMMAND, senderId)
     
     local result = {}
@@ -576,7 +591,7 @@ local function handleCommand(message, senderId, senderLabel)
         result.home = setHome()
         
     else
-        log.warn("Unknown command: " .. cmd)
+        debugLog("warn", "Unknown command: " .. cmd)
         success = false
         result.error = "Unknown command"
     end
@@ -587,15 +602,15 @@ local function handleCommand(message, senderId, senderLabel)
 end
 
 local function handlePing(message, senderId, senderLabel)
-    log.info("Received PING from controller #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
-    log.info("Sending PONG and status...")
+    debugLog("info", "Received PING from controller #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
+    debugLog("info", "Sending PONG and status...")
     comms.pong(senderId)
     comms.sendStatus(getFullStatus())
-    log.info("Response sent!")
+    debugLog("info", "Response sent!")
 end
 
 local function handleStop(message, senderId, senderLabel)
-    log.info("Stop command received from " .. (senderLabel or senderId))
+    debugLog("info", "Stop command received from " .. (senderLabel or senderId))
     running = false
     comms.sendAck(comms.MSG_TYPE.STOP, senderId)
 end
@@ -646,25 +661,26 @@ local function main(args)
     -- Check for debug flag
     args = args or {}
     if args[1] == "--debug" or args[1] == "-d" then
+        DEBUG = true
         comms.DEBUG = true
         print("Debug mode enabled")
     end
     
     -- Check for updates
     if updater and config.UPDATER and config.UPDATER.CHECK_ON_STARTUP then
-        log.info("Checking for updates...")
+        debugLog("info", "Checking for updates...")
         -- Update check would go here
     end
     
     -- Initialize communications
-    log.info("Initializing wireless modem...")
+    debugLog("info", "Initializing wireless modem...")
     if not comms.init(config.NETWORK) then
-        log.error("Failed to find wireless modem!")
+        debugLog("error", "Failed to find wireless modem!")
         print("Please equip a wireless modem.")
         return
     end
-    log.info("Wireless modem ready on channel " .. config.NETWORK.CHANNEL)
-    log.info("Turtle ID: " .. os.getComputerID())
+    debugLog("info", "Wireless modem ready on channel " .. config.NETWORK.CHANNEL)
+    debugLog("info", "Turtle ID: " .. os.getComputerID())
     
     -- Register message handlers
     comms.onMessage(comms.MSG_TYPE.PING, handlePing)
@@ -676,28 +692,28 @@ local function main(args)
     attach.setDefaultEquipped(config.TOOLS.PICKAXE)
     
     -- Initialize GPS
-    log.info("Acquiring GPS position...")
+    debugLog("info", "Acquiring GPS position...")
     if syncPositionFromGPS() then
-        log.info("GPS acquired, detecting facing...")
+        debugLog("info", "GPS acquired, detecting facing...")
         detectAndSaveFacing()
     else
-        log.warn("No GPS signal, using stored position")
+        debugLog("warn", "No GPS signal, using stored position")
     end
     
     -- Scan inventory
-    log.info("Scanning inventory...")
+    debugLog("info", "Scanning inventory...")
     local invSummary = inventory.scan(config.FUEL.ITEMS)
     if invSummary.roadBlockType then
-        log.info("Road block type: " .. invSummary.roadBlockType)
+        debugLog("info", "Road block type: " .. invSummary.roadBlockType)
         if not state.get("roadBlockType") then
             state.set("roadBlockType", invSummary.roadBlockType)
         end
     else
-        log.warn("No road blocks found in inventory!")
+        debugLog("warn", "No road blocks found in inventory!")
     end
     
-    log.info("Road blocks: " .. invSummary.roadBlockCount)
-    log.info("Fuel level: " .. turtle.getFuelLevel())
+    debugLog("info", "Road blocks: " .. invSummary.roadBlockCount)
+    debugLog("info", "Fuel level: " .. turtle.getFuelLevel())
     
     print("")
     print("Turtle ready! Waiting for commands...")
@@ -716,14 +732,14 @@ local function main(args)
                 local event, key = os.pullEvent("key")
                 if key == keys.q then
                     running = false
-                    log.info("Shutting down...")
+                    debugLog("info", "Shutting down...")
                 end
             end
         end
     )
     
     comms.close()
-    log.info("RBC turtle stopped")
+    debugLog("info", "RBC turtle stopped")
 end
 
 main({...})

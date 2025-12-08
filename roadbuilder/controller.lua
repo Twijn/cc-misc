@@ -19,6 +19,21 @@ end
 local log = require("log")
 local comms = require("comms")
 
+-- Debug mode (enabled with --debug flag)
+local DEBUG = false
+
+local function debugLog(level, msg)
+    if DEBUG then
+        if level == "info" then
+            log.info(msg)
+        elseif level == "warn" then
+            log.warn(msg)
+        elseif level == "error" then
+            log.error(msg)
+        end
+    end
+end
+
 -- Optional libraries
 local formUILoaded, FormUI = pcall(require, "formui")
 local updaterLoaded, updater = pcall(require, "updater")
@@ -126,7 +141,7 @@ end
 
 local function sendTurtleCommand(command, params)
     if not selectedTurtle then
-        log.warn("No turtle selected!")
+        debugLog("warn", "No turtle selected!")
         return false
     end
     
@@ -514,7 +529,7 @@ end
 
 local function handleStatus(message, senderId, senderLabel)
     -- Refresh our local turtle list from comms module
-    log.info("Received STATUS from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
+    debugLog("info", "Received STATUS from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
     refreshTurtles()
     
     -- Update selected turtle if it's this one
@@ -525,18 +540,18 @@ end
 
 local function handlePong(message, senderId, senderLabel)
     -- Refresh turtle list when we get a pong
-    log.info("Received PONG from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
+    debugLog("info", "Received PONG from turtle #" .. senderId .. " (" .. (senderLabel or "unnamed") .. ")")
     refreshTurtles()
 end
 
 local function handleComplete(message, senderId, senderLabel)
     local cmd = message.data.command or "?"
-    log.info("Command complete: " .. cmd .. " from " .. (senderLabel or senderId))
+    debugLog("info", "Command complete: " .. cmd .. " from " .. (senderLabel or senderId))
 end
 
 local function handleError(message, senderId, senderLabel)
     local err = message.data.error or "Unknown error"
-    log.error("Error from " .. (senderLabel or senderId) .. ": " .. err)
+    debugLog("error", "Error from " .. (senderLabel or senderId) .. ": " .. err)
 end
 
 -- ======= Main Loop =======
@@ -586,6 +601,7 @@ local function main(args)
     -- Check for debug flag
     args = args or {}
     if args[1] == "--debug" or args[1] == "-d" then
+        DEBUG = true
         comms.DEBUG = true
         print("Debug mode enabled")
     end
