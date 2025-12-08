@@ -228,6 +228,14 @@ local function processMessage(message)
     -- Validate message structure
     if type(message) ~= "table" or not message.type then
         debugLog("RECV: Invalid message (not a table or no type)")
+        debugLog("  -> Received type: " .. type(message))
+        if type(message) == "string" then
+            debugLog("  -> String content: " .. message:sub(1, 100))
+        elseif type(message) == "table" then
+            debugLog("  -> Table keys: " .. textutils.serialize(message):sub(1, 200))
+        else
+            debugLog("  -> Value: " .. tostring(message))
+        end
         return
     end
     
@@ -280,13 +288,13 @@ function module.receive(timeout)
     end
     
     while true do
-        local event, p1, p2, p3, p4, p5 = os.pullEvent()
+        local event, side, senderChannel, replyTo, message, distance = os.pullEvent()
         
         if event == "modem_message" then
-            local message = p5
+            debugLog("RAW MODEM: side=" .. tostring(side) .. " ch=" .. tostring(senderChannel) .. " reply=" .. tostring(replyTo) .. " dist=" .. tostring(distance))
             processMessage(message)
             return message
-        elseif event == "timer" and p1 == timer then
+        elseif event == "timer" and side == timer then
             return nil
         end
     end
