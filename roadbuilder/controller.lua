@@ -210,6 +210,94 @@ local function stopTurtle()
     end
 end
 
+-- ======= All Turtles Command Functions =======
+
+--- Send a command to all connected turtles
+---@param command string The command to send
+---@param params table Command parameters
+---@return number count Number of turtles commanded
+local function sendAllTurtlesCommand(command, params)
+    local turtleList = getTurtleList()
+    for _, turtle in ipairs(turtleList) do
+        comms.sendCommand(turtle.id, command, params)
+    end
+    return #turtleList
+end
+
+--- Build forward with all turtles (each builds 1 lane)
+local function allBuildForward(distance)
+    return sendAllTurtlesCommand(comms.COMMANDS.BUILD_FORWARD, {
+        distance = distance,
+        width = 1, -- Each turtle builds 1 lane
+    })
+end
+
+--- Build backward with all turtles
+local function allBuildBackward(distance)
+    return sendAllTurtlesCommand(comms.COMMANDS.BUILD_BACKWARD, {
+        distance = distance,
+    })
+end
+
+--- Move all turtles up
+local function allMoveUp(count)
+    return sendAllTurtlesCommand(comms.COMMANDS.MOVE_UP, { count = count })
+end
+
+--- Move all turtles down
+local function allMoveDown(count)
+    return sendAllTurtlesCommand(comms.COMMANDS.MOVE_DOWN, { count = count })
+end
+
+--- Turn all turtles left
+local function allTurnLeft()
+    return sendAllTurtlesCommand(comms.COMMANDS.TURN_LEFT, {})
+end
+
+--- Turn all turtles right
+local function allTurnRight()
+    return sendAllTurtlesCommand(comms.COMMANDS.TURN_RIGHT, {})
+end
+
+--- Set road width on all turtles
+local function allSetRoadWidth(width)
+    return sendAllTurtlesCommand(comms.COMMANDS.SET_WIDTH, { width = width })
+end
+
+--- Set block type on all turtles
+local function allSetBlockType(blockType)
+    return sendAllTurtlesCommand(comms.COMMANDS.SET_BLOCK, { blockType = blockType })
+end
+
+--- Refill all turtles
+local function allRefill()
+    return sendAllTurtlesCommand(comms.COMMANDS.REFILL, {})
+end
+
+--- Deposit from all turtles
+local function allDeposit()
+    return sendAllTurtlesCommand(comms.COMMANDS.DEPOSIT, {})
+end
+
+--- Send all turtles home
+local function allGoHome()
+    return sendAllTurtlesCommand(comms.COMMANDS.GO_HOME, {})
+end
+
+--- Set home for all turtles
+local function allSetHome()
+    return sendAllTurtlesCommand(comms.COMMANDS.SET_HOME, {})
+end
+
+--- Stop all turtles
+local function allStopTurtles()
+    local turtleList = getTurtleList()
+    for _, turtle in ipairs(turtleList) do
+        comms.send(comms.MSG_TYPE.STOP, {}, turtle.id)
+    end
+    return #turtleList
+end
+
 -- ======= Update Functions =======
 
 --- Update all connected turtles
@@ -338,15 +426,15 @@ local function drawMainMenu()
         y = screenH - 4
         setColor(colors.lightBlue)
         term.setCursorPos(1, y)
-        term.write(" 1-9:Sel A:All R:Rfsh")
+        term.write(" 1-9:Sel A:AllCtrl")
         term.setCursorPos(1, y + 1)
-        term.write(" U:Upd C:UpdCtrl Q:Quit")
+        term.write(" R:Rfsh U:Upd Q:Quit")
         setColor(colors.white)
     else
         y = screenH - 6
         setColor(colors.lightBlue)
         term.setCursorPos(2, y)
-        term.write("[1-9] Select turtle  [A] Build All")
+        term.write("[1-9] Select turtle  [A] All Control")
         term.setCursorPos(2, y + 1)
         term.write("[R] Refresh  [P] Ping all")
         term.setCursorPos(2, y + 2)
@@ -453,7 +541,7 @@ local function drawTurtleDetail()
         term.setCursorPos(1, menuY + 1)
         term.write(" W:Wid H:Home S:Stop")
         term.setCursorPos(1, menuY + 2)
-        term.write(" I:Fill O:Dep <-:Back")
+        term.write(" I:Fill O:Dep Del:Back")
         setColor(colors.white)
     else
         -- Full layout for computer
@@ -550,7 +638,7 @@ local function drawTurtleDetail()
         term.setCursorPos(2, menuY + 4)
         term.write("[H] Go Home [G] Set Home [I] Refill [O] Deposit")
         term.setCursorPos(2, menuY + 5)
-        term.write("[S] Stop  [Backspace] Back")
+        term.write("[S] Stop  [Delete/Backspace] Back")
         setColor(colors.white)
     end
     
@@ -558,6 +646,145 @@ local function drawTurtleDetail()
         drawFooter(" " .. truncate(label, screenW - 8) .. " " .. os.date("%H:%M"))
     else
         drawFooter(" " .. label .. " | " .. os.date("%H:%M:%S"))
+    end
+end
+
+local function drawAllControl()
+    clearScreen()
+    local turtleList = getTurtleList()
+    
+    if isPocket then
+        drawHeader("All Control")
+    else
+        drawHeader("All Turtles Control - " .. #turtleList .. " turtles")
+    end
+    
+    local y = 3
+    
+    if #turtleList == 0 then
+        setColor(colors.yellow)
+        centerText(y + 1, "No turtles connected")
+        setColor(colors.lightGray)
+        centerText(y + 2, "Press Del/Backspace to go back")
+        setColor(colors.white)
+    else
+        -- Show summary of all turtles
+        setColor(colors.lime)
+        term.setCursorPos(1, y)
+        term.write(" Connected: " .. #turtleList .. " turtle(s)")
+        setColor(colors.white)
+        y = y + 1
+        
+        -- Show aggregate stats
+        local totalFuel = 0
+        local totalBlocks = 0
+        local busyCount = 0
+        
+        for _, turtle in ipairs(turtleList) do
+            if turtle.data then
+                totalFuel = totalFuel + (turtle.data.fuel or 0)
+                if turtle.data.inventory then
+                    totalBlocks = totalBlocks + (turtle.data.inventory.roadBlockCount or 0)
+                end
+                if turtle.data.currentTask then
+                    busyCount = busyCount + 1
+                end
+            end
+        end
+        
+        if isPocket then
+            term.setCursorPos(1, y)
+            setColor(colors.lightBlue)
+            term.write(" Fuel:")
+            setColor(colors.white)
+            term.write(tostring(totalFuel))
+            term.write(" Blk:" .. totalBlocks)
+            y = y + 1
+            
+            term.setCursorPos(1, y)
+            if busyCount > 0 then
+                setColor(colors.yellow)
+                term.write(" Busy: " .. busyCount .. "/" .. #turtleList)
+            else
+                setColor(colors.lime)
+                term.write(" All idle")
+            end
+            setColor(colors.white)
+            y = y + 2
+        else
+            term.setCursorPos(2, y)
+            term.write(string.format("Total Fuel: %d  Total Blocks: %d", totalFuel, totalBlocks))
+            y = y + 1
+            
+            term.setCursorPos(2, y)
+            if busyCount > 0 then
+                setColor(colors.yellow)
+                term.write("Status: " .. busyCount .. "/" .. #turtleList .. " busy")
+            else
+                setColor(colors.lime)
+                term.write("Status: All idle")
+            end
+            setColor(colors.white)
+            y = y + 2
+            
+            -- List turtles briefly
+            setColor(colors.lightBlue)
+            term.setCursorPos(2, y)
+            term.write("Turtles:")
+            setColor(colors.white)
+            y = y + 1
+            
+            local maxShow = math.min(#turtleList, screenH - 14)
+            for i = 1, maxShow do
+                local turtle = turtleList[i]
+                local label = turtle.label or ("T-" .. turtle.id)
+                local status = turtle.data and turtle.data.currentTask and "*" or ""
+                term.setCursorPos(3, y)
+                term.write(truncate(label, screenW - 6) .. status)
+                y = y + 1
+            end
+            if #turtleList > maxShow then
+                term.setCursorPos(3, y)
+                setColor(colors.gray)
+                term.write("... and " .. (#turtleList - maxShow) .. " more")
+                setColor(colors.white)
+            end
+        end
+    end
+    
+    -- Draw menu
+    if isPocket then
+        local menuY = screenH - 4
+        setColor(colors.lightBlue)
+        term.setCursorPos(1, menuY)
+        term.write(" F:Fwd B:Bck U/D L/R")
+        term.setCursorPos(1, menuY + 1)
+        term.write(" W:Wid I:Fill O:Dep")
+        term.setCursorPos(1, menuY + 2)
+        term.write(" H:Home S:Stop Del:Bk")
+        setColor(colors.white)
+    else
+        local menuY = screenH - 7
+        setColor(colors.lightBlue)
+        term.setCursorPos(2, menuY)
+        term.write("[F] Build Forward  [B] Build Backward")
+        term.setCursorPos(2, menuY + 1)
+        term.write("[U] Move Up        [D] Move Down")
+        term.setCursorPos(2, menuY + 2)
+        term.write("[L] Turn Left      [R] Turn Right")
+        term.setCursorPos(2, menuY + 3)
+        term.write("[W] Set Width      [T] Set Block Type")
+        term.setCursorPos(2, menuY + 4)
+        term.write("[H] Go Home  [G] Set Home  [I] Refill  [O] Deposit")
+        term.setCursorPos(2, menuY + 5)
+        term.write("[S] Stop All  [Delete/Backspace] Back to Main")
+        setColor(colors.white)
+    end
+    
+    if isPocket then
+        drawFooter(" All:" .. #turtleList .. " " .. os.date("%H:%M"))
+    else
+        drawFooter(" All Turtles: " .. #turtleList .. " | " .. os.date("%H:%M:%S"))
     end
 end
 
@@ -737,22 +964,9 @@ local function handleMainMenuKey(key)
     elseif key == keys.p then
         comms.ping()
     elseif key == keys.a then
-        -- Build with all turtles
+        -- Open all control view
         if #turtleList > 0 then
-            local distance = promptNumber("Enter distance (all " .. #turtleList .. " turtles):", 10)
-            if distance and distance > 0 then
-                local count = buildWithAllTurtles(distance)
-                if count > 0 then
-                    clearScreen()
-                    drawHeader("Building")
-                    setColor(colors.lime)
-                    centerText(6, "Building " .. distance .. " blocks with " .. count .. " turtles")
-                    setColor(colors.lightGray)
-                    centerText(8, "(Width = " .. count .. " total)")
-                    setColor(colors.white)
-                    sleep(2)
-                end
-            end
+            currentView = "all_control"
         end
     elseif key == keys.u then
         -- Update all turtles
@@ -778,7 +992,7 @@ local function handleMainMenuKey(key)
 end
 
 local function handleTurtleDetailKey(key)
-    if key == keys.backspace then
+    if key == keys.backspace or key == keys.delete then
         selectedTurtle = nil
         currentView = "main"
         
@@ -847,11 +1061,102 @@ local function handleTurtleDetailKey(key)
     end
 end
 
+local function handleAllControlKey(key)
+    local turtleList = getTurtleList()
+    
+    if key == keys.backspace or key == keys.delete then
+        currentView = "main"
+        
+    elseif key == keys.f then
+        -- Build forward with all turtles
+        if #turtleList > 0 then
+            local distance = promptNumber("Distance (" .. #turtleList .. " turtles):", 10)
+            if distance and distance > 0 then
+                local count = allBuildForward(distance)
+                clearScreen()
+                drawHeader("Building")
+                setColor(colors.lime)
+                centerText(5, "Building forward " .. distance .. " blocks")
+                centerText(6, "with " .. count .. " turtles")
+                setColor(colors.white)
+                sleep(1.5)
+            end
+        end
+        
+    elseif key == keys.b then
+        -- Build backward with all turtles
+        if #turtleList > 0 then
+            local distance = promptNumber("Distance (" .. #turtleList .. " turtles):", 10)
+            if distance and distance > 0 then
+                local count = allBuildBackward(distance)
+                clearScreen()
+                drawHeader("Building")
+                setColor(colors.lime)
+                centerText(5, "Building backward " .. distance .. " blocks")
+                centerText(6, "with " .. count .. " turtles")
+                setColor(colors.white)
+                sleep(1.5)
+            end
+        end
+        
+    elseif key == keys.u then
+        -- Move all turtles up
+        local count = promptNumber("Height (all turtles):", 1)
+        if count and count > 0 then
+            allMoveUp(count)
+        end
+        
+    elseif key == keys.d then
+        -- Move all turtles down
+        local count = promptNumber("Depth (all turtles):", 1)
+        if count and count > 0 then
+            allMoveDown(count)
+        end
+        
+    elseif key == keys.l then
+        allTurnLeft()
+        
+    elseif key == keys.r then
+        allTurnRight()
+        
+    elseif key == keys.w then
+        -- Set width on all turtles
+        local width = promptNumber("Road width (all turtles):", 3)
+        if width and width > 0 then
+            allSetRoadWidth(width)
+        end
+        
+    elseif key == keys.t then
+        -- Set block type on all turtles
+        local blockType = promptString("Block ID (e.g. minecraft:stone):", nil)
+        if blockType and #blockType > 0 then
+            allSetBlockType(blockType)
+        end
+        
+    elseif key == keys.h then
+        allGoHome()
+        
+    elseif key == keys.g then
+        allSetHome()
+        
+    elseif key == keys.i then
+        allRefill()
+        
+    elseif key == keys.o then
+        allDeposit()
+        
+    elseif key == keys.s then
+        allStopTurtles()
+    end
+end
+
 local function handleKey(key)
     if currentView == "main" then
         handleMainMenuKey(key)
     elseif currentView == "turtle_detail" then
         handleTurtleDetailKey(key)
+    elseif currentView == "all_control" then
+        handleAllControlKey(key)
     end
 end
 
@@ -895,6 +1200,8 @@ local function displayLoop()
                 drawMainMenu()
             elseif currentView == "turtle_detail" then
                 drawTurtleDetail()
+            elseif currentView == "all_control" then
+                drawAllControl()
             end
         end
         
