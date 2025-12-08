@@ -1497,13 +1497,61 @@ end
 
 --- Show sales dashboard with overview stats
 local function showSalesDashboard()
+    local scroll = 0
+    
     while true do
         term.clear()
         term.setCursorPos(1, 1)
         
         local w, h = term.getSize()
+        local headerHeight = 3
+        local footerHeight = 2
+        local visibleHeight = h - headerHeight - footerHeight
+        
         local stats = salesManager.getStats()
         local todayStats = salesManager.getTodayStats()
+        
+        -- Build content lines
+        local contentLines = {}
+        
+        -- Overall stats
+        table.insert(contentLines, { text = "All Time Statistics:", color = colors.yellow })
+        table.insert(contentLines, { label = "  Total Sales: ", value = tostring(stats.totalSales or 0), labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { label = "  Total Revenue: ", value = formatKRO(stats.totalRevenue), labelColor = colors.lightBlue, valueColor = colors.green })
+        table.insert(contentLines, { label = "  Items Sold: ", value = tostring(stats.totalItemsSold or 0), labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { text = "", color = colors.white })
+        
+        -- Today's stats
+        table.insert(contentLines, { text = "Today's Statistics:", color = colors.yellow })
+        table.insert(contentLines, { label = "  Sales Today: ", value = tostring(todayStats.sales or 0), labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { label = "  Revenue Today: ", value = formatKRO(todayStats.revenue), labelColor = colors.lightBlue, valueColor = colors.green })
+        table.insert(contentLines, { label = "  Items Sold Today: ", value = tostring(todayStats.itemsSold or 0), labelColor = colors.lightBlue, valueColor = colors.white })
+        table.insert(contentLines, { text = "", color = colors.white })
+        
+        -- Quick stats
+        local topProducts = salesManager.getTopProducts(3)
+        if #topProducts > 0 then
+            table.insert(contentLines, { text = "Top 3 Products:", color = colors.yellow })
+            for i, prod in ipairs(topProducts) do
+                table.insert(contentLines, { text = string.format("  %d. %s - %s (%d sold)", 
+                    i, prod.name or prod.meta, formatKRO(prod.revenue), prod.itemsSold or 0), color = colors.white })
+            end
+            table.insert(contentLines, { text = "", color = colors.white })
+        end
+        
+        local topBuyers = salesManager.getTopBuyers(3)
+        if #topBuyers > 0 then
+            table.insert(contentLines, { text = "Top 3 Buyers:", color = colors.yellow })
+            for i, buyer in ipairs(topBuyers) do
+                table.insert(contentLines, { text = string.format("  %d. %s - %s", 
+                    i, truncateAddress(buyer.address, 15), formatKRO(buyer.totalSpent)), color = colors.white })
+            end
+        end
+        
+        local totalLines = #contentLines
+        
+        -- Clamp scroll
+        scroll = math.max(0, math.min(scroll, math.max(0, totalLines - visibleHeight)))
         
         -- Title
         term.setTextColor(colors.yellow)
@@ -1512,77 +1560,50 @@ local function showSalesDashboard()
         print(string.rep("-", w))
         print()
         
-        -- Overall stats
-        term.setTextColor(colors.yellow)
-        print("All Time Statistics:")
-        term.setTextColor(colors.lightBlue)
-        write("  Total Sales: ")
-        term.setTextColor(colors.white)
-        print(stats.totalSales or 0)
-        
-        term.setTextColor(colors.lightBlue)
-        write("  Total Revenue: ")
-        term.setTextColor(colors.green)
-        print(formatKRO(stats.totalRevenue))
-        
-        term.setTextColor(colors.lightBlue)
-        write("  Items Sold: ")
-        term.setTextColor(colors.white)
-        print(stats.totalItemsSold or 0)
-        
-        print()
-        
-        -- Today's stats
-        term.setTextColor(colors.yellow)
-        print("Today's Statistics:")
-        term.setTextColor(colors.lightBlue)
-        write("  Sales Today: ")
-        term.setTextColor(colors.white)
-        print(todayStats.sales or 0)
-        
-        term.setTextColor(colors.lightBlue)
-        write("  Revenue Today: ")
-        term.setTextColor(colors.green)
-        print(formatKRO(todayStats.revenue))
-        
-        term.setTextColor(colors.lightBlue)
-        write("  Items Sold Today: ")
-        term.setTextColor(colors.white)
-        print(todayStats.itemsSold or 0)
-        
-        print()
-        
-        -- Quick stats
-        local topProducts = salesManager.getTopProducts(3)
-        if #topProducts > 0 then
-            term.setTextColor(colors.yellow)
-            print("Top 3 Products:")
-            for i, prod in ipairs(topProducts) do
-                term.setTextColor(colors.white)
-                print(string.format("  %d. %s - %s (%d sold)", 
-                    i, prod.name or prod.meta, formatKRO(prod.revenue), prod.itemsSold or 0))
+        -- Draw visible content
+        for i = scroll + 1, math.min(totalLines, scroll + visibleHeight) do
+            local line = contentLines[i]
+            if line.label then
+                term.setTextColor(line.labelColor)
+                write(line.label)
+                term.setTextColor(line.valueColor)
+                print(line.value)
+            else
+                term.setTextColor(line.color)
+                print(line.text)
             end
-            print()
         end
         
-        local topBuyers = salesManager.getTopBuyers(3)
-        if #topBuyers > 0 then
-            term.setTextColor(colors.yellow)
-            print("Top 3 Buyers:")
-            for i, buyer in ipairs(topBuyers) do
-                term.setTextColor(colors.white)
-                print(string.format("  %d. %s - %s", 
-                    i, truncateAddress(buyer.address, 15), formatKRO(buyer.totalSpent)))
-            end
+        -- Draw scroll indicators
+        term.setTextColor(colors.gray)
+        if scroll > 0 then
+            term.setCursorPos(w, headerHeight + 1)
+            write("^")
+        end
+        if scroll + visibleHeight < totalLines then
+            term.setCursorPos(w, h - footerHeight)
+            write("v")
         end
         
         -- Footer
         term.setCursorPos(1, h - 1)
         term.setTextColor(colors.gray)
-        print("Press Q to go back")
+        print("Up/Down: Scroll | Q: Back")
         
         local e, key = os.pullEvent("key")
-        if key == keys.q then
+        if key == keys.up then
+            scroll = scroll - 1
+        elseif key == keys.down then
+            scroll = scroll + 1
+        elseif key == keys.pageUp then
+            scroll = scroll - (visibleHeight - 1)
+        elseif key == keys.pageDown then
+            scroll = scroll + (visibleHeight - 1)
+        elseif key == keys.home then
+            scroll = 0
+        elseif key == keys["end"] then
+            scroll = totalLines - visibleHeight
+        elseif key == keys.q then
             return
         end
     end
