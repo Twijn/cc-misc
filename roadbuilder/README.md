@@ -1,4 +1,4 @@
-# Road Builder
+# RBC (Road Builder Controller)
 
 A multi-turtle road building system for ComputerCraft with wireless control. Build roads automatically with GPS positioning, configurable road widths, and ender storage integration for extended operations.
 
@@ -169,7 +169,7 @@ For wide roads (width > 1):
 
 ## Updating
 
-The road builder supports automatic updates through the cc-misc updater:
+RBC supports automatic updates through the cc-misc updater:
 
 ```lua
 local updater = require("updater")
@@ -205,7 +205,7 @@ wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/instal
 
 ## Dependencies
 
-The road builder uses these cc-misc libraries:
+RBC uses these cc-misc libraries:
 - `attach` - Safe block digging and tool management
 - `log` - Colored logging with file output
 - `persist` - State persistence across restarts

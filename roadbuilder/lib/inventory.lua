@@ -1,4 +1,4 @@
---- Inventory Management Library for Road Builder
+--- Inventory Management Library for RBC
 --- Handles road block detection, ender storage, refilling, and debris disposal
 ---
 ---@version 1.0.0

@@ -1,4 +1,4 @@
---- Wireless Communications Library for Road Builder
+--- Wireless Communications Library for RBC
 --- Handles all modem communication between turtles and controller
 ---
 ---@version 1.0.0

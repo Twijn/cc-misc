@@ -1,5 +1,5 @@
---- Road Builder Installation Script
---- Uses the cc-misc installer to download required libraries, then downloads the road builder programs.
+--- RBC Installation Script
+--- Uses the cc-misc installer to download required libraries, then downloads the RBC programs.
 ---
 ---@usage
 ---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/install.lua
@@ -14,7 +14,7 @@ local isPocket = pocket ~= nil
 local isComputer = not isTurtle and not isPocket
 
 print("================================")
-print("  Road Builder Installer")
+print("  RBC Installer")
 print("================================")
 print("")
 
@@ -51,7 +51,7 @@ fs.delete(installerPath)
 
 -- Step 2: Determine which files to download based on device type
 print("")
-print("Downloading road builder components...")
+print("Downloading RBC components...")
 
 local libDir = fs.exists("disk") and "disk/lib" or "lib"
 fs.makeDir(libDir)
@@ -80,15 +80,15 @@ local mainUrl = nil
 if isTurtle then
     mainProgram = "turtle.lua"
     mainUrl = BASE_URL .. "/roadbuilder/turtle.lua"
-    print("Downloading road builder turtle program...")
+    print("Downloading RBC turtle program...")
 elseif isPocket then
     mainProgram = "controller.lua"
     mainUrl = BASE_URL .. "/roadbuilder/controller.lua"
-    print("Downloading road builder controller...")
+    print("Downloading RBC controller...")
 else
     mainProgram = "controller.lua"
     mainUrl = BASE_URL .. "/roadbuilder/controller.lua"
-    print("Downloading road builder controller...")
+    print("Downloading RBC controller...")
 end
 
 fs.delete(mainProgram)
@@ -114,7 +114,7 @@ term.setTextColor(colors.white)
 print("")
 
 -- Offer to set as startup
-print("Would you like to run the road builder on startup? (y/n)")
+print("Would you like to run RBC on startup? (y/n)")
 local input = read()
 if input:lower() == "y" or input:lower() == "yes" then
     fs.delete("startup.lua")
@@ -155,7 +155,7 @@ elseif isPocket then
     print("")
     term.setTextColor(colors.lightBlue)
     print("Use the controller to manage all")
-    print("road builder turtles on the network.")
+    print("RBC turtles on the network.")
 else
     print("To control turtles, run: controller")
     print("")

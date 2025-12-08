@@ -1,5 +1,5 @@
---- Road Builder Update Script
---- Updates all road builder components to the latest version
+--- RBC Update Script
+--- Updates all RBC components to the latest version
 ---
 ---@usage
 ---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/update.lua
@@ -12,7 +12,7 @@ local isTurtle = turtle ~= nil
 local isPocket = pocket ~= nil
 
 print("================================")
-print("  Road Builder Updater")
+print("  RBC Updater")
 print("================================")
 print("")
 

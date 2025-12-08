@@ -1,4 +1,4 @@
---- GPS and Position Management Library for Road Builder
+--- GPS and Position Management Library for RBC
 --- Provides GPS location, facing detection, and position tracking
 ---
 ---@version 1.0.0

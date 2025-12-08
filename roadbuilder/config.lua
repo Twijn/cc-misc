@@ -1,4 +1,4 @@
---- Road Builder Configuration
+--- RBC Configuration
 --- Edit this file to customize road building behavior
 ---
 ---@version 1.0.0

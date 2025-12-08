@@ -1,13 +1,13 @@
---- Road Builder Turtle Program
+--- RBC Turtle Program
 --- Main turtle program for building roads with wireless control
 ---
----@version 1.0.0
+---@version 1.1.0
 ---@usage
 --- wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/install.lua
 --- Then run: turtle
 ---
 
-local TURTLE_VERSION = "1.0.0"
+local TURTLE_VERSION = "1.1.0"
 local TURTLE_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/turtle.lua"
 
 -- Set up library path
@@ -636,7 +636,7 @@ local function main()
     term.setCursorPos(1, 1)
     
     print("================================")
-    print("  Road Builder Turtle v" .. TURTLE_VERSION)
+    print("  RBC Turtle v" .. TURTLE_VERSION)
     print("================================")
     print("")
     
@@ -712,7 +712,7 @@ local function main()
     )
     
     comms.close()
-    log.info("Road builder turtle stopped")
+    log.info("RBC turtle stopped")
 end
 
 main()

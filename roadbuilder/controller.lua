@@ -1,13 +1,13 @@
---- Road Builder Controller Program
---- Pocket computer / computer interface for controlling road builder turtles
+--- RBC Controller Program
+--- Pocket computer / computer interface for controlling RBC turtles
 ---
----@version 1.0.0
+---@version 1.1.0
 ---@usage
 --- wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/install.lua
 --- Then run: controller
 ---
 
-local CONTROLLER_VERSION = "1.0.0"
+local CONTROLLER_VERSION = "1.1.0"
 local CONTROLLER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/controller.lua"
 
 -- Set up library path
@@ -196,7 +196,7 @@ end
 
 local function drawMainMenu()
     clearScreen()
-    drawHeader("Road Builder Controller v" .. CONTROLLER_VERSION)
+    drawHeader("RBC Controller v" .. CONTROLLER_VERSION)
     
     local turtleList = getTurtleList()
     local y = 3
@@ -571,7 +571,7 @@ local function main()
     clearScreen()
     
     print("================================")
-    print("  Road Builder Controller")
+    print("  RBC Controller")
     print("  Version " .. CONTROLLER_VERSION)
     print("================================")
     print("")
@@ -623,7 +623,7 @@ local function main()
     
     comms.close()
     clearScreen()
-    print("Road Builder Controller stopped")
+    print("RBC Controller stopped")
 end
 
 main()
