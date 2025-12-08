@@ -1,13 +1,13 @@
 --- RBC Turtle Program
 --- Main turtle program for building roads with wireless control
 ---
----@version 1.1.1
+---@version 1.2.0
 ---@usage
 --- wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/install.lua
 --- Then run: turtle
 ---
 
-local TURTLE_VERSION = "1.1.1"
+local TURTLE_VERSION = "1.2.0"
 local TURTLE_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/turtle.lua"
 
 -- Set up library path
@@ -65,14 +65,14 @@ local taskTotal = 0
 local DEBUG = false
 
 local function debugLog(level, msg)
-    if DEBUG then
-        if level == "info" then
-            log.info(msg)
-        elseif level == "warn" then
-            log.warn(msg)
-        elseif level == "error" then
-            log.error(msg)
-        end
+    if level == "info" then
+        log.info(msg)
+    elseif level == "warn" then
+        log.warn(msg)
+    elseif level == "error" then
+        log.error(msg)
+    elseif level == "debug" and DEBUG then
+        log.info("[DEBUG] " .. msg)
     end
 end
 
@@ -183,13 +183,48 @@ end
 
 -- ======= Road Building Functions =======
 
+--- Check if there are blocks above using the plethora scanner
+--- Returns the max height that has blocks, or 0 if no scanner or no blocks
+---@param maxHeight number Maximum height to scan
+---@return number maxBlockHeight The highest block found (0 if none)
+local function scanBlocksAbove(maxHeight)
+    local scanner = attach.getScanner()
+    if not scanner then
+        return maxHeight -- No scanner, assume we need to mine full height
+    end
+    
+    local blocks = scanner.scan()
+    if not blocks then
+        return maxHeight
+    end
+    
+    local maxBlockY = 0
+    for _, block in ipairs(blocks) do
+        -- Scanner returns relative coordinates; y > 0 is above the turtle
+        if block.y > 0 and block.y <= maxHeight and block.name ~= "minecraft:air" then
+            if block.y > maxBlockY then
+                maxBlockY = block.y
+            end
+        end
+    end
+    
+    return maxBlockY
+end
+
 --- Mine a column above the current position
 ---@param height number Height to mine
 local function mineColumn(height)
     local startY = gpsLib.getPosition().y
     local mined = 0
     
-    for i = 1, height do
+    -- Use scanner to check if there are blocks above
+    local actualHeight = scanBlocksAbove(height)
+    if actualHeight == 0 then
+        -- No blocks above, skip mining
+        return 0
+    end
+    
+    for i = 1, actualHeight do
         if up() then
             mined = mined + 1
         else
@@ -226,29 +261,6 @@ local function placeRoadBlock()
     
     -- Select and place road block
     if inventory.selectRoadBlock() then
-        -- Check if we're placing a slab - slabs need special handling to be placed on top half
-        local itemDetail = turtle.getItemDetail()
-        local isSlab = itemDetail and itemDetail.name and itemDetail.name:find("slab")
-        
-        if isSlab then
-            -- For slabs, move down first then place forward against the block below
-            -- This ensures the slab is placed on the top half
-            if down() then
-                turnAround()
-                if turtle.place() then
-                    turnAround()
-                    up()
-                    local stats = state.get("stats")
-                    stats.blocks_placed = stats.blocks_placed + 1
-                    state.set("stats", stats)
-                    return true
-                end
-                turnAround()
-                up()
-            end
-            -- Fallback to normal placement if special handling fails
-        end
-        
         if turtle.placeDown() then
             local stats = state.get("stats")
             stats.blocks_placed = stats.blocks_placed + 1

@@ -24,10 +24,10 @@
 --- -- Find and wrap a peripheral
 ---local modem = attach.find("modem")
 ---
----@version 1.0.2
+---@version 1.0.3
 -- @module attach
 
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 ---@class AttachModule
 ---@field _unsafeBlocks string[] List of block IDs that should not be dug
@@ -453,6 +453,46 @@ function module.find(peripheralType)
     debugInfo.error = "No matching peripheral found in attached peripherals or inventory"
     
     return nil, textutils.serialiseJSON(debugInfo)
+end
+
+-- Cached scanner reference
+local cachedScanner = nil
+
+---Get a plethora block scanner if available
+---Returns a cached scanner proxy if already found, otherwise tries to find and wrap one
+---@return table|nil # A scanner proxy with scan() method, or nil if not found
+function module.getScanner()
+    -- Return cached scanner if still valid
+    if cachedScanner then
+        -- Verify it's still working by checking if the peripheral is present
+        local valid = pcall(function() return cachedScanner.scan end)
+        if valid then
+            return cachedScanner
+        end
+        cachedScanner = nil
+    end
+    
+    -- Try to find a scanner
+    local scanner = module.find("plethora:scanner")
+    if scanner then
+        cachedScanner = scanner
+        return scanner
+    end
+    
+    -- Also try just "scanner" as a fallback
+    scanner = module.find("scanner")
+    if scanner then
+        cachedScanner = scanner
+        return scanner
+    end
+    
+    return nil
+end
+
+---Check if a plethora scanner is available
+---@return boolean # True if a scanner is available
+function module.hasScanner()
+    return module.getScanner() ~= nil
 end
 
 

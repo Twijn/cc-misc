@@ -1,13 +1,13 @@
 --- RBC Controller Program
 --- Pocket computer / computer interface for controlling RBC turtles
 ---
----@version 1.1.1
+---@version 1.2.0
 ---@usage
 --- wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/install.lua
 --- Then run: controller
 ---
 
-local CONTROLLER_VERSION = "1.1.1"
+local CONTROLLER_VERSION = "1.2.0"
 local CONTROLLER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/controller.lua"
 
 -- Set up library path
@@ -271,64 +271,96 @@ end
 
 local function drawMainMenu()
     clearScreen()
-    drawHeader("RBC Controller v" .. CONTROLLER_VERSION)
+    
+    if isPocket then
+        drawHeader("RBC v" .. CONTROLLER_VERSION)
+    else
+        drawHeader("RBC Controller v" .. CONTROLLER_VERSION)
+    end
     
     local turtleList = getTurtleList()
     local y = 3
     
     if #turtleList == 0 then
         setColor(colors.yellow)
-        centerText(y + 2, "No turtles found")
+        centerText(y + 1, "No turtles")
         setColor(colors.lightGray)
-        centerText(y + 4, "Searching...")
+        centerText(y + 2, "Searching...")
         setColor(colors.white)
     else
         setColor(colors.lime)
-        term.setCursorPos(2, y)
-        term.write("Connected Turtles: " .. #turtleList)
+        term.setCursorPos(1, y)
+        if isPocket then
+            term.write(" Turtles: " .. #turtleList)
+        else
+            term.write(" Connected Turtles: " .. #turtleList)
+        end
         setColor(colors.white)
-        y = y + 2
+        y = y + 1
+        
+        -- Calculate max turtles we can show
+        local maxTurtles = isPocket and (screenH - 7) or (screenH - 8)
         
         for i, turtle in ipairs(turtleList) do
-            if y > screenH - 2 then break end
+            if i > maxTurtles then break end
             
-            local label = turtle.label or ("Turtle-" .. turtle.id)
+            local label = turtle.label or ("T-" .. turtle.id)
             local status = ""
             
             if turtle.data then
                 if turtle.data.currentTask then
-                    status = "[" .. turtle.data.currentTask .. "]"
+                    status = isPocket and "*" or "[Busy]"
                     setColor(colors.yellow)
                 else
-                    status = "[Idle]"
+                    status = isPocket and "" or "[Idle]"
                     setColor(colors.lime)
                 end
             else
-                status = "[?]"
+                status = "?"
                 setColor(colors.gray)
             end
             
-            term.setCursorPos(2, y)
-            term.write(string.format("%d. %s %s", i, truncate(label, screenW - 15), status))
+            term.setCursorPos(1, y)
+            if isPocket then
+                -- Compact format for pocket: "1.Label *"
+                local maxLabelLen = screenW - 4 - #status
+                term.write(string.format(" %d.%s%s", i, truncate(label, maxLabelLen), status))
+            else
+                term.write(string.format(" %d. %s %s", i, truncate(label, screenW - 15), status))
+            end
             setColor(colors.white)
             y = y + 1
         end
     end
     
-    -- Draw menu options
-    y = screenH - 6
-    setColor(colors.lightBlue)
-    term.setCursorPos(2, y)
-    term.write("[1-9] Select turtle  [A] Build All")
-    term.setCursorPos(2, y + 1)
-    term.write("[R] Refresh  [P] Ping all")
-    term.setCursorPos(2, y + 2)
-    term.write("[U] Update All  [C] Update Controller")
-    term.setCursorPos(2, y + 3)
-    term.write("[Q] Quit")
-    setColor(colors.white)
+    -- Draw menu options - adapt to pocket
+    if isPocket then
+        y = screenH - 4
+        setColor(colors.lightBlue)
+        term.setCursorPos(1, y)
+        term.write(" 1-9:Sel A:All R:Rfsh")
+        term.setCursorPos(1, y + 1)
+        term.write(" U:Upd C:UpdCtrl Q:Quit")
+        setColor(colors.white)
+    else
+        y = screenH - 6
+        setColor(colors.lightBlue)
+        term.setCursorPos(2, y)
+        term.write("[1-9] Select turtle  [A] Build All")
+        term.setCursorPos(2, y + 1)
+        term.write("[R] Refresh  [P] Ping all")
+        term.setCursorPos(2, y + 2)
+        term.write("[U] Update All  [C] Update Controller")
+        term.setCursorPos(2, y + 3)
+        term.write("[Q] Quit")
+        setColor(colors.white)
+    end
     
-    drawFooter(" Turtles: " .. #turtleList .. " | " .. os.date("%H:%M:%S"))
+    if isPocket then
+        drawFooter(" T:" .. #turtleList .. " " .. os.date("%H:%M"))
+    else
+        drawFooter(" Turtles: " .. #turtleList .. " | " .. os.date("%H:%M:%S"))
+    end
 end
 
 local function drawTurtleDetail()
@@ -339,106 +371,171 @@ local function drawTurtleDetail()
     
     clearScreen()
     local label = selectedTurtle.label or ("Turtle-" .. selectedTurtle.id)
-    drawHeader(truncate(label, screenW - 4))
+    drawHeader(truncate(label, screenW - 2))
     
     local data = selectedTurtle.data or {}
     local y = 3
     
-    -- Position info
-    setColor(colors.lightBlue)
-    term.setCursorPos(2, y)
-    term.write("Position:")
-    setColor(colors.white)
-    y = y + 1
-    
-    if data.position then
-        term.setCursorPos(3, y)
-        term.write(string.format("X:%.0f Y:%.0f Z:%.0f", 
-            data.position.x or 0, 
-            data.position.y or 0, 
-            data.position.z or 0))
-        y = y + 1
-        term.setCursorPos(3, y)
-        term.write("Facing: " .. (data.facingName or "Unknown"))
-        if data.hasGPS then
-            setColor(colors.lime)
-            term.write(" [GPS]")
-            setColor(colors.white)
-        end
-    else
-        term.setCursorPos(3, y)
-        term.write("Unknown")
-    end
-    y = y + 2
-    
-    -- Status info
-    setColor(colors.lightBlue)
-    term.setCursorPos(2, y)
-    term.write("Status:")
-    setColor(colors.white)
-    y = y + 1
-    
-    term.setCursorPos(3, y)
-    local fuelPct = 0
-    if data.fuelLimit and data.fuelLimit > 0 then
-        fuelPct = math.floor((data.fuel or 0) / data.fuelLimit * 100)
-    end
-    term.write(string.format("Fuel: %d (%d%%)", data.fuel or 0, fuelPct))
-    y = y + 1
-    
-    if data.inventory then
-        term.setCursorPos(3, y)
-        term.write(string.format("Blocks: %d", data.inventory.roadBlockCount or 0))
-        y = y + 1
-    end
-    
-    if data.currentTask then
-        term.setCursorPos(3, y)
-        setColor(colors.yellow)
-        term.write("Task: " .. data.currentTask)
-        if data.taskTotal > 0 then
-            term.write(string.format(" (%d/%d)", data.taskProgress or 0, data.taskTotal))
-        end
-        setColor(colors.white)
-        y = y + 1
-    end
-    y = y + 1
-    
-    -- Road settings
-    setColor(colors.lightBlue)
-    term.setCursorPos(2, y)
-    term.write("Road Settings:")
-    setColor(colors.white)
-    y = y + 1
-    
-    term.setCursorPos(3, y)
-    term.write(string.format("Width: %d  Height: %d", 
-        data.roadWidth or 3, 
-        data.mineHeight or 5))
-    y = y + 1
-    
-    if data.roadBlockType then
-        term.setCursorPos(3, y)
-        local blockName = data.roadBlockType:gsub("minecraft:", ""):gsub("_", " ")
-        term.write("Block: " .. truncate(blockName, screenW - 10))
-    end
-    y = y + 2
-    
-    -- Command menu at bottom
     if isPocket then
-        -- Compact menu for pocket
-        local menuY = screenH - 5
+        -- Compact layout for pocket
+        -- Position on one line
+        if data.position then
+            term.setCursorPos(1, y)
+            setColor(colors.lightBlue)
+            term.write(" Pos:")
+            setColor(colors.white)
+            term.write(string.format("%.0f,%.0f,%.0f", 
+                data.position.x or 0, 
+                data.position.y or 0, 
+                data.position.z or 0))
+            y = y + 1
+            
+            term.setCursorPos(1, y)
+            term.write(" " .. (data.facingName or "?"))
+            if data.hasGPS then
+                setColor(colors.lime)
+                term.write(" GPS")
+                setColor(colors.white)
+            end
+        else
+            term.setCursorPos(1, y)
+            term.write(" Pos: Unknown")
+        end
+        y = y + 1
+        
+        -- Fuel and blocks on same line
+        term.setCursorPos(1, y)
         setColor(colors.lightBlue)
-        term.setCursorPos(2, menuY)
-        term.write("[F] Fwd [B] Back [U/D] Up/Dn")
-        term.setCursorPos(2, menuY + 1)
-        term.write("[L/R] Turn  [W] Width")
-        term.setCursorPos(2, menuY + 2)
-        term.write("[H] Home [S] Stop [I] Refill")
-        term.setCursorPos(2, menuY + 3)
-        term.write("[Backspace] Back to list")
+        term.write(" F:")
+        setColor(colors.white)
+        term.write(tostring(data.fuel or 0))
+        if data.inventory then
+            term.write(" B:" .. (data.inventory.roadBlockCount or 0))
+        end
+        y = y + 1
+        
+        -- Task if running
+        if data.currentTask then
+            term.setCursorPos(1, y)
+            setColor(colors.yellow)
+            local taskStr = truncate(data.currentTask, screenW - 2)
+            if data.taskTotal > 0 then
+                taskStr = string.format("%s %d/%d", 
+                    truncate(data.currentTask, screenW - 10),
+                    data.taskProgress or 0, data.taskTotal)
+            end
+            term.write(" " .. taskStr)
+            setColor(colors.white)
+            y = y + 1
+        end
+        y = y + 1
+        
+        -- Road settings
+        term.setCursorPos(1, y)
+        setColor(colors.lightBlue)
+        term.write(" W:")
+        setColor(colors.white)
+        term.write(tostring(data.roadWidth or 3))
+        term.write(" H:" .. (data.mineHeight or 5))
+        y = y + 1
+        
+        if data.roadBlockType then
+            term.setCursorPos(1, y)
+            local blockName = data.roadBlockType:gsub("minecraft:", ""):gsub("_", " ")
+            term.write(" " .. truncate(blockName, screenW - 2))
+        end
+        
+        -- Compact menu for pocket
+        local menuY = screenH - 4
+        setColor(colors.lightBlue)
+        term.setCursorPos(1, menuY)
+        term.write(" F:Fwd B:Bck U/D L/R")
+        term.setCursorPos(1, menuY + 1)
+        term.write(" W:Wid H:Home S:Stop")
+        term.setCursorPos(1, menuY + 2)
+        term.write(" I:Fill O:Dep <-:Back")
         setColor(colors.white)
     else
+        -- Full layout for computer
+        -- Position info
+        setColor(colors.lightBlue)
+        term.setCursorPos(2, y)
+        term.write("Position:")
+        setColor(colors.white)
+        y = y + 1
+        
+        if data.position then
+            term.setCursorPos(3, y)
+            term.write(string.format("X:%.0f Y:%.0f Z:%.0f", 
+                data.position.x or 0, 
+                data.position.y or 0, 
+                data.position.z or 0))
+            y = y + 1
+            term.setCursorPos(3, y)
+            term.write("Facing: " .. (data.facingName or "Unknown"))
+            if data.hasGPS then
+                setColor(colors.lime)
+                term.write(" [GPS]")
+                setColor(colors.white)
+            end
+        else
+            term.setCursorPos(3, y)
+            term.write("Unknown")
+        end
+        y = y + 2
+        
+        -- Status info
+        setColor(colors.lightBlue)
+        term.setCursorPos(2, y)
+        term.write("Status:")
+        setColor(colors.white)
+        y = y + 1
+        
+        term.setCursorPos(3, y)
+        local fuelPct = 0
+        if data.fuelLimit and data.fuelLimit > 0 then
+            fuelPct = math.floor((data.fuel or 0) / data.fuelLimit * 100)
+        end
+        term.write(string.format("Fuel: %d (%d%%)", data.fuel or 0, fuelPct))
+        y = y + 1
+        
+        if data.inventory then
+            term.setCursorPos(3, y)
+            term.write(string.format("Blocks: %d", data.inventory.roadBlockCount or 0))
+            y = y + 1
+        end
+        
+        if data.currentTask then
+            term.setCursorPos(3, y)
+            setColor(colors.yellow)
+            term.write("Task: " .. data.currentTask)
+            if data.taskTotal > 0 then
+                term.write(string.format(" (%d/%d)", data.taskProgress or 0, data.taskTotal))
+            end
+            setColor(colors.white)
+            y = y + 1
+        end
+        y = y + 1
+        
+        -- Road settings
+        setColor(colors.lightBlue)
+        term.setCursorPos(2, y)
+        term.write("Road Settings:")
+        setColor(colors.white)
+        y = y + 1
+        
+        term.setCursorPos(3, y)
+        term.write(string.format("Width: %d  Height: %d", 
+            data.roadWidth or 3, 
+            data.mineHeight or 5))
+        y = y + 1
+        
+        if data.roadBlockType then
+            term.setCursorPos(3, y)
+            local blockName = data.roadBlockType:gsub("minecraft:", ""):gsub("_", " ")
+            term.write("Block: " .. truncate(blockName, screenW - 10))
+        end
+        
         -- Full menu for computer
         local menuY = screenH - 6
         setColor(colors.lightBlue)
@@ -457,34 +554,54 @@ local function drawTurtleDetail()
         setColor(colors.white)
     end
     
-    drawFooter(" " .. label .. " | " .. os.date("%H:%M:%S"))
+    if isPocket then
+        drawFooter(" " .. truncate(label, screenW - 8) .. " " .. os.date("%H:%M"))
+    else
+        drawFooter(" " .. label .. " | " .. os.date("%H:%M:%S"))
+    end
 end
 
 local function promptNumber(prompt, default)
     inputMode = true
     clearScreen()
-    drawHeader("Enter Value")
     
-    setColor(colors.white)
-    term.setCursorPos(2, 4)
-    term.write(prompt)
-    term.setCursorPos(2, 6)
-    term.write("Default: " .. tostring(default or 0))
-    term.setCursorPos(2, 7)
-    setColor(colors.lightGray)
-    term.write("(Press Enter for default, Q to cancel)")
-    term.setCursorPos(2, 9)
-    setColor(colors.white)
-    term.write("> ")
+    if isPocket then
+        drawHeader("Enter Value")
+        setColor(colors.white)
+        term.setCursorPos(1, 3)
+        term.write(" " .. truncate(prompt, screenW - 2))
+        term.setCursorPos(1, 4)
+        term.write(" Def:" .. tostring(default or 0))
+        term.setCursorPos(1, 5)
+        setColor(colors.lightGray)
+        term.write(" Enter=OK Q=Cancel")
+        term.setCursorPos(1, 7)
+        setColor(colors.white)
+        term.write(" > ")
+    else
+        drawHeader("Enter Value")
+        setColor(colors.white)
+        term.setCursorPos(2, 4)
+        term.write(prompt)
+        term.setCursorPos(2, 6)
+        term.write("Default: " .. tostring(default or 0))
+        term.setCursorPos(2, 7)
+        setColor(colors.lightGray)
+        term.write("(Press Enter for default, Q to cancel)")
+        term.setCursorPos(2, 9)
+        setColor(colors.white)
+        term.write("> ")
+    end
     
     setColor(colors.yellow)
     term.setCursorBlink(true)
     
     local input = ""
-    local cursorX = 4
+    local cursorX = isPocket and 4 or 4
+    local cursorY = isPocket and 7 or 9
     
     while true do
-        term.setCursorPos(cursorX, 9)
+        term.setCursorPos(cursorX, cursorY)
         local event, param = os.pullEvent()
         
         if event == "char" then
@@ -501,7 +618,7 @@ local function promptNumber(prompt, default)
                 if #input > 0 then
                     input = input:sub(1, -2)
                     cursorX = cursorX - 1
-                    term.setCursorPos(cursorX, 9)
+                    term.setCursorPos(cursorX, cursorY)
                     term.write(" ")
                 end
             elseif param == keys.q then
@@ -527,30 +644,48 @@ end
 local function promptString(prompt, default)
     inputMode = true
     clearScreen()
-    drawHeader("Enter Value")
     
-    setColor(colors.white)
-    term.setCursorPos(2, 4)
-    term.write(prompt)
-    if default then
-        term.setCursorPos(2, 6)
-        term.write("Default: " .. tostring(default))
+    if isPocket then
+        drawHeader("Enter Value")
+        setColor(colors.white)
+        term.setCursorPos(1, 3)
+        term.write(" " .. truncate(prompt, screenW - 2))
+        if default then
+            term.setCursorPos(1, 4)
+            term.write(" Def:" .. truncate(tostring(default), screenW - 6))
+        end
+        term.setCursorPos(1, 5)
+        setColor(colors.lightGray)
+        term.write(" Enter=OK Q=Cancel")
+        term.setCursorPos(1, 7)
+        setColor(colors.white)
+        term.write(" > ")
+    else
+        drawHeader("Enter Value")
+        setColor(colors.white)
+        term.setCursorPos(2, 4)
+        term.write(prompt)
+        if default then
+            term.setCursorPos(2, 6)
+            term.write("Default: " .. tostring(default))
+        end
+        term.setCursorPos(2, 7)
+        setColor(colors.lightGray)
+        term.write("(Press Enter to confirm, Q to cancel)")
+        term.setCursorPos(2, 9)
+        setColor(colors.white)
+        term.write("> ")
     end
-    term.setCursorPos(2, 7)
-    setColor(colors.lightGray)
-    term.write("(Press Enter to confirm, Q to cancel)")
-    term.setCursorPos(2, 9)
-    setColor(colors.white)
-    term.write("> ")
     
     setColor(colors.yellow)
     term.setCursorBlink(true)
     
     local input = ""
-    local cursorX = 4
+    local cursorX = isPocket and 4 or 4
+    local cursorY = isPocket and 7 or 9
     
     while true do
-        term.setCursorPos(cursorX, 9)
+        term.setCursorPos(cursorX, cursorY)
         local event, param = os.pullEvent()
         
         if event == "char" then
@@ -564,7 +699,7 @@ local function promptString(prompt, default)
                 if #input > 0 then
                     input = input:sub(1, -2)
                     cursorX = cursorX - 1
-                    term.setCursorPos(cursorX, 9)
+                    term.setCursorPos(cursorX, cursorY)
                     term.write(" ")
                 end
             elseif param == keys.q then
