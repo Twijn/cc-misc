@@ -1,7 +1,7 @@
 --- SignShop Configuration UI ---
 --- Interactive configuration interface for SignShop using formui.
 ---
----@version 1.3.0
+---@version 1.4.0
 
 if not package.path:find("disk") then
     package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
@@ -13,6 +13,7 @@ local productManager = require("managers.product")
 local inventoryManager = require("managers.inventory")
 local aisleManager = require("managers.aisle")
 local signManager = require("managers.sign")
+local salesManager = require("managers.sales")
 
 local VERSION = ssVersion and ssVersion() or "unknown"
 
@@ -180,6 +181,11 @@ local function mainMenu()
         { label = "Add Product", action = "add_product" },
         { label = "Edit Product", action = "edit_product" },
         { label = "Delete Product", action = "delete_product" },
+        { separator = true, label = "--- Sales ---" },
+        { label = "View Sales Dashboard", action = "sales_dashboard" },
+        { label = "Recent Sales", action = "recent_sales" },
+        { label = "Top Products", action = "top_products" },
+        { label = "Top Buyers", action = "top_buyers" },
         { separator = true, label = "--- Signs ---" },
         { label = "View Signs", action = "view_signs" },
         { label = "Update All Signs", action = "signs" },
@@ -1411,6 +1417,410 @@ local function configureShopSync()
     end
 end
 
+--- Format a Krist amount nicely
+---@param amount number Amount in KRO
+---@return string Formatted string
+local function formatKRO(amount)
+    return string.format("%.03f KRO", amount or 0)
+end
+
+--- Format a timestamp nicely
+---@param timestamp number Unix timestamp in milliseconds
+---@return string Formatted date/time
+local function formatTime(timestamp)
+    if not timestamp then return "Unknown" end
+    -- Convert from epoch milliseconds to a relative time
+    local now = os.epoch("utc")
+    local diff = now - timestamp
+    
+    if diff < 60000 then
+        return "just now"
+    elseif diff < 3600000 then
+        return math.floor(diff / 60000) .. "m ago"
+    elseif diff < 86400000 then
+        return math.floor(diff / 3600000) .. "h ago"
+    else
+        return math.floor(diff / 86400000) .. "d ago"
+    end
+end
+
+--- Truncate a Krist address for display
+---@param address string Full address
+---@param maxLen? number Max length (default 12)
+---@return string Truncated address
+local function truncateAddress(address, maxLen)
+    maxLen = maxLen or 12
+    if not address then return "Unknown" end
+    if #address <= maxLen then return address end
+    return address:sub(1, maxLen - 2) .. ".."
+end
+
+--- Show sales dashboard with overview stats
+local function showSalesDashboard()
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        local w, h = term.getSize()
+        local stats = salesManager.getStats()
+        local todayStats = salesManager.getTodayStats()
+        
+        -- Title
+        term.setTextColor(colors.yellow)
+        print("=== Sales Dashboard ===")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        print()
+        
+        -- Overall stats
+        term.setTextColor(colors.yellow)
+        print("All Time Statistics:")
+        term.setTextColor(colors.lightBlue)
+        write("  Total Sales: ")
+        term.setTextColor(colors.white)
+        print(stats.totalSales or 0)
+        
+        term.setTextColor(colors.lightBlue)
+        write("  Total Revenue: ")
+        term.setTextColor(colors.green)
+        print(formatKRO(stats.totalRevenue))
+        
+        term.setTextColor(colors.lightBlue)
+        write("  Items Sold: ")
+        term.setTextColor(colors.white)
+        print(stats.totalItemsSold or 0)
+        
+        print()
+        
+        -- Today's stats
+        term.setTextColor(colors.yellow)
+        print("Today's Statistics:")
+        term.setTextColor(colors.lightBlue)
+        write("  Sales Today: ")
+        term.setTextColor(colors.white)
+        print(todayStats.sales or 0)
+        
+        term.setTextColor(colors.lightBlue)
+        write("  Revenue Today: ")
+        term.setTextColor(colors.green)
+        print(formatKRO(todayStats.revenue))
+        
+        term.setTextColor(colors.lightBlue)
+        write("  Items Sold Today: ")
+        term.setTextColor(colors.white)
+        print(todayStats.itemsSold or 0)
+        
+        print()
+        
+        -- Quick stats
+        local topProducts = salesManager.getTopProducts(3)
+        if #topProducts > 0 then
+            term.setTextColor(colors.yellow)
+            print("Top 3 Products:")
+            for i, prod in ipairs(topProducts) do
+                term.setTextColor(colors.white)
+                print(string.format("  %d. %s - %s (%d sold)", 
+                    i, prod.name or prod.meta, formatKRO(prod.revenue), prod.itemsSold or 0))
+            end
+            print()
+        end
+        
+        local topBuyers = salesManager.getTopBuyers(3)
+        if #topBuyers > 0 then
+            term.setTextColor(colors.yellow)
+            print("Top 3 Buyers:")
+            for i, buyer in ipairs(topBuyers) do
+                term.setTextColor(colors.white)
+                print(string.format("  %d. %s - %s", 
+                    i, truncateAddress(buyer.address, 15), formatKRO(buyer.totalSpent)))
+            end
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h - 1)
+        term.setTextColor(colors.gray)
+        print("Press Q to go back")
+        
+        local e, key = os.pullEvent("key")
+        if key == keys.q then
+            return
+        end
+    end
+end
+
+--- Show recent sales with scrolling
+local function showRecentSales()
+    local scroll = 0
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        local w, h = term.getSize()
+        local headerHeight = 3
+        local footerHeight = 2
+        local visibleHeight = h - headerHeight - footerHeight
+        
+        local sales = salesManager.getRecentSales(100)
+        
+        -- Title
+        term.setTextColor(colors.yellow)
+        print("=== Recent Sales ===")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        print()
+        
+        if #sales == 0 then
+            term.setTextColor(colors.gray)
+            print("No sales recorded yet.")
+        else
+            -- Clamp scroll
+            scroll = math.max(0, math.min(scroll, math.max(0, #sales - visibleHeight)))
+            
+            -- Draw sales
+            for i = scroll + 1, math.min(#sales, scroll + visibleHeight) do
+                local sale = sales[i]
+                local line = string.format("#%d %s - %s x%d = %s from %s",
+                    sale.id or i,
+                    formatTime(sale.timestamp),
+                    sale.productName or sale.productMeta or "?",
+                    sale.quantity or 0,
+                    formatKRO(sale.totalPrice),
+                    truncateAddress(sale.buyerAddress, 10))
+                
+                -- Truncate if too long
+                if #line > w - 1 then
+                    line = line:sub(1, w - 4) .. "..."
+                end
+                
+                term.setTextColor(colors.white)
+                print(line)
+            end
+            
+            -- Draw scroll indicators
+            term.setTextColor(colors.gray)
+            if scroll > 0 then
+                term.setCursorPos(w, headerHeight + 1)
+                write("^")
+            end
+            if scroll + visibleHeight < #sales then
+                term.setCursorPos(w, h - footerHeight)
+                write("v")
+            end
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h - 1)
+        term.setTextColor(colors.gray)
+        print("Up/Down: Scroll | Q: Back")
+        
+        local e, key = os.pullEvent("key")
+        if key == keys.q then
+            return
+        elseif key == keys.up then
+            scroll = scroll - 1
+        elseif key == keys.down then
+            scroll = scroll + 1
+        elseif key == keys.pageUp then
+            scroll = scroll - (visibleHeight - 1)
+        elseif key == keys.pageDown then
+            scroll = scroll + (visibleHeight - 1)
+        elseif key == keys.home then
+            scroll = 0
+        elseif key == keys["end"] then
+            scroll = #sales - visibleHeight
+        end
+    end
+end
+
+--- Show top products by revenue
+local function showTopProducts()
+    local scroll = 0
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        local w, h = term.getSize()
+        local headerHeight = 3
+        local footerHeight = 2
+        local visibleHeight = h - headerHeight - footerHeight
+        
+        local products = salesManager.getTopProducts(50)
+        
+        -- Title
+        term.setTextColor(colors.yellow)
+        print("=== Top Products by Revenue ===")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        print()
+        
+        if #products == 0 then
+            term.setTextColor(colors.gray)
+            print("No product sales recorded yet.")
+        else
+            -- Clamp scroll
+            scroll = math.max(0, math.min(scroll, math.max(0, #products - visibleHeight)))
+            
+            -- Draw products
+            for i = scroll + 1, math.min(#products, scroll + visibleHeight) do
+                local prod = products[i]
+                local rank = i
+                
+                -- Format: #1 Product Name - 123.456 KRO (45 sales, 120 items)
+                local line = string.format("#%d %s - %s (%d sales, %d items)",
+                    rank,
+                    prod.name or prod.meta or "?",
+                    formatKRO(prod.revenue),
+                    prod.sales or 0,
+                    prod.itemsSold or 0)
+                
+                -- Truncate if too long
+                if #line > w - 1 then
+                    line = line:sub(1, w - 4) .. "..."
+                end
+                
+                -- Color based on rank
+                if rank <= 3 then
+                    term.setTextColor(colors.green)
+                elseif rank <= 10 then
+                    term.setTextColor(colors.yellow)
+                else
+                    term.setTextColor(colors.white)
+                end
+                print(line)
+            end
+            
+            -- Draw scroll indicators
+            term.setTextColor(colors.gray)
+            if scroll > 0 then
+                term.setCursorPos(w, headerHeight + 1)
+                write("^")
+            end
+            if scroll + visibleHeight < #products then
+                term.setCursorPos(w, h - footerHeight)
+                write("v")
+            end
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h - 1)
+        term.setTextColor(colors.gray)
+        print("Up/Down: Scroll | Q: Back")
+        
+        local e, key = os.pullEvent("key")
+        if key == keys.q then
+            return
+        elseif key == keys.up then
+            scroll = scroll - 1
+        elseif key == keys.down then
+            scroll = scroll + 1
+        elseif key == keys.pageUp then
+            scroll = scroll - (visibleHeight - 1)
+        elseif key == keys.pageDown then
+            scroll = scroll + (visibleHeight - 1)
+        elseif key == keys.home then
+            scroll = 0
+        elseif key == keys["end"] then
+            scroll = #products - visibleHeight
+        end
+    end
+end
+
+--- Show top buyers by total spent
+local function showTopBuyers()
+    local scroll = 0
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        local w, h = term.getSize()
+        local headerHeight = 3
+        local footerHeight = 2
+        local visibleHeight = h - headerHeight - footerHeight
+        
+        local buyers = salesManager.getTopBuyers(50)
+        
+        -- Title
+        term.setTextColor(colors.yellow)
+        print("=== Top Buyers by Spending ===")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        print()
+        
+        if #buyers == 0 then
+            term.setTextColor(colors.gray)
+            print("No buyer data recorded yet.")
+        else
+            -- Clamp scroll
+            scroll = math.max(0, math.min(scroll, math.max(0, #buyers - visibleHeight)))
+            
+            -- Draw buyers
+            for i = scroll + 1, math.min(#buyers, scroll + visibleHeight) do
+                local buyer = buyers[i]
+                local rank = i
+                
+                -- Format: #1 k1234abcd... - 123.456 KRO (45 purchases, 120 items)
+                local line = string.format("#%d %s - %s (%d purchases, %d items)",
+                    rank,
+                    truncateAddress(buyer.address, 14),
+                    formatKRO(buyer.totalSpent),
+                    buyer.purchases or 0,
+                    buyer.itemsBought or 0)
+                
+                -- Truncate if too long
+                if #line > w - 1 then
+                    line = line:sub(1, w - 4) .. "..."
+                end
+                
+                -- Color based on rank
+                if rank <= 3 then
+                    term.setTextColor(colors.green)
+                elseif rank <= 10 then
+                    term.setTextColor(colors.yellow)
+                else
+                    term.setTextColor(colors.white)
+                end
+                print(line)
+            end
+            
+            -- Draw scroll indicators
+            term.setTextColor(colors.gray)
+            if scroll > 0 then
+                term.setCursorPos(w, headerHeight + 1)
+                write("^")
+            end
+            if scroll + visibleHeight < #buyers then
+                term.setCursorPos(w, h - footerHeight)
+                write("v")
+            end
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h - 1)
+        term.setTextColor(colors.gray)
+        print("Up/Down: Scroll | Q: Back")
+        
+        local e, key = os.pullEvent("key")
+        if key == keys.q then
+            return
+        elseif key == keys.up then
+            scroll = scroll - 1
+        elseif key == keys.down then
+            scroll = scroll + 1
+        elseif key == keys.pageUp then
+            scroll = scroll - (visibleHeight - 1)
+        elseif key == keys.pageDown then
+            scroll = scroll + (visibleHeight - 1)
+        elseif key == keys.home then
+            scroll = 0
+        elseif key == keys["end"] then
+            scroll = #buyers - visibleHeight
+        end
+    end
+end
+
 --- Main configuration loop
 function config.run()
     while true do
@@ -1424,6 +1834,14 @@ function config.run()
             editProduct()
         elseif action == "delete_product" then
             deleteProduct()
+        elseif action == "sales_dashboard" then
+            showSalesDashboard()
+        elseif action == "recent_sales" then
+            showRecentSales()
+        elseif action == "top_products" then
+            showTopProducts()
+        elseif action == "top_buyers" then
+            showTopBuyers()
         elseif action == "view_signs" then
             viewSigns()
         elseif action == "refresh_product_sign" then

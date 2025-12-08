@@ -1,7 +1,7 @@
 --- SignShop Server ---
 --- Main server component that manages aisles, inventory, products, and purchases.
 ---
----@version 1.3.0
+---@version 1.4.0
 -- @module signshop-server
 
 local VERSION = "1.3.0"

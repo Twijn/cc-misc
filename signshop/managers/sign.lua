@@ -1,7 +1,7 @@
 --- SignShop Sign Manager ---
 --- Manages shop signs and updates them with product/stock information.
 ---
----@version 1.1.0
+---@version 1.4.0
 
 local logger = require("lib.log")
 local persist = require("lib.persist")

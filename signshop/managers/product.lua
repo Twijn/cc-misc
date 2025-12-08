@@ -1,7 +1,7 @@
 --- SignShop Product Manager ---
 --- Manages product definitions and metadata.
 ---
----@version 1.1.0
+---@version 1.4.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")

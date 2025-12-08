@@ -1,7 +1,7 @@
 --- SignShop Purchase Manager ---
 --- Handles Krist transactions and item dispensing.
 ---
----@version 1.1.0
+---@version 1.4.0
 
 local s = require("lib.s")
 local logger = require("lib.log")
@@ -9,6 +9,7 @@ local persist = require("lib.persist")
 
 local productManager = require("managers.product")
 local inventoryManager = require("managers.inventory")
+local salesManager = require("managers.sales")
 
 -- Check if this is first run or settings are missing
 local needsSetup = not settings.get("shopk.private")
@@ -140,6 +141,8 @@ shopk.on("transaction", function(transaction)
       end
 
       if dispensed > 0 then
+        -- Record the sale
+        salesManager.recordSale(product, dispensed, transaction, refundAmount)
         os.queueEvent("purchase", product, dispensed, transaction, refundAmount)
       end
       return
