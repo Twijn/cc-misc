@@ -436,7 +436,7 @@ local function drawTurtleDetail()
         term.setCursorPos(2, menuY + 2)
         term.write("[H] Home [S] Stop [I] Refill")
         term.setCursorPos(2, menuY + 3)
-        term.write("[ESC] Back to list")
+        term.write("[Backspace] Back to list")
         setColor(colors.white)
     else
         -- Full menu for computer
@@ -453,7 +453,7 @@ local function drawTurtleDetail()
         term.setCursorPos(2, menuY + 4)
         term.write("[H] Go Home [G] Set Home [I] Refill [O] Deposit")
         term.setCursorPos(2, menuY + 5)
-        term.write("[S] Stop  [ESC] Back")
+        term.write("[S] Stop  [Backspace] Back")
         setColor(colors.white)
     end
     
@@ -472,7 +472,7 @@ local function promptNumber(prompt, default)
     term.write("Default: " .. tostring(default or 0))
     term.setCursorPos(2, 7)
     setColor(colors.lightGray)
-    term.write("(Press Enter for default, Esc to cancel)")
+    term.write("(Press Enter for default, Q to cancel)")
     term.setCursorPos(2, 9)
     setColor(colors.white)
     term.write("> ")
@@ -504,7 +504,7 @@ local function promptNumber(prompt, default)
                     term.setCursorPos(cursorX, 9)
                     term.write(" ")
                 end
-            elseif param == keys.escape then
+            elseif param == keys.q then
                 term.setCursorBlink(false)
                 setColor(colors.white)
                 inputMode = false
@@ -538,7 +538,7 @@ local function promptString(prompt, default)
     end
     term.setCursorPos(2, 7)
     setColor(colors.lightGray)
-    term.write("(Press Enter to confirm, Esc to cancel)")
+    term.write("(Press Enter to confirm, Q to cancel)")
     term.setCursorPos(2, 9)
     setColor(colors.white)
     term.write("> ")
@@ -567,7 +567,7 @@ local function promptString(prompt, default)
                     term.setCursorPos(cursorX, 9)
                     term.write(" ")
                 end
-            elseif param == keys.escape then
+            elseif param == keys.q then
                 term.setCursorBlink(false)
                 setColor(colors.white)
                 inputMode = false
@@ -643,7 +643,7 @@ local function handleMainMenuKey(key)
 end
 
 local function handleTurtleDetailKey(key)
-    if key == keys.escape or key == keys.backspace then
+    if key == keys.backspace then
         selectedTurtle = nil
         currentView = "main"
         
