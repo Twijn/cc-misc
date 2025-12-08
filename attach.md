@@ -59,6 +59,18 @@ Find and wrap a peripheral by type, equipping it as a tool if necessary
 
 **Returns:** string|nil # Error message if peripheral was not found
 
+### `module.getScanner()`
+
+Get a plethora block scanner if available Returns a cached scanner proxy if already found, otherwise tries to find and wrap one
+
+**Returns:** table|nil # A scanner proxy with scan() method, or nil if not found
+
+### `module.hasScanner()`
+
+Check if a plethora scanner is available
+
+**Returns:** boolean # True if a scanner is available
+
 ### `module._debug()`
 
 Print debug information about the module state, peripherals, and inventory Pauses between sections for user to read (press Enter to continue)

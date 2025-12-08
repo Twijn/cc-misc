@@ -776,7 +776,7 @@
     },
     "attach": {
       "name": "attach",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "A turtle utility module for ComputerCraft that provides safe block interaction, automatic tool management, and peripheral handling for turtles. Features: Automatic tool equipping based on action type (dig, attack, place), unsafe block protection to prevent accidentally digging storage blocks, peripheral auto-placement and wrapping, modem protection (never unequips modems), configurable default and always-equipped tools, and proxy wrappers for peripherals.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/attach.lua",
@@ -845,11 +845,25 @@
           "line": 393
         },
         {
+          "name": "module.getScanner",
+          "params": [],
+          "returns": "table|nil # A scanner proxy with scan() method, or nil if not found",
+          "description": "Get a plethora block scanner if available Returns a cached scanner proxy if already found, otherwise tries to find and wrap one",
+          "line": 461
+        },
+        {
+          "name": "module.hasScanner",
+          "params": [],
+          "returns": "boolean # True if a scanner is available",
+          "description": "Check if a plethora scanner is available",
+          "line": 492
+        },
+        {
           "name": "module._debug",
           "params": [],
           "returns": "",
           "description": "Print debug information about the module state, peripherals, and inventory Pauses between sections for user to read (press Enter to continue)",
-          "line": 461
+          "line": 501
         }
       ],
       "classes": []
@@ -1553,5 +1567,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-08T00:09:19Z"
+  "updated": "2025-12-08T05:25:35Z"
 }
