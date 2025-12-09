@@ -13,10 +13,10 @@
 ---local name = s.string("server_name", "MyServer")
 ---local enabled = s.boolean("enabled")
 ---
----@version 2.0.1
+---@version 2.0.2
 -- @module s
 
-local VERSION = "2.0.1"
+local VERSION = "2.0.2"
 
 local module = {}
 
@@ -262,10 +262,11 @@ function module.useForm(title)
     ---@return function # Getter function that returns the number value
     function formInterface.number(name, from, to, default)
         local existingValue = settings.get(name)
-        local field = form:number(name, existingValue or default or 0)
+        local validator = nil
         if from or to then
-            field.validate = formui.validation.number_range(from or -math.huge, to or math.huge)
+            validator = formui.validation.number_range(from or -math.huge, to or math.huge)
         end
+        local field = form:number(name, existingValue or default or 0, validator)
         return function()
             local value = field()
             if value then
