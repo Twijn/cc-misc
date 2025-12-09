@@ -579,7 +579,7 @@
     },
     "s": {
       "name": "s",
-      "version": "2.0.1",
+      "version": "2.0.2",
       "description": "A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.",
       "dependencies": [
         "formui"
@@ -749,7 +749,7 @@
           ],
           "returns": "function # Getter function that returns the string value",
           "description": "Add a string field to the form",
-          "line": 279
+          "line": 280
         },
         {
           "name": "formInterface.boolean",
@@ -762,14 +762,14 @@
           ],
           "returns": "function # Getter function that returns the boolean value",
           "description": "Add a boolean field to the form",
-          "line": 296
+          "line": 297
         },
         {
           "name": "formInterface.submit",
           "params": [],
           "returns": "boolean # True if submitted, false if cancelled",
           "description": "Add submit and cancel buttons, then run the form",
-          "line": 314
+          "line": 315
         }
       ],
       "classes": []
@@ -1567,5 +1567,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-08T05:25:35Z"
+  "updated": "2025-12-09T03:56:43Z"
 }

@@ -1,6 +1,6 @@
 {
   "name": "s",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "description": "A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.",
   "dependencies": [
     "formui"
