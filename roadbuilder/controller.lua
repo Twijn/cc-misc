@@ -1,18 +1,18 @@
 --- RBC Controller Program
 --- Pocket computer / computer interface for controlling RBC turtles
 ---
----@version 1.2.0
+---@version 1.2.1
 ---@usage
 --- wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/install.lua
 --- Then run: controller
 ---
 
-local CONTROLLER_VERSION = "1.2.0"
+local CONTROLLER_VERSION = "1.2.1"
 local CONTROLLER_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/controller.lua"
 
 -- Set up library path
 if not package.path:find("lib") then
-    package.path = package.path .. ";lib/?.lua;lib/?/init.lua"
+    package.path = package.path .. ";/lib/?.lua;/lib/?/init.lua"
 end
 
 -- Load libraries

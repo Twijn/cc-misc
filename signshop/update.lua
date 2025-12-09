@@ -9,7 +9,7 @@
 ---update signshop   -- Update only SignShop files
 ---
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local BASE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main"
 
 local args = {...}
@@ -17,7 +17,7 @@ local mode = args[1] or "all"
 
 -- Adjust package path for disk-based installations
 if not package.path:find("disk") then
-    package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
+    package.path = package.path .. ";/disk/?.lua;/disk/lib/?.lua"
 end
 
 -- Try to use the updater library for libs

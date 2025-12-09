@@ -4,13 +4,13 @@
 --- For disk-based installations, this script runs from the disk drive and
 --- automatically starts either the aisle (turtle) or server (computer) component.
 ---
----@version 1.4.0
+---@version 1.4.1
 
 print("SignShop - Starting from disk...")
 
 -- Adjust package path for disk-based installations
 if not package.path:find("disk") then
-    package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
+    package.path = package.path .. ";/disk/?.lua;/disk/lib/?.lua"
 end
 
 local start = shell.openTab or shell.run

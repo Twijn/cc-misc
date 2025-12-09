@@ -1,16 +1,16 @@
 --- SignShop Aisle ---
 --- Turtle component that dispenses items and responds to server pings.
 ---
----@version 1.4.0
+---@version 1.4.1
 -- @module signshop-aisle
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 local dropFunc = turtle.dropUp
 
 -- Adjust package path for disk-based installations
 if not package.path:find("disk") then
-    package.path = package.path .. ";disk/?.lua;disk/lib/?.lua"
+    package.path = package.path .. ";/disk/?.lua;/disk/lib/?.lua"
 end
 
 local s = require("lib.s")

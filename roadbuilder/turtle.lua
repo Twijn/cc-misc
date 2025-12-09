@@ -1,18 +1,18 @@
 --- RBC Turtle Program
 --- Main turtle program for building roads with wireless control
 ---
----@version 1.2.0
+---@version 1.2.1
 ---@usage
 --- wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/install.lua
 --- Then run: turtle
 ---
 
-local TURTLE_VERSION = "1.2.0"
+local TURTLE_VERSION = "1.2.1"
 local TURTLE_UPDATE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main/roadbuilder/turtle.lua"
 
 -- Set up library path
 if not package.path:find("lib") then
-    package.path = package.path .. ";lib/?.lua;lib/?/init.lua"
+    package.path = package.path .. ";/lib/?.lua;/lib/?/init.lua"
 end
 
 -- Load libraries
