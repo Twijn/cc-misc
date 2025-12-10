@@ -27,7 +27,7 @@
 ---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
----@version 0.3.2
+---@version 0.3.3
 -- @module formui
 
 ---@class FormField
@@ -46,7 +46,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.3.2"
+local VERSION = "0.3.3"
 local FormUI = { _v = VERSION }
 FormUI.__index = FormUI
 
@@ -474,13 +474,50 @@ function FormUI:draw()
         self.scrollOffset = 0
     end
     
-    -- Calculate how many lines each field takes
+    -- Calculate how many lines each field takes (accounting for text wrapping)
     local fieldLines = {}
     local totalLines = 0
     for i, f in ipairs(self.fields) do
         local lines = 1  -- Base field line
+        
+        -- Calculate actual display text to determine wrapping
+        local displayText = ""
+        if f.type == "label" then
+            displayText = "  " .. f.text
+        elseif f.type == "button" then
+            displayText = "[ " .. f.text .. " ]"
+        else
+            local display = ""
+            if f.type == "text" or f.type == "number" then
+                display = tostring(f.value)
+            elseif f.type == "select" or f.type == "peripheral" then
+                local opts = f.options or {}
+                display = (#opts > 0) and tostring(opts[f.value]) or "(none)"
+            elseif f.type == "checkbox" then
+                display = f.value and "[X]" or "[ ]"
+            elseif f.type == "multiselect" then
+                local opts = f.options or {}
+                local sel = {}
+                for idx, v in ipairs(opts) do
+                    if f.value[idx] then table.insert(sel, v) end
+                end
+                display = (#sel > 0) and table.concat(sel, ", ") or "(none)"
+            elseif f.type == "list" then
+                display = (#f.value > 0) and ("[" .. table.concat(f.value, ", ") .. "]") or "(empty)"
+            end
+            displayText = "> " .. f.label .. ": " .. display
+            if display == "" then
+                displayText = displayText .. "< no value >"
+            end
+        end
+        
+        -- Calculate how many lines this text will take
+        lines = math.ceil(#displayText / w)
+        if lines < 1 then lines = 1 end
+        
         if f.label and self.errors[f.label] then
-            lines = lines + 1  -- Error message line
+            local errorText = "! " .. self.errors[f.label]
+            lines = lines + math.ceil(#errorText / w)
         end
         fieldLines[i] = lines
         totalLines = totalLines + lines
@@ -537,16 +574,26 @@ function FormUI:draw()
         end
         
         -- Check if this field is in the visible area
-        if currentLine >= self.scrollOffset and currentLine < self.scrollOffset + availableLines then
+        local fieldStartLine = currentLine
+        local fieldEndLine = currentLine + fieldLines[i] - 1
+        
+        -- Only draw if at least part of the field is visible
+        if fieldEndLine >= self.scrollOffset and fieldStartLine < self.scrollOffset + availableLines then
             local y = headerLines + 1 + (currentLine - self.scrollOffset)
-            term.setCursorPos(1, y)
             
             if f.type == "label" then
                 -- Labels are shown in light gray and not selectable
                 term.setTextColor(colors.lightGray)
-                print("  " .. f.text)
+                local labelText = "  " .. f.text
+                -- Truncate to fit on one line
+                labelText = truncate(labelText, w - 1)
+                term.setCursorPos(1, y)
+                term.clearLine()
+                term.write(labelText)
             elseif f.type == "button" then
                 -- Buttons are shown with special styling
+                term.setCursorPos(1, y)
+                term.clearLine()
                 if i == self.selected then
                     term.setTextColor(colors.black)
                     term.setBackgroundColor(colors.white)
@@ -556,7 +603,6 @@ function FormUI:draw()
                     term.setTextColor(colors.lightBlue)
                     write("[ " .. f.text .. " ]")
                 end
-                print()
             else
                 if f.label and self.errors[f.label] then
                     term.setTextColor(colors.red)
@@ -565,16 +611,29 @@ function FormUI:draw()
                 else
                     term.setTextColor(colors.white)
                 end
-                write(prefix .. f.label .. ": " .. display)
-
+                
+                local fullText = prefix .. f.label .. ": " .. display
                 if display == "" then
-                    if term.getTextColor() == colors.white then
-                        term.setTextColor(colors.lightGray)
-                    end
-                    print("< no value >")
-                else print() end
+                    local noValueColor = (term.getTextColor() == colors.white) and colors.lightGray or term.getTextColor()
+                    fullText = prefix .. f.label .. ": "
+                    -- Truncate main part
+                    fullText = truncate(fullText, w - 12) -- Leave room for "< no value >"
+                    term.setCursorPos(1, y)
+                    term.clearLine()
+                    term.write(fullText)
+                    term.setTextColor(noValueColor)
+                    term.write("< no value >")
+                else
+                    -- Truncate to fit on one line
+                    fullText = truncate(fullText, w - 1)
+                    term.setCursorPos(1, y)
+                    term.clearLine()
+                    term.write(fullText)
+                end
             end
         end
+        
+        -- Account for the lines this field takes (using pre-calculated value, but capped at 1 for simplicity)
         currentLine = currentLine + 1
         
         -- Draw error message if visible
@@ -582,8 +641,10 @@ function FormUI:draw()
             if currentLine >= self.scrollOffset and currentLine < self.scrollOffset + availableLines then
                 local y = headerLines + 1 + (currentLine - self.scrollOffset)
                 term.setCursorPos(1, y)
+                term.clearLine()
                 term.setTextColor(colors.red)
-                print("! " .. self.errors[f.label])
+                local errorText = truncate("! " .. self.errors[f.label], w - 1)
+                term.write(errorText)
             end
             currentLine = currentLine + 1
         end
@@ -636,12 +697,12 @@ function FormUI:edit(index)
         term.setTextColor(colors.white)
         print(prompt .. ":")
         term.setTextColor(colors.lightGray)
+        local currentValue = tostring(f.value)
+        print("Current: " .. (currentValue ~= "" and currentValue or "(empty)"))
         print("(Press Enter to confirm, or type \\c to cancel)")
         term.setTextColor(colors.white)
         write("> ")
-        -- Pre-fill with current value for better UX
-        local currentValue = tostring(f.value)
-        local input = read(nil, nil, nil, currentValue)
+        local input = read()
         
         -- Check for cancel command
         if input == "\\c" or input == nil then
