@@ -117,27 +117,6 @@
       "classes": []
     },
     {
-      "name": "errors",
-      "version": "1.5.0",
-      "description": "SignShop Error Handling Library --- Provides standardized error handling patterns across all managers. Features: Structured error types, success/error result wrappers, error checking utilities, and function wrapping for error handling.",
-      "dependencies": [],
-      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/errors.lua",
-      "documentation_url": "https://ccmisc.twijn.dev/errors.html",
-      "functions": [
-        "errors.create",
-        "errors.success",
-        "errors.isError",
-        "errors.isSuccess",
-        "errors.getMessage",
-        "errors.getType",
-        "errors.unwrap",
-        "errors.wrap",
-        "errors.fromLegacy",
-        "errors.format"
-      ],
-      "classes": []
-    },
-    {
       "name": "attach",
       "version": "1.0.3",
       "description": "A turtle utility module for ComputerCraft that provides safe block interaction, automatic tool management, and peripheral handling for turtles. Features: Automatic tool equipping based on action type (dig, attack, place), unsafe block protection to prevent accidentally digging storage blocks, peripheral auto-placement and wrapping, modem protection (never unequips modems), configurable default and always-equipped tools, and proxy wrappers for peripherals.",
@@ -257,5 +236,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-12-13T05:19:37Z"
+  "updated": "2025-12-13T05:24:48Z"
 }
