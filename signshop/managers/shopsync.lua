@@ -1,7 +1,7 @@
 --- SignShop ShopSync Manager ---
 --- Broadcasts shop data to the ShopSync network.
 ---
----@version 1.4.2
+---@version 1.5.0
 
 local s = require("lib.s")
 local logger = require("lib.log")
