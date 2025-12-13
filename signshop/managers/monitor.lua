@@ -351,28 +351,47 @@ local function drawRecentSales(y, limit)
         drawText(2, y, "(no sales yet)", colors.gray)
         y = y + 1
     else
+        local indent = monitorWidth >= 20 and 2 or 1
+        local availableWidth = monitorWidth - indent
+        
         for i, sale in ipairs(sales) do
             if y >= monitorHeight - 1 then break end
             
+            -- Build the line dynamically based on available width
+            local qty = string.format("x%d", sale.quantity or 0)
+            local time = formatTime(sale.timestamp)
+            local product = sale.productName or "?"
+            local buyer = truncateAddress(sale.buyerAddress, 10)
+            
             local line
-            if monitorWidth >= 50 then
-                -- Wide: full details
-                line = string.format("%s x%d %s - %s",
-                    formatTime(sale.timestamp),
-                    sale.quantity or 0,
-                    sale.productName or "?",
-                    truncateAddress(sale.buyerAddress, 8))
-            elseif monitorWidth >= 30 then
-                -- Medium: product and quantity
-                line = string.format("x%d %s",
-                    sale.quantity or 0,
-                    sale.productName or "?")
+            if availableWidth >= 60 then
+                -- Very wide: full details with price
+                line = string.format("%s %s %s - %s %s", time, qty, product, formatKRO(sale.totalPrice), buyer)
+            elseif availableWidth >= 45 then
+                -- Wide: time, qty, product, buyer
+                line = string.format("%s %s %s - %s", time, qty, product, buyer)
+            elseif availableWidth >= 30 then
+                -- Medium: qty, product, truncated buyer
+                local maxProduct = availableWidth - #qty - 10
+                if #product > maxProduct then
+                    product = product:sub(1, maxProduct - 2) .. ".."
+                end
+                line = string.format("%s %s - %s", qty, product, truncateAddress(sale.buyerAddress, 6))
+            elseif availableWidth >= 18 then
+                -- Narrow: qty and product only
+                local maxProduct = availableWidth - #qty - 1
+                if #product > maxProduct then
+                    product = product:sub(1, maxProduct - 2) .. ".."
+                end
+                line = string.format("%s %s", qty, product)
             else
-                -- Small: just product name truncated
-                line = sale.productName or "?"
+                -- Very narrow: just product truncated
+                if #product > availableWidth then
+                    product = product:sub(1, availableWidth - 2) .. ".."
+                end
+                line = product
             end
             
-            local indent = monitorWidth >= 20 and 2 or 1
             drawText(indent, y, line)
             y = y + 1
         end
@@ -456,13 +475,9 @@ local function drawAisleHealth(y)
         y = y + 1
     end
     
-    local hasAisles = false
-    local aisleCount = 0
+    -- Collect aisle data first
+    local aisleList = {}
     for name, aisle in pairs(aisles) do
-        aisleCount = aisleCount + 1
-        if y >= monitorHeight then break end
-        hasAisles = true
-        
         local health = aisleManager.getAisleHealth and aisleManager.getAisleHealth(name) or "unknown"
         local healthColor = colors.gray
         local symbol = "?"
@@ -478,18 +493,89 @@ local function drawAisleHealth(y)
             symbol = "!"
         end
         
-        local indent = monitorWidth >= 20 and 2 or 1
-        if monitorWidth >= 20 then
-            drawText(indent, y, string.format("[%s] %s", symbol, name), healthColor)
-        else
-            drawText(indent, y, string.format("%s%s", symbol, name:sub(1, monitorWidth - 2)), healthColor)
-        end
-        y = y + 1
+        table.insert(aisleList, {
+            name = name,
+            symbol = symbol,
+            color = healthColor
+        })
     end
     
-    if not hasAisles then
+    -- Sort aisles by name
+    table.sort(aisleList, function(a, b) return a.name < b.name end)
+    
+    if #aisleList == 0 then
         local indent = monitorWidth >= 20 and 2 or 1
         drawText(indent, y, "(no aisles)", colors.gray)
+        y = y + 1
+        return y
+    end
+    
+    local indent = monitorWidth >= 20 and 2 or 1
+    local availableWidth = monitorWidth - indent
+    
+    -- Calculate how many aisles can fit per line
+    -- Format: "[+] Name" = 4 + name length, with 2 spaces between items
+    local maxNameLen = 0
+    for _, aisle in ipairs(aisleList) do
+        maxNameLen = math.max(maxNameLen, #aisle.name)
+    end
+    
+    -- Determine item width and items per row
+    local itemWidth
+    if monitorWidth >= 40 then
+        -- Wide: show full names with brackets
+        itemWidth = math.min(maxNameLen + 5, 20)  -- "[+] Name" + padding
+    elseif monitorWidth >= 25 then
+        -- Medium: shorter format
+        itemWidth = math.min(maxNameLen + 3, 12)  -- "+Name" + padding
+    else
+        -- Narrow: very compact
+        itemWidth = math.min(maxNameLen + 2, 8)
+    end
+    
+    local itemsPerRow = math.max(1, math.floor(availableWidth / itemWidth))
+    
+    -- Draw aisles in rows
+    local col = 0
+    local currentX = indent
+    
+    for i, aisle in ipairs(aisleList) do
+        if y >= monitorHeight then break end
+        
+        local displayName = aisle.name
+        local maxDisplayLen = itemWidth - 4  -- Account for symbol and spacing
+        if #displayName > maxDisplayLen then
+            displayName = displayName:sub(1, maxDisplayLen - 1) .. "."
+        end
+        
+        local text
+        if monitorWidth >= 40 then
+            text = string.format("[%s] %s", aisle.symbol, displayName)
+        else
+            text = string.format("%s%s", aisle.symbol, displayName)
+        end
+        
+        -- Pad to item width for alignment (except last item in row)
+        if col < itemsPerRow - 1 and i < #aisleList then
+            text = text .. string.rep(" ", math.max(0, itemWidth - #text))
+        end
+        
+        monitor.setCursorPos(currentX, y)
+        monitor.setTextColor(aisle.color)
+        monitor.write(text)
+        
+        col = col + 1
+        currentX = currentX + itemWidth
+        
+        if col >= itemsPerRow then
+            col = 0
+            currentX = indent
+            y = y + 1
+        end
+    end
+    
+    -- Move to next line if we didn't just do so
+    if col > 0 then
         y = y + 1
     end
     
