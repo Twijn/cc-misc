@@ -79,6 +79,8 @@ local function updateSignShop()
         {url = BASE_URL .. "/signshop/server.lua", path = diskPrefix .. "server.lua"},
         {url = BASE_URL .. "/signshop/startup.lua", path = diskPrefix .. "startup.lua"},
         {url = BASE_URL .. "/signshop/update.lua", path = diskPrefix .. "update.lua"},
+        -- SignShop lib files
+        {url = BASE_URL .. "/signshop/lib/errors.lua", path = diskPrefix .. "lib/errors.lua"},
         -- Manager files
         {url = BASE_URL .. "/signshop/managers/aisle.lua", path = diskPrefix .. "managers/aisle.lua"},
         {url = BASE_URL .. "/signshop/managers/inventory.lua", path = diskPrefix .. "managers/inventory.lua"},
