@@ -1,11 +1,13 @@
 --- SignShop Purchase Manager ---
 --- Handles Krist transactions and item dispensing.
+--- Includes pending transaction tracking for graceful shutdown.
 ---
----@version 1.4.0
+---@version 1.5.0
 
 local s = require("lib.s")
 local logger = require("lib.log")
 local persist = require("lib.persist")
+local errors = require("lib.errors")
 
 local productManager = require("managers.product")
 local inventoryManager = require("managers.inventory")
@@ -41,6 +43,8 @@ end
 local shopk = require("lib.shopk")(shopkConfig)
 
 local awaitingRefunds = persist("awaiting-refunds.txt", true)
+local pendingTransactions = persist("pending-transactions.json", false)
+local inFlightTransactions = {}
 
 local manager = {
   address = nil,
@@ -52,6 +56,31 @@ local manager = {
     shopk.close()
   end,
 }
+
+--- Save pending transactions before shutdown
+function manager.beforeShutdown()
+  if next(inFlightTransactions) then
+    logger.warn("Saving " .. #inFlightTransactions .. " in-flight transactions")
+    pendingTransactions.setAll(inFlightTransactions)
+  end
+end
+
+--- Check for pending transactions from previous shutdown
+local function checkPendingTransactions()
+  local pending = pendingTransactions.getAll()
+  if pending and next(pending) then
+    logger.warn("Found pending transactions from previous session:")
+    for tid, details in pairs(pending) do
+      logger.warn(string.format("  Transaction #%s from %s: %.03f KRO for %s", 
+        tid, details.from or "?", details.value or 0, details.product or "?"))
+    end
+    -- Clear pending after logging
+    pendingTransactions.setAll({})
+  end
+end
+
+-- Check for pending transactions on load
+checkPendingTransactions()
 
 function manager.refundAwaiting()
   local currentRefunds = awaitingRefunds.getAll()
@@ -126,14 +155,37 @@ shopk.on("transaction", function(transaction)
           transaction.from
         )
       )
-      local dispensed = inventoryManager.dispense(product, purchased)
+      
+      -- Track in-flight transaction
+      inFlightTransactions[transaction.id] = {
+        id = transaction.id,
+        from = transaction.from,
+        value = transaction.value,
+        product = meta,
+        timestamp = os.epoch("utc"),
+      }
+      
+      local result = inventoryManager.dispense(product, purchased)
+      local dispensed = 0
+      
+      if errors.isError(result) then
+        logger.warn(string.format("Dispense error: %s", result.message))
+        dispensed = 0
+      else
+        dispensed = result.data.dispensed
+      end
+      
       local refundAmount = transaction.value - (product.cost * dispensed)
 
       local refundMessage = "Here is your refund for items that could not be dispensed!"
       if product.cost > transaction.value then
         refundMessage = string.format("You must purchase at least one of %s!", productManager.getName(product))
       elseif dispensed == 0 then
-        refundMessage = string.format("Item %s is out of stock!", productManager.getName(product))
+        if errors.isError(result) and result.type == errors.types.AISLE_OFFLINE then
+          refundMessage = string.format("Aisle %s is currently offline! Please try again later.", product.aisleName)
+        else
+          refundMessage = string.format("Item %s is out of stock!", productManager.getName(product))
+        end
       end
 
       if refundAmount > 0 then
@@ -145,6 +197,10 @@ shopk.on("transaction", function(transaction)
         salesManager.recordSale(product, dispensed, transaction, refundAmount)
         os.queueEvent("purchase", product, dispensed, transaction, refundAmount)
       end
+      
+      -- Remove from in-flight
+      inFlightTransactions[transaction.id] = nil
+      
       return
     end
   end
