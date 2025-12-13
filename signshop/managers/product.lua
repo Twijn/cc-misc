@@ -1,12 +1,26 @@
 --- SignShop Product Manager ---
 --- Manages product definitions and metadata.
+--- Integrates with history manager for undo functionality.
 ---
----@version 1.4.0
+---@version 1.5.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
 
 local products = persist("products.json")
+
+-- History manager for tracking changes (loaded lazily to avoid circular deps)
+local historyManager = nil
+local function getHistoryManager()
+    if not historyManager then
+        -- Try to load history manager
+        local ok, manager = pcall(require, "managers.history")
+        if ok then
+            historyManager = manager
+        end
+    end
+    return historyManager
+end
 
 local function findItem(name)
   -- strip modid from search name if given
@@ -44,6 +58,13 @@ function products:createProductFromSign(meta, line1, line2, cost, aisleName)
     modid = modid
   }
   self.set(meta, product)
+  
+  -- Record history
+  local history = getHistoryManager()
+  if history then
+    history.recordChange("create", "product", meta, nil, product)
+  end
+  
   os.queueEvent("product_create", product)
   return product
 end
@@ -56,6 +77,12 @@ function products:updateItem(product, newProduct)
     end
   end
 
+  -- Make a copy of the old product for history
+  local oldProductCopy = {}
+  for k, v in pairs(product) do
+    oldProductCopy[k] = v
+  end
+
   -- If the meta has changed, remove the old meta instance
   if product.meta ~= newProduct.meta then
     products.unset(product.meta)
@@ -63,10 +90,47 @@ function products:updateItem(product, newProduct)
 
   products.set(newProduct.meta, newProduct)
 
+  -- Record history
+  local history = getHistoryManager()
+  if history then
+    history.recordChange("update", "product", newProduct.meta, oldProductCopy, newProduct)
+  end
+
   logger.info("Updated item " .. products.getName(newProduct))
   os.queueEvent("product_update", newProduct, product)
 
   return newProduct
+end
+
+--- Delete a product
+---@param meta string The product meta/ID to delete
+---@return boolean success Whether the product was deleted
+---@return string|nil error Error message if failed
+function products.deleteProduct(meta)
+  local product = products.get(meta)
+  if not product then
+    return false, "Product not found: " .. meta
+  end
+  
+  -- Make a copy for history
+  local productCopy = {}
+  for k, v in pairs(product) do
+    productCopy[k] = v
+  end
+  
+  -- Remove the product
+  products.unset(meta)
+  
+  -- Record history
+  local history = getHistoryManager()
+  if history then
+    history.recordChange("delete", "product", meta, productCopy, nil)
+  end
+  
+  logger.info("Deleted product " .. products.getName(productCopy))
+  os.queueEvent("product_delete", productCopy)
+  
+  return true
 end
 
 local function trim(s)
