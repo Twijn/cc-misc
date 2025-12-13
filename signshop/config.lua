@@ -1,7 +1,7 @@
 --- SignShop Configuration UI ---
 --- Interactive configuration interface for SignShop using formui.
 ---
----@version 1.4.1
+---@version 1.4.2
 
 if not package.path:find("disk") then
     package.path = package.path .. ";/disk/?.lua;/disk/lib/?.lua"
