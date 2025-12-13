@@ -1,10 +1,12 @@
 --- SignShop Inventory Manager ---
 --- Manages inventory scanning and item dispensing.
+--- Includes aisle health checking before dispense operations.
 ---
----@version 1.4.2
+---@version 1.5.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
+local errors = require("lib.errors")
 local aisleManager = require("managers.aisle")
 
 local detailCache = persist("detail-cache.json")
@@ -121,10 +123,36 @@ local function decrementStock(name, nbt, count)
   end
 end
 
+--- Dispense items for a product to an aisle
+--- Checks aisle health before attempting dispense.
+---@param product table The product to dispense
+---@param maxCount number Maximum number of items to dispense
+---@return table Result object (use errors.isError to check, errors.unwrap to get data)
 function manager.dispense(product, maxCount)
-  local aisle = aisleManager.getAisle(product.aisleName)
+  local aisle, aisleErr = aisleManager.getAisle(product.aisleName)
   if not aisle then
-    return false, string.format("Aisle %s not found!", product.aisleName)
+    local errType = errors.types.AISLE_NOT_FOUND
+    local errMsg = string.format("Aisle %s not found!", product.aisleName)
+    if errors.isError(aisleErr) then
+      errType = aisleErr.type
+      errMsg = aisleErr.message
+    end
+    logger.error(string.format("[%s] %s", errType, errMsg))
+    return errors.create(errType, errMsg, { aisleName = product.aisleName })
+  end
+
+  -- Check aisle health
+  local health = aisleManager.getAisleHealth(product.aisleName)
+  
+  if health == "offline" then
+    local errMsg = string.format("Aisle %s is offline", product.aisleName)
+    logger.error(string.format("[%s] %s", errors.types.AISLE_OFFLINE, errMsg))
+    return errors.create(errors.types.AISLE_OFFLINE, errMsg, { 
+      aisleName = product.aisleName,
+      health = health 
+    })
+  elseif health == "degraded" then
+    logger.warn(string.format("Aisle %s is degraded, attempting dispense anyway", product.aisleName))
   end
 
   peripheral.call(aisle.self, "turnOn")
@@ -149,7 +177,28 @@ function manager.dispense(product, maxCount)
     end
   end
 
-  return dispensed
+  if dispensed == 0 and maxCount > 0 then
+    local errMsg = string.format("Could not dispense any %s - insufficient stock", product.modid)
+    logger.warn(errMsg)
+    return errors.create(errors.types.INSUFFICIENT_STOCK, errMsg, {
+      product = product.meta,
+      requested = maxCount,
+      dispensed = 0
+    })
+  end
+
+  return errors.success({ 
+    dispensed = dispensed,
+    requested = maxCount,
+    aisle = product.aisleName
+  })
+end
+
+--- Force save stock cache (for shutdown)
+function manager.beforeShutdown()
+  local stock = stockCache.getAll()
+  stockCache.setAll(stock)
+  logger.info("Stock cache saved before shutdown")
 end
 
 function manager.run()
