@@ -81,6 +81,15 @@ local function updateSignShop()
         {url = BASE_URL .. "/signshop/update.lua", path = diskPrefix .. "update.lua"},
         -- SignShop lib files
         {url = BASE_URL .. "/signshop/lib/errors.lua", path = diskPrefix .. "lib/errors.lua"},
+        {url = BASE_URL .. "/signshop/lib/menu.lua", path = diskPrefix .. "lib/menu.lua"},
+        {url = BASE_URL .. "/signshop/lib/ui.lua", path = diskPrefix .. "lib/ui.lua"},
+        -- Config module files
+        {url = BASE_URL .. "/signshop/config/products.lua", path = diskPrefix .. "config/products.lua"},
+        {url = BASE_URL .. "/signshop/config/signs.lua", path = diskPrefix .. "config/signs.lua"},
+        {url = BASE_URL .. "/signshop/config/aisles.lua", path = diskPrefix .. "config/aisles.lua"},
+        {url = BASE_URL .. "/signshop/config/sales.lua", path = diskPrefix .. "config/sales.lua"},
+        {url = BASE_URL .. "/signshop/config/settings.lua", path = diskPrefix .. "config/settings.lua"},
+        {url = BASE_URL .. "/signshop/config/history.lua", path = diskPrefix .. "config/history.lua"},
         -- Manager files
         {url = BASE_URL .. "/signshop/managers/aisle.lua", path = diskPrefix .. "managers/aisle.lua"},
         {url = BASE_URL .. "/signshop/managers/history.lua", path = diskPrefix .. "managers/history.lua"},
@@ -92,6 +101,11 @@ local function updateSignShop()
         {url = BASE_URL .. "/signshop/managers/shopsync.lua", path = diskPrefix .. "managers/shopsync.lua"},
         {url = BASE_URL .. "/signshop/managers/sign.lua", path = diskPrefix .. "managers/sign.lua"},
     }
+    
+    -- Ensure directories exist
+    fs.makeDir(diskPrefix .. "lib")
+    fs.makeDir(diskPrefix .. "config")
+    fs.makeDir(diskPrefix .. "managers")
     
     local successCount = 0
     for _, file in ipairs(files) do
