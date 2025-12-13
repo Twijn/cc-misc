@@ -27,11 +27,11 @@
 ---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
----@version 0.3.3
+---@version 0.4.0
 -- @module formui
 
 ---@class FormField
----@field type string The field type: "text", "number", "select", "peripheral", "checkbox", "multiselect", "list", "label", "button"
+---@field type string The field type: "text", "number", "select", "peripheral", "checkbox", "multiselect", "list", "label", "button", "color"
 ---@field label string The field label/name
 ---@field value any The current field value
 ---@field validate? fun(value: any, field: FormField): boolean, string? Validation function
@@ -46,8 +46,29 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.3.3"
+local VERSION = "0.4.0"
 local FormUI = { _v = VERSION }
+
+-- ComputerCraft color names and their values
+local COLOR_NAMES = {
+    "white", "orange", "magenta", "lightBlue",
+    "yellow", "lime", "pink", "gray",
+    "lightGray", "cyan", "purple", "blue",
+    "brown", "green", "red", "black"
+}
+
+local COLOR_VALUES = {
+    white = colors.white, orange = colors.orange, magenta = colors.magenta, lightBlue = colors.lightBlue,
+    yellow = colors.yellow, lime = colors.lime, pink = colors.pink, gray = colors.gray,
+    lightGray = colors.lightGray, cyan = colors.cyan, purple = colors.purple, blue = colors.blue,
+    brown = colors.brown, green = colors.green, red = colors.red, black = colors.black
+}
+
+-- Reverse lookup: color value to name
+local COLOR_VALUE_TO_NAME = {}
+for name, value in pairs(COLOR_VALUES) do
+    COLOR_VALUE_TO_NAME[value] = name
+end
 FormUI.__index = FormUI
 
 ---@class FormValidation
@@ -299,6 +320,34 @@ function FormUI:checkbox(label, default)
     })
 end
 
+---Add a color selector field
+---@param label string The field label
+---@param default? number Default color value (e.g., colors.white)
+---@return fun(): number # Function to get the selected color value after submission
+function FormUI:color(label, default)
+    local defaultIndex = 1
+    if default then
+        local defaultName = COLOR_VALUE_TO_NAME[default]
+        if defaultName then
+            for i, name in ipairs(COLOR_NAMES) do
+                if name == defaultName then
+                    defaultIndex = i
+                    break
+                end
+            end
+        end
+    end
+    return self:addField({
+        type = "color",
+        label = label,
+        options = COLOR_NAMES,
+        value = defaultIndex,
+        validate = function(v, f)
+            return f.options[v] ~= nil, "Must select a valid color"
+        end
+    })
+end
+
 ---Add a multi-select dropdown field
 ---@param label string The field label
 ---@param options string[] Available options
@@ -391,7 +440,10 @@ end
 function FormUI:get(label)
     for _, f in ipairs(self.fields) do
         if f.label == label then
-            if f.type == "select" or f.type == "peripheral" then
+            if f.type == "color" then
+                local colorName = f.options[f.value]
+                return colorName and COLOR_VALUES[colorName] or colors.white
+            elseif f.type == "select" or f.type == "peripheral" then
                 return f.options[f.value]
             elseif f.type == "multiselect" then
                 local selected = {}
@@ -416,7 +468,28 @@ end
 function FormUI:setValue(label, value)
     for _, f in ipairs(self.fields) do
         if f.label == label then
-            if f.type == "select" or f.type == "peripheral" then
+            if f.type == "color" then
+                -- For color fields, value can be color value or color name
+                if type(value) == "number" then
+                    local colorName = COLOR_VALUE_TO_NAME[value]
+                    if colorName then
+                        for i, name in ipairs(f.options) do
+                            if name == colorName then
+                                f.value = i
+                                return true
+                            end
+                        end
+                    end
+                elseif type(value) == "string" then
+                    for i, name in ipairs(f.options) do
+                        if name == value then
+                            f.value = i
+                            return true
+                        end
+                    end
+                end
+                return false
+            elseif f.type == "select" or f.type == "peripheral" then
                 -- For select/peripheral fields, find the index of the option
                 if type(value) == "string" and f.options then
                     for i, opt in ipairs(f.options) do
@@ -490,7 +563,7 @@ function FormUI:draw()
             local display = ""
             if f.type == "text" or f.type == "number" then
                 display = tostring(f.value)
-            elseif f.type == "select" or f.type == "peripheral" then
+            elseif f.type == "select" or f.type == "peripheral" or f.type == "color" then
                 local opts = f.options or {}
                 display = (#opts > 0) and tostring(opts[f.value]) or "(none)"
             elseif f.type == "checkbox" then
@@ -553,7 +626,7 @@ function FormUI:draw()
 
         if f.type == "text" or f.type == "number" then
             display = tostring(f.value)
-        elseif f.type == "select" or f.type == "peripheral" then
+        elseif f.type == "select" or f.type == "peripheral" or f.type == "color" then
             local opts = f.options or {}
             display = (#opts > 0) and tostring(opts[f.value]) or "(none)"
         elseif f.type == "checkbox" then
@@ -732,7 +805,7 @@ function FormUI:edit(index)
             end
             -- If input is "" and allowEmpty is false, keep existing value
         end
-    elseif f.type == "select" or f.type == "peripheral" then
+    elseif f.type == "select" or f.type == "peripheral" or f.type == "color" then
         local opts = f.options or {}
         if #opts == 0 then
             term.setTextColor(colors.red)
@@ -1030,7 +1103,10 @@ function FormUI:run()
 
     local result = {}
     for _, f in ipairs(self.fields) do
-        if f.type == "select" or f.type == "peripheral" then
+        if f.type == "color" then
+            local colorName = f.options[f.value]
+            result[f.label] = colorName and COLOR_VALUES[colorName] or colors.white
+        elseif f.type == "select" or f.type == "peripheral" then
             result[f.label] = f.options[f.value]
         elseif f.type == "multiselect" then
             local selected = {}
@@ -1049,5 +1125,10 @@ function FormUI:run()
     term.setCursorPos(1,1)
     return result
 end
+
+-- Expose color constants for external use
+FormUI.COLOR_NAMES = COLOR_NAMES
+FormUI.COLOR_VALUES = COLOR_VALUES
+FormUI.COLOR_VALUE_TO_NAME = COLOR_VALUE_TO_NAME
 
 return FormUI

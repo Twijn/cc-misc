@@ -63,10 +63,10 @@ local layout = s.string("monitor.layout", "dashboard")
 local refreshRate = s.number("monitor.refresh_rate", 1, 60, 5)
 
 -- Color configuration
-local colorBackground = s.number("monitor.colors.background", 0, 15, colors.black)
-local colorHeader = s.number("monitor.colors.header", 0, 15, colors.yellow)
-local colorText = s.number("monitor.colors.text", 0, 15, colors.white)
-local colorAccent = s.number("monitor.colors.accent", 0, 15, colors.lightBlue)
+local colorBackground = s.color("monitor.colors.background", colors.black)
+local colorHeader = s.color("monitor.colors.header", colors.yellow)
+local colorText = s.color("monitor.colors.text", colors.white)
+local colorAccent = s.color("monitor.colors.accent", colors.lightBlue)
 
 -- Sections to show (stored as comma-separated string)
 local defaultSections = "header,stats,recent_sales,low_stock,aisle_health"

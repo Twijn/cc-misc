@@ -13,16 +13,37 @@
 ---local name = s.string("server_name", "MyServer")
 ---local enabled = s.boolean("enabled")
 ---
----@version 2.0.2
+---@version 2.1.0
 -- @module s
 
-local VERSION = "2.0.2"
+local VERSION = "2.1.0"
 
 local module = {}
 
 local tables = require("lib.tables")
 
 local sides = {"top","bottom","front","back","left","right"}
+
+-- ComputerCraft color names and their values
+local COLOR_NAMES = {
+    "white", "orange", "magenta", "lightBlue",
+    "yellow", "lime", "pink", "gray",
+    "lightGray", "cyan", "purple", "blue",
+    "brown", "green", "red", "black"
+}
+
+local COLOR_VALUES = {
+    white = colors.white, orange = colors.orange, magenta = colors.magenta, lightBlue = colors.lightBlue,
+    yellow = colors.yellow, lime = colors.lime, pink = colors.pink, gray = colors.gray,
+    lightGray = colors.lightGray, cyan = colors.cyan, purple = colors.purple, blue = colors.blue,
+    brown = colors.brown, green = colors.green, red = colors.red, black = colors.black
+}
+
+-- Reverse lookup: color value to name
+local COLOR_VALUE_TO_NAME = {}
+for name, value in pairs(COLOR_VALUES) do
+    COLOR_VALUE_TO_NAME[value] = name
+end
 
 ---Display an interactive menu for selecting from a list of options
 ---@param title string The main title to display
@@ -203,6 +224,33 @@ function module.boolean(name)
     return value
 end
 
+---Get or configure a color setting using an interactive menu
+---@param name string The setting name to store/retrieve
+---@param default? number Default color value (e.g., colors.white)
+---@return number # The configured color value
+function module.color(name, default)
+    local value = settings.get(name)
+
+    if value == nil then
+        local defaultName = default and COLOR_VALUE_TO_NAME[default] or nil
+        local defaultIdx = 1
+        if defaultName then
+            for i, n in ipairs(COLOR_NAMES) do
+                if n == defaultName then
+                    defaultIdx = i
+                    break
+                end
+            end
+        end
+        local selected = selectMenu("Select a color", "Set a color for " .. name, COLOR_NAMES, defaultIdx)
+        value = COLOR_VALUES[selected]
+        settings.set(name, value)
+        settings.save()
+    end
+
+    return value
+end
+
 ---Create a form-based settings interface using formui.lua
 ---Requires formui.lua to be installed. Returns a table with form-based versions of all s.lua functions.
 ---
@@ -309,6 +357,23 @@ function module.useForm(title)
                 return boolValue
             end
             return nil
+        end
+    end
+    
+    ---Add a color field to the form
+    ---@param name string The setting name
+    ---@param default? number Default color value (e.g., colors.white)
+    ---@return function # Getter function that returns the color value
+    function formInterface.color(name, default)
+        local existingValue = settings.get(name)
+        local field = form:color(name, existingValue or default or colors.white)
+        return function()
+            local value = field()
+            if value then
+                settings.set(name, value)
+                settings.save()
+            end
+            return value
         end
     end
     
