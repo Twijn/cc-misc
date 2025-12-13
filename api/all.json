@@ -579,7 +579,7 @@
     },
     "s": {
       "name": "s",
-      "version": "2.0.2",
+      "version": "2.1.0",
       "description": "A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive peripheral selection with type filtering, number input with range validation, string input with default values, boolean selection with menu interface, automatic settings persistence, peripheral availability checking and recovery, side-only peripheral filtering, and optional form UI integration.",
       "dependencies": [
         "formui"
@@ -608,7 +608,7 @@
           ],
           "returns": "table # The wrapped peripheral object",
           "description": "Get or configure a peripheral setting with automatic validation and recovery",
-          "line": 97
+          "line": 118
         },
         {
           "name": "module.number",
@@ -636,7 +636,7 @@
           ],
           "returns": "number # The configured number value",
           "description": "Get or configure a number setting with range validation",
-          "line": 127
+          "line": 148
         },
         {
           "name": "module.string",
@@ -654,7 +654,7 @@
           ],
           "returns": "string # The configured string value",
           "description": "Get or configure a string setting with optional default value",
-          "line": 164
+          "line": 185
         },
         {
           "name": "module.boolean",
@@ -667,7 +667,25 @@
           ],
           "returns": "boolean # The configured boolean value",
           "description": "Get or configure a boolean setting using an interactive menu",
-          "line": 191
+          "line": 212
+        },
+        {
+          "name": "module.color",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name to store/retrieve"
+            },
+            {
+              "name": "default?",
+              "type": "number",
+              "description": "Default color value (e.g., colors.white)"
+            }
+          ],
+          "returns": "number # The configured color value",
+          "description": "Get or configure a color setting using an interactive menu",
+          "line": 227
         },
         {
           "name": "module.useForm",
@@ -680,7 +698,7 @@
           ],
           "returns": "table # Form interface with peripheral, number, string, boolean, and submit functions",
           "description": "Create a form-based settings interface using formui.lua Requires formui.lua to be installed. Returns a table with form-based versions of all s.lua functions.  local s = require(\"s\") local form = s.useForm(\"My App Configuration\")  local modem = form.peripheral(\"modem\", \"modem\", true) local port = form.number(\"port\", 1, 65535, 8080) local name = form.string(\"server_name\", \"MyServer\") local enabled = form.boolean(\"enabled\")  if form.submit() then print(\"Settings saved!\") print(\"Modem:\", modem()) print(\"Port:\", port()) end ",
-          "line": 206
+          "line": 254
         },
         {
           "name": "formInterface.peripheral",
@@ -703,7 +721,7 @@
           ],
           "returns": "function # Getter function that returns the peripheral name",
           "description": "Add a peripheral field to the form",
-          "line": 232
+          "line": 280
         },
         {
           "name": "formInterface.number",
@@ -731,7 +749,7 @@
           ],
           "returns": "function # Getter function that returns the number value",
           "description": "Add a number field to the form",
-          "line": 257
+          "line": 305
         },
         {
           "name": "formInterface.string",
@@ -749,7 +767,7 @@
           ],
           "returns": "function # Getter function that returns the string value",
           "description": "Add a string field to the form",
-          "line": 280
+          "line": 328
         },
         {
           "name": "formInterface.boolean",
@@ -762,14 +780,198 @@
           ],
           "returns": "function # Getter function that returns the boolean value",
           "description": "Add a boolean field to the form",
-          "line": 297
+          "line": 345
+        },
+        {
+          "name": "formInterface.color",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The setting name"
+            },
+            {
+              "name": "default?",
+              "type": "number",
+              "description": "Default color value (e.g., colors.white)"
+            }
+          ],
+          "returns": "function # Getter function that returns the color value",
+          "description": "Add a color field to the form",
+          "line": 363
         },
         {
           "name": "formInterface.submit",
           "params": [],
           "returns": "boolean # True if submitted, false if cancelled",
           "description": "Add submit and cancel buttons, then run the form",
-          "line": 315
+          "line": 380
+        }
+      ],
+      "classes": []
+    },
+    "errors": {
+      "name": "errors",
+      "version": "1.5.0",
+      "description": "SignShop Error Handling Library --- Provides standardized error handling patterns across all managers. Features: Structured error types, success/error result wrappers, error checking utilities, and function wrapping for error handling.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/errors.lua",
+      "documentation_url": "https://ccmisc.twijn.dev/errors.html",
+      "functions": [
+        {
+          "name": "errors.create",
+          "params": [
+            {
+              "name": "type",
+              "type": "string",
+              "description": "Error type from errors.types"
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "description": "Human-readable error message"
+            },
+            {
+              "name": "details?",
+              "type": "table",
+              "description": "Additional error context"
+            }
+          ],
+          "returns": "table Structured error object",
+          "description": "Create a structured error object",
+          "line": 38
+        },
+        {
+          "name": "errors.success",
+          "params": [
+            {
+              "name": "data",
+              "type": "any",
+              "description": "The successful result data"
+            }
+          ],
+          "returns": "table Success result object",
+          "description": "Create a success result wrapper",
+          "line": 53
+        },
+        {
+          "name": "errors.isError",
+          "params": [
+            {
+              "name": "result",
+              "type": "any",
+              "description": "The result to check"
+            }
+          ],
+          "returns": "boolean True if result is a structured error",
+          "description": "Check if a result is an error",
+          "line": 63
+        },
+        {
+          "name": "errors.isSuccess",
+          "params": [
+            {
+              "name": "result",
+              "type": "any",
+              "description": "The result to check"
+            }
+          ],
+          "returns": "boolean True if result is a success wrapper",
+          "description": "Check if a result is successful",
+          "line": 70
+        },
+        {
+          "name": "errors.getMessage",
+          "params": [
+            {
+              "name": "result",
+              "type": "any",
+              "description": "The result to extract message from"
+            }
+          ],
+          "returns": "string|nil Error message or nil",
+          "description": "Get error message from a result, or nil if not an error",
+          "line": 77
+        },
+        {
+          "name": "errors.getType",
+          "params": [
+            {
+              "name": "result",
+              "type": "any",
+              "description": "The result to extract type from"
+            }
+          ],
+          "returns": "string|nil Error type or nil",
+          "description": "Get error type from a result, or nil if not an error",
+          "line": 87
+        },
+        {
+          "name": "errors.unwrap",
+          "params": [
+            {
+              "name": "result",
+              "type": "any",
+              "description": "The result to unwrap"
+            },
+            {
+              "name": "default?",
+              "type": "any",
+              "description": "Default value to return on error"
+            }
+          ],
+          "returns": "any The unwrapped data or default value",
+          "description": "Unwrap a successful result, or return default value on error",
+          "line": 97
+        },
+        {
+          "name": "errors.wrap",
+          "params": [
+            {
+              "name": "fn",
+              "type": "function",
+              "description": "The function to wrap"
+            }
+          ],
+          "returns": "function Wrapped function that catches errors",
+          "description": "Wrap a function to catch errors and return structured result If the function throws, it's caught and returned as a structured error. If the function returns normally, the result is passed through.",
+          "line": 108
+        },
+        {
+          "name": "errors.fromLegacy",
+          "params": [
+            {
+              "name": "success",
+              "type": "boolean",
+              "description": "The success flag from legacy format"
+            },
+            {
+              "name": "message?",
+              "type": "string",
+              "description": "The error message from legacy format"
+            },
+            {
+              "name": "type?",
+              "type": "string",
+              "description": "Optional error type"
+            }
+          ],
+          "returns": "table Structured result (success or error)",
+          "description": "Convert legacy error format (false, \"message\") to structured error Useful for migrating old code incrementally",
+          "line": 123
+        },
+        {
+          "name": "errors.format",
+          "params": [
+            {
+              "name": "result",
+              "type": "table",
+              "description": "The error result to format"
+            }
+          ],
+          "returns": "string Formatted error string",
+          "description": "Format an error for logging",
+          "line": 137
         }
       ],
       "classes": []
@@ -1218,7 +1420,7 @@
     },
     "formui": {
       "name": "formui",
-      "version": "0.3.3",
+      "version": "0.4.0",
       "description": "A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, checkbox/toggle fields, multi-select dropdowns, list fields with item management, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/formui.lua",
@@ -1235,7 +1437,7 @@
           ],
           "returns": "FormUI # New FormUI instance",
           "description": "Create a new FormUI instance",
-          "line": 145
+          "line": 166
         },
         {
           "name": "FormUI:addField",
@@ -1248,7 +1450,7 @@
           ],
           "returns": "fun(): any # Function that returns the field's final value after form submission",
           "description": "Add a field to the form and return a getter function",
-          "line": 157
+          "line": 178
         },
         {
           "name": "FormUI:text",
@@ -1276,7 +1478,7 @@
           ],
           "returns": "fun(): string # Function to get the field value after submission",
           "description": "Add a text input field",
-          "line": 170
+          "line": 191
         },
         {
           "name": "FormUI:number",
@@ -1299,7 +1501,7 @@
           ],
           "returns": "fun(): number # Function to get the field value after submission",
           "description": "Add a number input field",
-          "line": 192
+          "line": 213
         },
         {
           "name": "FormUI:select",
@@ -1327,7 +1529,7 @@
           ],
           "returns": "fun(): string # Function to get the selected option after submission",
           "description": "Add a select dropdown field",
-          "line": 208
+          "line": 229
         },
         {
           "name": "FormUI:peripheral",
@@ -1355,7 +1557,7 @@
           ],
           "returns": "fun(): string # Function to get the selected peripheral name after submission",
           "description": "Add a peripheral selector field that automatically detects peripherals",
-          "line": 226
+          "line": 247
         },
         {
           "name": "FormUI:label",
@@ -1368,7 +1570,7 @@
           ],
           "returns": "fun(): string # Function to get the label text (always returns the same text)",
           "description": "Add a non-interactive label for display purposes",
-          "line": 259
+          "line": 280
         },
         {
           "name": "FormUI:button",
@@ -1386,7 +1588,7 @@
           ],
           "returns": "fun(): string # Function to get the button text",
           "description": "Add a button that can trigger actions",
-          "line": 272
+          "line": 293
         },
         {
           "name": "FormUI:checkbox",
@@ -1404,7 +1606,25 @@
           ],
           "returns": "fun(): boolean # Function to get the field value after submission",
           "description": "Add a checkbox/toggle field",
-          "line": 287
+          "line": 308
+        },
+        {
+          "name": "FormUI:color",
+          "params": [
+            {
+              "name": "label",
+              "type": "string",
+              "description": "The field label"
+            },
+            {
+              "name": "default?",
+              "type": "number",
+              "description": "Default color value (e.g., colors.white)"
+            }
+          ],
+          "returns": "fun(): number # Function to get the selected color value after submission",
+          "description": "Add a color selector field",
+          "line": 323
         },
         {
           "name": "FormUI:multiselect",
@@ -1427,7 +1647,7 @@
           ],
           "returns": "fun(): string[] # Function to get selected options after submission",
           "description": "Add a multi-select dropdown field",
-          "line": 302
+          "line": 351
         },
         {
           "name": "FormUI:list",
@@ -1450,14 +1670,14 @@
           ],
           "returns": "fun(): table # Function to get the list after submission",
           "description": "Add a list field (string or number list, with item reordering)",
-          "line": 329
+          "line": 378
         },
         {
           "name": "FormUI:addSubmitCancel",
           "params": [],
           "returns": "",
           "description": "Add standard Submit and Cancel buttons to the form",
-          "line": 354
+          "line": 403
         },
         {
           "name": "FormUI:validateField",
@@ -1470,14 +1690,14 @@
           ],
           "returns": "string? error Error message if validation failed",
           "description": "Validate a specific field by index",
-          "line": 360
+          "line": 409
         },
         {
           "name": "FormUI:isValid",
           "params": [],
           "returns": "boolean # True if all fields are valid",
           "description": "Validate all fields in the form",
-          "line": 374
+          "line": 423
         },
         {
           "name": "FormUI:get",
@@ -1490,7 +1710,7 @@
           ],
           "returns": "any # The field's current value, or nil if not found",
           "description": "Get the current value of a field by label",
-          "line": 388
+          "line": 437
         },
         {
           "name": "FormUI:setValue",
@@ -1508,14 +1728,14 @@
           ],
           "returns": "boolean # True if field was found and updated, false otherwise",
           "description": "Set the value of a field by label",
-          "line": 412
+          "line": 464
         },
         {
           "name": "FormUI:draw",
           "params": [],
           "returns": "",
           "description": "Draw the form to the terminal",
-          "line": 459
+          "line": 532
         },
         {
           "name": "FormUI:edit",
@@ -1528,7 +1748,7 @@
           ],
           "returns": "string? action Action identifier if a button was pressed",
           "description": "Edit a field at the specified index",
-          "line": 672
+          "line": 745
         },
         {
           "name": "FormUI:nextSelectableField",
@@ -1541,7 +1761,7 @@
           ],
           "returns": "number # Next selectable field index (wraps around)",
           "description": "Find the next selectable field index (skips labels)",
-          "line": 907
+          "line": 980
         },
         {
           "name": "FormUI:prevSelectableField",
@@ -1554,18 +1774,18 @@
           ],
           "returns": "number # Previous selectable field index (wraps around)",
           "description": "Find the previous selectable field index (skips labels)",
-          "line": 925
+          "line": 998
         },
         {
           "name": "FormUI:run",
           "params": [],
           "returns": "FormResult? result Table of field values indexed by label, or nil if cancelled",
           "description": "Run the form's main input loop",
-          "line": 943
+          "line": 1016
         }
       ],
       "classes": []
     }
   },
-  "updated": "2025-12-10T04:15:40Z"
+  "updated": "2025-12-13T05:19:37Z"
 }

@@ -74,6 +74,17 @@ Get or configure a boolean setting using an interactive menu
 
 **Returns:** boolean # The configured boolean value
 
+### `module.color(name, default?)`
+
+Get or configure a color setting using an interactive menu
+
+**Parameters:**
+
+- `name` (string): The setting name to store/retrieve
+- `default?` (number): Default color value (e.g., colors.white)
+
+**Returns:** number # The configured color value
+
 ### `module.useForm(title?)`
 
 Create a form-based settings interface using formui.lua Requires formui.lua to be installed. Returns a table with form-based versions of all s.lua functions.  local s = require("s") local form = s.useForm("My App Configuration")  local modem = form.peripheral("modem", "modem", true) local port = form.number("port", 1, 65535, 8080) local name = form.string("server_name", "MyServer") local enabled = form.boolean("enabled")  if form.submit() then print("Settings saved!") print("Modem:", modem()) print("Port:", port()) end 
@@ -129,6 +140,17 @@ Add a boolean field to the form
 - `name` (string): The setting name
 
 **Returns:** function # Getter function that returns the boolean value
+
+### `formInterface.color(name, default?)`
+
+Add a color field to the form
+
+**Parameters:**
+
+- `name` (string): The setting name
+- `default?` (number): Default color value (e.g., colors.white)
+
+**Returns:** function # Getter function that returns the color value
 
 ### `formInterface.submit()`
 

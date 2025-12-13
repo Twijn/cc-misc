@@ -128,6 +128,17 @@ Add a checkbox/toggle field
 
 **Returns:** fun(): boolean # Function to get the field value after submission
 
+### `FormUI:color(label, default?)`
+
+Add a color selector field
+
+**Parameters:**
+
+- `label` (string): The field label
+- `default?` (number): Default color value (e.g., colors.white)
+
+**Returns:** fun(): number # Function to get the selected color value after submission
+
 ### `FormUI:multiselect(label, options, defaultIndices?)`
 
 Add a multi-select dropdown field
