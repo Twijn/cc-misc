@@ -356,6 +356,9 @@ end
 local addProduct
 local viewProductDetails
 local showProducts
+local showHistory
+local showUndoMenu
+local configureMonitor
 
 --- View product details
 ---@param product table The product to view
@@ -2272,21 +2275,20 @@ local function configureMonitor()
     local currentRefresh = settings.get("monitor.refresh_rate") or 5
     
     local enabledField = form:checkbox("Enable Monitor", currentEnabled)
-    local sideField = form:text("Monitor Side/Name (empty=auto)", currentSide)
-    local layoutField = form:text("Layout (dashboard/sales_feed/stock/custom)", currentLayout)
+    local sideField = form:peripheral("Monitor", "monitor", nil, currentSide)
+    local layoutField = form:select("Layout", {"dashboard", "sales_feed", "stock", "custom"}, 
+        currentLayout == "dashboard" and 1 or
+        currentLayout == "sales_feed" and 2 or
+        currentLayout == "stock" and 3 or 4)
     local refreshField = form:number("Refresh Rate (seconds)", currentRefresh,
         formui.validation.number_range(1, 60))
     
     form:label("")
-    form:label("--- Colors (0-15) ---")
-    local bgColorField = form:number("Background Color", settings.get("monitor.colors.background") or colors.black,
-        formui.validation.number_range(0, 15))
-    local headerColorField = form:number("Header Color", settings.get("monitor.colors.header") or colors.yellow,
-        formui.validation.number_range(0, 15))
-    local textColorField = form:number("Text Color", settings.get("monitor.colors.text") or colors.white,
-        formui.validation.number_range(0, 15))
-    local accentColorField = form:number("Accent Color", settings.get("monitor.colors.accent") or colors.lightBlue,
-        formui.validation.number_range(0, 15))
+    form:label("--- Colors ---")
+    local bgColorField = form:color("Background Color", settings.get("monitor.colors.background") or colors.black)
+    local headerColorField = form:color("Header Color", settings.get("monitor.colors.header") or colors.yellow)
+    local textColorField = form:color("Text Color", settings.get("monitor.colors.text") or colors.white)
+    local accentColorField = form:color("Accent Color", settings.get("monitor.colors.accent") or colors.lightBlue)
     
     form:addSubmitCancel()
     

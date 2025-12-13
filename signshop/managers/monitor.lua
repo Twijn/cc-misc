@@ -20,15 +20,36 @@ local salesManager, productManager, inventoryManager, aisleManager
 -- Check if monitor feature is configured
 local monitorEnabled = settings.get("monitor.enabled")
 
--- If monitor.enabled is not set at all, offer setup
-if monitorEnabled == nil then
+-- Layout options
+local LAYOUT_OPTIONS = {"dashboard", "sales_feed", "stock", "custom"}
+
+-- Check if this is first run or settings are missing
+local needsSetup = monitorEnabled == nil
+
+local monitorSide, layout, refreshRate
+local colorBackground, colorHeader, colorText, colorAccent
+local showSectionsStr
+
+-- Default sections
+local defaultSections = "header,stats,recent_sales,low_stock,aisle_health"
+
+if needsSetup then
+    -- Use form-based setup for new installations
     local form = s.useForm("Monitor Display Setup")
     
     print("Would you like to configure an external monitor display?")
     print("This will show shop stats, sales, and stock information.")
     print()
     
-    local enableField = form.boolean("monitor.enabled", false)
+    local enableField = form.boolean("monitor.enabled")
+    local monitorField = form.peripheral("monitor.side", "monitor")
+    local layoutField = form.string("monitor.layout", "dashboard")
+    local refreshField = form.number("monitor.refresh_rate", 1, 60, 5)
+    local bgColorField = form.color("monitor.colors.background", colors.black)
+    local headerColorField = form.color("monitor.colors.header", colors.yellow)
+    local textColorField = form.color("monitor.colors.text", colors.white)
+    local accentColorField = form.color("monitor.colors.accent", colors.lightBlue)
+    local sectionsField = form.string("monitor.show_sections", defaultSections)
     
     if not form.submit() then
         -- Setup cancelled, disable monitor
@@ -37,7 +58,30 @@ if monitorEnabled == nil then
         monitorEnabled = false
     else
         monitorEnabled = enableField()
+        if monitorEnabled then
+            -- Call the getters to save values to settings
+            monitorField()
+            layoutField()
+            refreshField()
+            bgColorField()
+            headerColorField()
+            textColorField()
+            accentColorField()
+            sectionsField()
+            
+            -- Read values back from settings
+            monitorSide = settings.get("monitor.side") or ""
+            layout = settings.get("monitor.layout") or "dashboard"
+            refreshRate = settings.get("monitor.refresh_rate") or 5
+            colorBackground = settings.get("monitor.colors.background") or colors.black
+            colorHeader = settings.get("monitor.colors.header") or colors.yellow
+            colorText = settings.get("monitor.colors.text") or colors.white
+            colorAccent = settings.get("monitor.colors.accent") or colors.lightBlue
+            showSectionsStr = settings.get("monitor.show_sections") or defaultSections
+        end
     end
+else
+    monitorEnabled = settings.get("monitor.enabled")
 end
 
 -- If monitor is disabled, return minimal manager
@@ -57,20 +101,23 @@ productManager = require("managers.product")
 inventoryManager = require("managers.inventory")
 aisleManager = require("managers.aisle")
 
--- Monitor configuration with defaults
-local monitorSide = s.string("monitor.side", "")
-local layout = s.string("monitor.layout", "dashboard")
-local refreshRate = s.number("monitor.refresh_rate", 1, 60, 5)
+-- Load configuration from settings if not already set by form
+if not monitorSide then
+    -- Use s.peripheral for monitor selection when not using form
+    local monitorPeripheral = s.peripheral("monitor.side", "monitor")
+    monitorSide = monitorPeripheral and peripheral.getName(monitorPeripheral) or ""
+end
+if not layout then layout = s.string("monitor.layout", "dashboard") end
+if not refreshRate then refreshRate = s.number("monitor.refresh_rate", 1, 60, 5) end
 
--- Color configuration
-local colorBackground = s.color("monitor.colors.background", colors.black)
-local colorHeader = s.color("monitor.colors.header", colors.yellow)
-local colorText = s.color("monitor.colors.text", colors.white)
-local colorAccent = s.color("monitor.colors.accent", colors.lightBlue)
+-- Color configuration (load if not set by form)
+if not colorBackground then colorBackground = s.color("monitor.colors.background", colors.black) end
+if not colorHeader then colorHeader = s.color("monitor.colors.header", colors.yellow) end
+if not colorText then colorText = s.color("monitor.colors.text", colors.white) end
+if not colorAccent then colorAccent = s.color("monitor.colors.accent", colors.lightBlue) end
 
 -- Sections to show (stored as comma-separated string)
-local defaultSections = "header,stats,recent_sales,low_stock,aisle_health"
-local showSectionsStr = s.string("monitor.show_sections", defaultSections)
+if not showSectionsStr then showSectionsStr = s.string("monitor.show_sections", defaultSections) end
 
 -- Parse sections string into table
 local function parseSections(str)
