@@ -128,10 +128,10 @@ local function sendShopSync()
             },
             item = {
                 name = product.modid,
-                nbt = product.itemnbt,
+                nbt = product.anyNbt and "*" or product.itemnbt,  -- Use "*" to indicate any NBT
                 displayName = name,
             },
-            stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0,
+            stock = inventoryManager.getItemStock(product.modid, product.itemnbt, product.anyNbt) or 0,
             dynamicPrice = false,
             madeOnDemand = false,
             requiresInteraction = false,

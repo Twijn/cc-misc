@@ -212,7 +212,7 @@ local function getProductOptions()
     
     if products then
         for meta, product in pairs(products) do
-            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt, product.anyNbt) or 0
             local label = string.format("%s [%s] - %.03f KRO (Stock: %d)",
                 productManager.getName(product), meta, product.cost, stock)
             table.insert(options, { label = label, action = meta, product = product })
@@ -245,7 +245,7 @@ viewProductDetails = function(product)
         local headerHeight = 3
         local footerHeight = 2
         local visibleHeight = h - headerHeight - footerHeight
-        local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+        local stock = inventoryManager.getItemStock(product.modid, product.itemnbt, product.anyNbt) or 0
         
         -- Build content lines
         local contentLines = {}
@@ -262,7 +262,9 @@ viewProductDetails = function(product)
         table.insert(contentLines, { text = "", color = colors.white })
         table.insert(contentLines, { label = "Mod ID: ", value = product.modid or "unknown", labelColor = colors.lightBlue, valueColor = colors.gray })
         
-        if product.itemnbt then
+        if product.anyNbt then
+            table.insert(contentLines, { label = "NBT: ", value = "Any (matches all NBT values)", labelColor = colors.lightBlue, valueColor = colors.orange })
+        elseif product.itemnbt then
             table.insert(contentLines, { label = "NBT: ", value = product.itemnbt, labelColor = colors.lightBlue, valueColor = colors.gray })
         end
         
@@ -368,6 +370,7 @@ viewProductDetails = function(product)
             local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
             local aisleField = form:text("Aisle Name", product.aisleName)
             local modidField = form:text("Mod ID", product.modid or "")
+            local anyNbtField = form:checkbox("Match Any NBT", product.anyNbt or false)
             
             form:addSubmitCancel()
             
@@ -380,7 +383,8 @@ viewProductDetails = function(product)
                     cost = costField(),
                     aisleName = aisleField(),
                     modid = modidField(),
-                    itemnbt = product.itemnbt
+                    itemnbt = product.itemnbt,
+                    anyNbt = anyNbtField()
                 }
                 
                 local success, err = productManager:updateItem(product, newProduct)
@@ -454,7 +458,7 @@ showProducts = function()
             table.insert(menuOptions, { separator = true, label = "--- " .. aisleName .. " ---" })
             for _, opt in ipairs(byAisle[aisleName]) do
                 -- Shorter label for menu
-                local stock = inventoryManager.getItemStock(opt.product.modid, opt.product.itemnbt) or 0
+                local stock = inventoryManager.getItemStock(opt.product.modid, opt.product.itemnbt, opt.product.anyNbt) or 0
                 local label = string.format("%s - %.03f KRO (x%d)",
                     productManager.getName(opt.product), opt.product.cost, stock)
                 table.insert(menuOptions, { 
@@ -506,6 +510,7 @@ addProduct = function()
     local costField = form:number("Cost (KRO)", 0.001, formui.validation.number_range(0.001, 999999))
     local aisleField = form:text("Aisle Name", aisleNames[1] or "")
     local modidField = form:text("Mod ID (e.g., minecraft:diamond)", "")
+    local anyNbtField = form:checkbox("Match Any NBT", false)
     
     form:addSubmitCancel()
     
@@ -529,7 +534,8 @@ addProduct = function()
             line2 = line2Field(),
             cost = costField(),
             aisleName = aisleField(),
-            modid = modidField()
+            modid = modidField(),
+            anyNbt = anyNbtField()
         }
         
         productManager.set(meta, product)
@@ -597,6 +603,7 @@ local function editProduct()
     local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
     local aisleField = form:text("Aisle Name", product.aisleName)
     local modidField = form:text("Mod ID", product.modid or "")
+    local anyNbtField = form:checkbox("Match Any NBT", product.anyNbt or false)
     
     form:addSubmitCancel()
     
@@ -609,7 +616,8 @@ local function editProduct()
             cost = costField(),
             aisleName = aisleField(),
             modid = modidField(),
-            itemnbt = product.itemnbt  -- Preserve NBT if exists
+            itemnbt = product.itemnbt,  -- Preserve NBT if exists
+            anyNbt = anyNbtField()
         }
         
         local success, err = productManager:updateItem(product, newProduct)
@@ -702,7 +710,7 @@ local function getSignOptions()
         local label
         local status
         if product then
-            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+            local stock = inventoryManager.getItemStock(product.modid, product.itemnbt, product.anyNbt) or 0
             label = string.format("%s -> %s (Stock: %d)", signName, productManager.getName(product), stock)
             status = "linked"
         elseif meta and #meta > 0 then
@@ -767,7 +775,7 @@ local function viewSignDetails(signOpt)
         
         -- Product info
         if signOpt.product then
-            local stock = inventoryManager.getItemStock(signOpt.product.modid, signOpt.product.itemnbt) or 0
+            local stock = inventoryManager.getItemStock(signOpt.product.modid, signOpt.product.itemnbt, signOpt.product.anyNbt) or 0
             table.insert(contentLines, { text = "Linked Product:", color = colors.green })
             table.insert(contentLines, { text = "  Name: " .. productManager.getName(signOpt.product), color = colors.white })
             table.insert(contentLines, { text = "  Meta: " .. signOpt.product.meta, color = colors.white })
@@ -866,6 +874,7 @@ local function viewSignDetails(signOpt)
             local costField = form:number("Cost (KRO)", product.cost, formui.validation.number_range(0.001, 999999))
             local aisleField = form:text("Aisle Name", product.aisleName)
             local modidField = form:text("Mod ID", product.modid or "")
+            local anyNbtField = form:checkbox("Match Any NBT", product.anyNbt or false)
             
             form:addSubmitCancel()
             
@@ -878,7 +887,8 @@ local function viewSignDetails(signOpt)
                     cost = costField(),
                     aisleName = aisleField(),
                     modid = modidField(),
-                    itemnbt = product.itemnbt
+                    itemnbt = product.itemnbt,
+                    anyNbt = anyNbtField()
                 }
                 
                 local success, err = productManager:updateItem(product, newProduct)
@@ -1200,7 +1210,7 @@ local function showAisles()
                                 return productManager.getName(a) < productManager.getName(b)
                             end)
                             for _, product in ipairs(aisleProducts) do
-                                local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+                                local stock = inventoryManager.getItemStock(product.modid, product.itemnbt, product.anyNbt) or 0
                                 table.insert(lines, { text = string.format("  %s (x%d)", productManager.getName(product), stock), color = colors.white })
                             end
                         end

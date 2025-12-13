@@ -24,6 +24,21 @@ local function getItemKey(item)
   end
 end
 
+--- Get all stock keys matching a given mod ID (for anyNbt products)
+---@param name string The mod ID to match
+---@return table Array of {key, count} pairs for all matching items
+local function getMatchingStockKeys(name)
+  local matches = {}
+  local allStock = stockCache.getAll() or {}
+  for key, count in pairs(allStock) do
+    -- Check if the key starts with the mod ID
+    if key == name or key:match("^" .. name:gsub("%.", "%%."):gsub("%-", "%%-") .. "%.(.+)$") then
+      table.insert(matches, { key = key, count = count })
+    end
+  end
+  return matches
+end
+
 function manager.rescan()
   local start = os.clock()
   local stock = {}
@@ -46,22 +61,53 @@ function manager.rescan()
   logger.info(string.format("Rescanned inventories in %.2f second(s)", os.clock() - start))
 end
 
-function manager.getItemStock(name, nbt)
-  local key = getItemKey({
-    name = name,
-    nbt = nbt,
-  })
-  return stockCache.get(key)
+function manager.getItemStock(name, nbt, anyNbt)
+  if anyNbt then
+    -- Sum up all stock for items with this mod ID, regardless of NBT
+    local matches = getMatchingStockKeys(name)
+    local total = 0
+    for _, match in ipairs(matches) do
+      total = total + match.count
+    end
+    return total > 0 and total or nil
+  else
+    local key = getItemKey({
+      name = name,
+      nbt = nbt,
+    })
+    return stockCache.get(key)
+  end
 end
 
-function manager.getItemDetail(name, nbt)
-  local key = getItemKey({
-    name = name,
-    nbt = nbt,
-  })
-  local detail = detailCache.get(key)
-  detail.count = stockCache.get(key)
-  return detail
+function manager.getItemDetail(name, nbt, anyNbt)
+  if anyNbt then
+    -- Get details for the first matching item found
+    local matches = getMatchingStockKeys(name)
+    if #matches > 0 then
+      local detail = detailCache.get(matches[1].key)
+      if detail then
+        detail = textutils.unserialize(textutils.serialize(detail)) -- shallow copy
+        -- Sum up total stock
+        local total = 0
+        for _, match in ipairs(matches) do
+          total = total + match.count
+        end
+        detail.count = total
+        return detail
+      end
+    end
+    return nil
+  else
+    local key = getItemKey({
+      name = name,
+      nbt = nbt,
+    })
+    local detail = detailCache.get(key)
+    if detail then
+      detail.count = stockCache.get(key)
+    end
+    return detail
+  end
 end
 
 local function decrementStock(name, nbt, count)
@@ -87,16 +133,21 @@ function manager.dispense(product, maxCount)
   for _, chest in ipairs(getChests()) do
     for slot, item in pairs(chest.list()) do
       if dispensed >= maxCount then break end
-      if item.name == product.modid and item.nbt == product.itemnbt then
+      -- Match item: if anyNbt is true, match only by modid; otherwise match both modid and nbt
+      local matches = item.name == product.modid
+      if matches and not product.anyNbt then
+        matches = item.nbt == product.itemnbt
+      end
+      if matches then
         local remaining = maxCount - dispensed
         local moved = chest.pushItems(aisle.self, slot, remaining)
         dispensed = dispensed + moved
+        -- Decrement stock for the specific item that was dispensed
+        decrementStock(item.name, item.nbt, moved)
         sleep()
       end
     end
   end
-
-  decrementStock(product.modid, product.itemnbt, dispensed)
 
   return dispensed
 end

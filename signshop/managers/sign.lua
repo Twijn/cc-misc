@@ -54,7 +54,7 @@ local function formatStock(stock)
 end
 
 local function updateSign(sign, product)
-  local stock = inventoryManager.getItemStock(product.modid, product.itemnbt) or 0
+  local stock = inventoryManager.getItemStock(product.modid, product.itemnbt, product.anyNbt) or 0
   sign.setSignText(
     product.line1,
     product.line2,
