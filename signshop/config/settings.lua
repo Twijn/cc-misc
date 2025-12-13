@@ -136,17 +136,29 @@ function settingsConfig.configureMonitor()
     
     local currentEnabled = settings.get("monitor.enabled") or false
     local currentSide = settings.get("monitor.side") or ""
-    local currentLayout = settings.get("monitor.layout") or "dashboard"
     local currentRefresh = settings.get("monitor.refresh_rate") or 5
+    
+    -- Parse current sections string into individual booleans
+    local currentSectionsStr = settings.get("monitor.show_sections") or "header,stats,recent_sales,low_stock,aisle_health"
+    local currentSections = {}
+    for section in currentSectionsStr:gmatch("[^,]+") do
+        currentSections[section:match("^%s*(.-)%s*$")] = true
+    end
     
     local enabledField = form:checkbox("Enable Monitor", currentEnabled)
     local sideField = form:peripheral("Monitor", "monitor", nil, currentSide)
-    local layoutField = form:select("Layout", {"dashboard", "sales_feed", "stock", "custom"}, 
-        currentLayout == "dashboard" and 1 or
-        currentLayout == "sales_feed" and 2 or
-        currentLayout == "stock" and 3 or 4)
     local refreshField = form:number("Refresh Rate (seconds)", currentRefresh,
         formui.validation.number_range(1, 60))
+    
+    form:label("")
+    form:label("--- Display Sections ---")
+    local headerField = form:checkbox("Show Header", currentSections.header ~= false)
+    local statsField = form:checkbox("Show Today's Stats", currentSections.stats ~= false)
+    local recentSalesField = form:checkbox("Show Recent Sales", currentSections.recent_sales ~= false)
+    local lowStockField = form:checkbox("Show Low Stock Warnings", currentSections.low_stock ~= false)
+    local aisleHealthField = form:checkbox("Show Aisle Health", currentSections.aisle_health ~= false)
+    local topProductsField = form:checkbox("Show Top Products", currentSections.top_products or false)
+    local topBuyersField = form:checkbox("Show Top Buyers", currentSections.top_buyers or false)
     
     form:label("")
     form:label("--- Colors ---")
@@ -161,8 +173,19 @@ function settingsConfig.configureMonitor()
     if result then
         settings.set("monitor.enabled", enabledField())
         settings.set("monitor.side", sideField())
-        settings.set("monitor.layout", layoutField())
         settings.set("monitor.refresh_rate", refreshField())
+        
+        -- Build sections string from checkboxes
+        local sections = {}
+        if headerField() then table.insert(sections, "header") end
+        if statsField() then table.insert(sections, "stats") end
+        if recentSalesField() then table.insert(sections, "recent_sales") end
+        if lowStockField() then table.insert(sections, "low_stock") end
+        if aisleHealthField() then table.insert(sections, "aisle_health") end
+        if topProductsField() then table.insert(sections, "top_products") end
+        if topBuyersField() then table.insert(sections, "top_buyers") end
+        settings.set("monitor.show_sections", table.concat(sections, ","))
+        
         settings.set("monitor.colors.background", bgColorField())
         settings.set("monitor.colors.header", headerColorField())
         settings.set("monitor.colors.text", textColorField())

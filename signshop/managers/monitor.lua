@@ -20,13 +20,10 @@ local salesManager, productManager, inventoryManager, aisleManager
 -- Check if monitor feature is configured
 local monitorEnabled = settings.get("monitor.enabled")
 
--- Layout options
-local LAYOUT_OPTIONS = {"dashboard", "sales_feed", "stock", "custom"}
-
 -- Check if this is first run or settings are missing
 local needsSetup = monitorEnabled == nil
 
-local monitorSide, layout, refreshRate
+local monitorSide, refreshRate
 local colorBackground, colorHeader, colorText, colorAccent
 local showSectionsStr
 
@@ -43,7 +40,6 @@ if needsSetup then
     
     local enableField = form.boolean("monitor.enabled")
     local monitorField = form.peripheral("monitor.side", "monitor")
-    local layoutField = form.string("monitor.layout", "dashboard")
     local refreshField = form.number("monitor.refresh_rate", 1, 60, 5)
     local bgColorField = form.color("monitor.colors.background", colors.black)
     local headerColorField = form.color("monitor.colors.header", colors.yellow)
@@ -61,7 +57,6 @@ if needsSetup then
         if monitorEnabled then
             -- Call the getters to save values to settings
             monitorField()
-            layoutField()
             refreshField()
             bgColorField()
             headerColorField()
@@ -71,7 +66,6 @@ if needsSetup then
             
             -- Read values back from settings
             monitorSide = settings.get("monitor.side") or ""
-            layout = settings.get("monitor.layout") or "dashboard"
             refreshRate = settings.get("monitor.refresh_rate") or 5
             colorBackground = settings.get("monitor.colors.background") or colors.black
             colorHeader = settings.get("monitor.colors.header") or colors.yellow
@@ -107,7 +101,6 @@ if not monitorSide then
     local monitorPeripheral = s.peripheral("monitor.side", "monitor")
     monitorSide = monitorPeripheral and peripheral.getName(monitorPeripheral) or ""
 end
-if not layout then layout = s.string("monitor.layout", "dashboard") end
 if not refreshRate then refreshRate = s.number("monitor.refresh_rate", 1, 60, 5) end
 
 -- Color configuration (load if not set by form)
@@ -157,20 +150,26 @@ local function findMonitor()
     if monitor then
         monitorWidth, monitorHeight = monitor.getSize()
         
-        -- Scale text based on monitor size
+        -- Scale text based on monitor size for optimal readability
         local scale = 1
-        if monitorWidth >= 60 then
+        if monitorWidth >= 80 then
+            scale = 0.5
+        elseif monitorWidth >= 60 then
             scale = 0.5
         elseif monitorWidth >= 40 then
             scale = 1
-        else
+        elseif monitorWidth >= 20 then
             scale = 1
+        else
+            scale = 2  -- Very small monitors need larger text
         end
         
         if monitor.setTextScale then
             monitor.setTextScale(scale)
             monitorWidth, monitorHeight = monitor.getSize()
         end
+        
+        logger.info(string.format("Monitor configured: %dx%d (scale %.1f)", monitorWidth, monitorHeight, scale))
         
         return true
     end
@@ -285,21 +284,46 @@ local function drawStats(y)
     local todayStats = salesManager.getTodayStats()
     local allStats = salesManager.getStats()
     
-    drawText(1, y, "Today:", colorAccent)
-    y = y + 1
-    
-    drawText(2, y, string.format("Sales: %d | Revenue: %s", 
-        todayStats.sales or 0, formatKRO(todayStats.revenue)))
-    y = y + 1
-    
-    drawText(2, y, string.format("Items Sold: %d", todayStats.itemsSold or 0))
-    y = y + 1
-    
-    if monitorHeight > 10 then
+    -- Adapt layout based on monitor width
+    if monitorWidth >= 40 then
+        -- Wide monitor: show more detail
+        drawText(1, y, "Today:", colorAccent)
         y = y + 1
-        drawText(1, y, "All Time:", colorAccent)
+        
+        drawText(2, y, string.format("Sales: %d | Revenue: %s", 
+            todayStats.sales or 0, formatKRO(todayStats.revenue)))
         y = y + 1
-        drawText(2, y, string.format("Total Revenue: %s", formatKRO(allStats.totalRevenue)))
+        
+        drawText(2, y, string.format("Items Sold: %d", todayStats.itemsSold or 0))
+        y = y + 1
+        
+        if monitorHeight > 10 then
+            y = y + 1
+            drawText(1, y, "All Time:", colorAccent)
+            y = y + 1
+            drawText(2, y, string.format("Total Revenue: %s", formatKRO(allStats.totalRevenue)))
+            y = y + 1
+        end
+    elseif monitorWidth >= 25 then
+        -- Medium monitor: compact format
+        drawText(1, y, "Today:", colorAccent)
+        y = y + 1
+        drawText(2, y, string.format("%d sales", todayStats.sales or 0))
+        y = y + 1
+        drawText(2, y, formatKRO(todayStats.revenue))
+        y = y + 1
+        
+        if monitorHeight > 8 then
+            drawText(1, y, "Total:", colorAccent)
+            y = y + 1
+            drawText(2, y, formatKRO(allStats.totalRevenue))
+            y = y + 1
+        end
+    else
+        -- Small monitor: minimal info
+        drawText(1, y, string.format("$%d", todayStats.sales or 0), colorAccent)
+        y = y + 1
+        drawText(1, y, formatKRO(todayStats.revenue))
         y = y + 1
     end
     
@@ -311,14 +335,17 @@ end
 ---@param limit? number Max sales to show
 ---@return number Next available line
 local function drawRecentSales(y, limit)
-    limit = limit or 5
+    -- Adapt limit based on available space
+    limit = limit or math.max(2, math.floor((monitorHeight - y) / 2))
     local sales = salesManager.getRecentSales(limit)
     
     drawLine(y, colors.gray)
     y = y + 1
     
-    drawText(1, y, "Recent Sales:", colorAccent)
-    y = y + 1
+    if monitorWidth >= 20 then
+        drawText(1, y, "Recent Sales:", colorAccent)
+        y = y + 1
+    end
     
     if #sales == 0 then
         drawText(2, y, "(no sales yet)", colors.gray)
@@ -327,13 +354,26 @@ local function drawRecentSales(y, limit)
         for i, sale in ipairs(sales) do
             if y >= monitorHeight - 1 then break end
             
-            local line = string.format("%s x%d %s - %s",
-                formatTime(sale.timestamp),
-                sale.quantity or 0,
-                sale.productName or "?",
-                truncateAddress(sale.buyerAddress, 8))
+            local line
+            if monitorWidth >= 50 then
+                -- Wide: full details
+                line = string.format("%s x%d %s - %s",
+                    formatTime(sale.timestamp),
+                    sale.quantity or 0,
+                    sale.productName or "?",
+                    truncateAddress(sale.buyerAddress, 8))
+            elseif monitorWidth >= 30 then
+                -- Medium: product and quantity
+                line = string.format("x%d %s",
+                    sale.quantity or 0,
+                    sale.productName or "?")
+            else
+                -- Small: just product name truncated
+                line = sale.productName or "?"
+            end
             
-            drawText(2, y, line)
+            local indent = monitorWidth >= 20 and 2 or 1
+            drawText(indent, y, line)
             y = y + 1
         end
     end
@@ -370,20 +410,31 @@ local function drawLowStock(y, threshold)
     drawLine(y, colors.gray)
     y = y + 1
     
-    drawText(1, y, "Low Stock:", colorAccent)
-    y = y + 1
+    if monitorWidth >= 15 then
+        drawText(1, y, "Low Stock:", colorAccent)
+        y = y + 1
+    end
     
     if #lowStock == 0 then
-        drawText(2, y, "(all stocked)", colors.green)
+        local indent = monitorWidth >= 20 and 2 or 1
+        drawText(indent, y, "(all stocked)", colors.green)
         y = y + 1
     else
+        -- Limit based on screen height
+        local maxItems = math.min(5, math.max(2, monitorHeight - y - 1))
         for i, item in ipairs(lowStock) do
-            if y >= monitorHeight - 1 or i > 5 then break end
+            if y >= monitorHeight - 1 or i > maxItems then break end
             
             local stockColor = item.stock == 0 and colors.red or colors.orange
-            local line = string.format("x%d %s", item.stock, item.name)
+            local line
+            if monitorWidth >= 25 then
+                line = string.format("x%d %s", item.stock, item.name)
+            else
+                line = string.format("%d %s", item.stock, item.name:sub(1, monitorWidth - 4))
+            end
             
-            drawText(2, y, line, stockColor)
+            local indent = monitorWidth >= 20 and 2 or 1
+            drawText(indent, y, line, stockColor)
             y = y + 1
         end
     end
@@ -400,11 +451,15 @@ local function drawAisleHealth(y)
     drawLine(y, colors.gray)
     y = y + 1
     
-    drawText(1, y, "Aisles:", colorAccent)
-    y = y + 1
+    if monitorWidth >= 12 then
+        drawText(1, y, "Aisles:", colorAccent)
+        y = y + 1
+    end
     
     local hasAisles = false
+    local aisleCount = 0
     for name, aisle in pairs(aisles) do
+        aisleCount = aisleCount + 1
         if y >= monitorHeight then break end
         hasAisles = true
         
@@ -423,19 +478,110 @@ local function drawAisleHealth(y)
             symbol = "!"
         end
         
-        drawText(2, y, string.format("[%s] %s", symbol, name), healthColor)
+        local indent = monitorWidth >= 20 and 2 or 1
+        if monitorWidth >= 20 then
+            drawText(indent, y, string.format("[%s] %s", symbol, name), healthColor)
+        else
+            drawText(indent, y, string.format("%s%s", symbol, name:sub(1, monitorWidth - 2)), healthColor)
+        end
         y = y + 1
     end
     
     if not hasAisles then
-        drawText(2, y, "(no aisles)", colors.gray)
+        local indent = monitorWidth >= 20 and 2 or 1
+        drawText(indent, y, "(no aisles)", colors.gray)
         y = y + 1
     end
     
     return y
 end
 
---- Draw dashboard layout (default)
+--- Draw top products section
+---@param y number Starting line
+---@param limit? number Max products to show
+---@return number Next available line
+local function drawTopProducts(y, limit)
+    limit = limit or math.max(2, math.min(5, math.floor((monitorHeight - y) / 2)))
+    local products = salesManager.getTopProducts(limit)
+    
+    drawLine(y, colors.gray)
+    y = y + 1
+    
+    if monitorWidth >= 18 then
+        drawText(1, y, "Top Products:", colorAccent)
+        y = y + 1
+    end
+    
+    if #products == 0 then
+        local indent = monitorWidth >= 20 and 2 or 1
+        drawText(indent, y, "(no sales)", colors.gray)
+        y = y + 1
+    else
+        for i, prod in ipairs(products) do
+            if y >= monitorHeight - 1 then break end
+            
+            local line
+            if monitorWidth >= 40 then
+                line = string.format("#%d %s - %s", i, prod.name or prod.meta or "?", formatKRO(prod.revenue))
+            elseif monitorWidth >= 25 then
+                line = string.format("#%d %s", i, prod.name or prod.meta or "?")
+            else
+                line = string.format("%d.%s", i, (prod.name or "?"):sub(1, monitorWidth - 3))
+            end
+            
+            local indent = monitorWidth >= 20 and 2 or 1
+            local rankColor = i <= 3 and colors.green or colorText
+            drawText(indent, y, line, rankColor)
+            y = y + 1
+        end
+    end
+    
+    return y
+end
+
+--- Draw top buyers section
+---@param y number Starting line
+---@param limit? number Max buyers to show
+---@return number Next available line
+local function drawTopBuyers(y, limit)
+    limit = limit or math.max(2, math.min(5, math.floor((monitorHeight - y) / 2)))
+    local buyers = salesManager.getTopBuyers(limit)
+    
+    drawLine(y, colors.gray)
+    y = y + 1
+    
+    if monitorWidth >= 16 then
+        drawText(1, y, "Top Buyers:", colorAccent)
+        y = y + 1
+    end
+    
+    if #buyers == 0 then
+        local indent = monitorWidth >= 20 and 2 or 1
+        drawText(indent, y, "(no buyers)", colors.gray)
+        y = y + 1
+    else
+        for i, buyer in ipairs(buyers) do
+            if y >= monitorHeight - 1 then break end
+            
+            local addrLen = monitorWidth >= 40 and 12 or (monitorWidth >= 25 and 8 or 6)
+            local line
+            if monitorWidth >= 35 then
+                line = string.format("#%d %s - %s", i, truncateAddress(buyer.address, addrLen), formatKRO(buyer.totalSpent))
+            else
+                line = string.format("%d.%s", i, truncateAddress(buyer.address, addrLen))
+            end
+            
+            local indent = monitorWidth >= 20 and 2 or 1
+            local rankColor = i <= 3 and colors.green or colorText
+            drawText(indent, y, line, rankColor)
+            y = y + 1
+        end
+    end
+    
+    return y
+end
+
+--- Draw dashboard layout (based on enabled sections)
 local function drawDashboard()
     clearMonitor()
     local y = 1
@@ -445,12 +591,20 @@ local function drawDashboard()
         y = y + 1
     end
     
-    if showSections.stats then
+    if showSections.stats and y < monitorHeight - 2 then
         y = drawStats(y)
     end
     
     if showSections.recent_sales and y < monitorHeight - 3 then
-        y = drawRecentSales(y, 5)
+        y = drawRecentSales(y)
+    end
+    
+    if showSections.top_products and y < monitorHeight - 3 then
+        y = drawTopProducts(y)
+    end
+    
+    if showSections.top_buyers and y < monitorHeight - 3 then
+        y = drawTopBuyers(y)
     end
     
     if showSections.low_stock and y < monitorHeight - 3 then
@@ -563,17 +717,8 @@ local function updateDisplay()
         return
     end
     
-    if layout == "dashboard" then
-        drawDashboard()
-    elseif layout == "sales_feed" then
-        drawSalesFeed()
-    elseif layout == "stock" then
-        drawStockDisplay()
-    elseif layout == "custom" then
-        drawCustom()
-    else
-        drawDashboard()
-    end
+    -- Always use dashboard layout which respects section settings
+    drawDashboard()
 end
 
 --- Main run loop
