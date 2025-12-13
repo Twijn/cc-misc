@@ -1,7 +1,8 @@
 --- SignShop Configuration UI ---
 --- Interactive configuration interface for SignShop using formui.
+--- Includes product search/filter and history management.
 ---
----@version 1.4.2
+---@version 1.5.0
 
 if not package.path:find("disk") then
     package.path = package.path .. ";/disk/?.lua;/disk/lib/?.lua"
@@ -14,31 +15,79 @@ local inventoryManager = require("managers.inventory")
 local aisleManager = require("managers.aisle")
 local signManager = require("managers.sign")
 local salesManager = require("managers.sales")
+local historyManager = require("managers.history")
 
 local VERSION = ssVersion and ssVersion() or "unknown"
 
 local config = {}
 
+-- Current filter state (persisted while navigating product menus)
+local currentFilter = ""
+
 --- Display a simple menu with arrow key navigation and scrolling
 ---@param title string Menu title
 ---@param options table Array of {label, action} pairs
+---@param filterable? boolean Whether to enable filter mode with / or F key
+---@param filterFn? function Function to filter options: fn(option, filterText) -> boolean
 ---@return string|nil action The selected action or nil if cancelled
-local function showMenu(title, options)
+local function showMenu(title, options, filterable, filterFn)
     local selected = 1
     local scroll = 0
+    local filterText = filterable and currentFilter or ""
+    local isFiltering = false
     
-    -- Find first non-separator option
-    while options[selected] and options[selected].separator do
-        selected = selected + 1
+    -- Apply filter to options
+    local function getFilteredOptions()
+        if not filterable or filterText == "" then
+            return options
+        end
+        
+        local filtered = {}
+        local lowerFilter = filterText:lower()
+        
+        for _, opt in ipairs(options) do
+            if opt.separator then
+                -- Keep separators if they're before matching items
+                -- We'll handle this by just including them anyway
+            else
+                local include = false
+                if filterFn then
+                    include = filterFn(opt, lowerFilter)
+                else
+                    -- Default: match label
+                    include = opt.label and opt.label:lower():find(lowerFilter, 1, true)
+                end
+                if include then
+                    table.insert(filtered, opt)
+                end
+            end
+        end
+        
+        return filtered
     end
     
+    -- Find first non-separator option
+    local function findFirstOption(opts)
+        for i, opt in ipairs(opts) do
+            if not opt.separator then
+                return i
+            end
+        end
+        return 1
+    end
+    
+    local filteredOptions = getFilteredOptions()
+    selected = findFirstOption(filteredOptions)
+    
     while true do
+        filteredOptions = getFilteredOptions()
+        
         term.clear()
         term.setCursorPos(1, 1)
         
         local w, h = term.getSize()
         local headerHeight = 3  -- title + separator + blank line
-        local footerHeight = 2  -- help text
+        local footerHeight = filterable and 3 or 2  -- help text + filter line if filterable
         local visibleHeight = h - headerHeight - footerHeight
         
         -- Draw title
@@ -47,11 +96,20 @@ local function showMenu(title, options)
         print(title)
         term.setTextColor(colors.gray)
         print(string.rep("-", w))
-        print()
+        
+        -- Show filter status if active
+        if filterable and filterText ~= "" then
+            term.setTextColor(colors.lightBlue)
+            local filterInfo = string.format("Filter: %s (Showing %d of %d)", 
+                filterText, #filteredOptions, #options)
+            print(filterInfo)
+        else
+            print()
+        end
         
         -- Calculate which items to show (flattened view for scrolling)
         local displayLines = {}
-        for i, opt in ipairs(options) do
+        for i, opt in ipairs(filteredOptions) do
             if opt.separator then
                 if opt.label ~= "" then
                     table.insert(displayLines, { type = "separator", label = opt.label, index = i })
@@ -123,53 +181,116 @@ local function showMenu(title, options)
             write("v")
         end
         
-        -- Draw help
-        term.setCursorPos(1, h - 1)
+        -- Draw help and filter input
+        term.setCursorPos(1, h - (filterable and 2 or 1))
         term.setTextColor(colors.gray)
-        print("Up/Down: Navigate | Enter: Select | Q: Back")
+        if filterable then
+            print("Up/Down: Navigate | Enter: Select | /,F: Filter | Esc: Clear | Q: Back")
+            if isFiltering then
+                term.setTextColor(colors.yellow)
+                write("Filter: ")
+                term.setTextColor(colors.white)
+                write(filterText .. "_")
+            end
+        else
+            print("Up/Down: Navigate | Enter: Select | Q: Back")
+        end
         
         -- Handle input
-        local e, key = os.pullEvent("key")
-        if key == keys.up then
-            repeat
-                selected = selected - 1
-                if selected < 1 then selected = #options end
-            until not options[selected].separator
-        elseif key == keys.down then
-            repeat
-                selected = selected + 1
-                if selected > #options then selected = 1 end
-            until not options[selected].separator
-        elseif key == keys.pageUp then
-            for _ = 1, visibleHeight - 1 do
+        if isFiltering then
+            local e, p1, p2 = os.pullEvent()
+            if e == "key" then
+                if p1 == keys.enter or p1 == keys.escape then
+                    isFiltering = false
+                    if p1 == keys.escape then
+                        filterText = ""
+                        currentFilter = ""
+                    end
+                elseif p1 == keys.backspace then
+                    filterText = filterText:sub(1, -2)
+                    currentFilter = filterText
+                    selected = findFirstOption(getFilteredOptions())
+                    scroll = 0
+                end
+            elseif e == "char" then
+                filterText = filterText .. p1
+                currentFilter = filterText
+                selected = findFirstOption(getFilteredOptions())
+                scroll = 0
+            end
+        else
+            local e, key = os.pullEvent("key")
+            if key == keys.up then
                 repeat
                     selected = selected - 1
-                    if selected < 1 then selected = #options end
-                until not options[selected].separator
-            end
-        elseif key == keys.pageDown then
-            for _ = 1, visibleHeight - 1 do
+                    if selected < 1 then selected = #filteredOptions end
+                until not filteredOptions[selected] or not filteredOptions[selected].separator
+            elseif key == keys.down then
                 repeat
                     selected = selected + 1
-                    if selected > #options then selected = 1 end
-                until not options[selected].separator
+                    if selected > #filteredOptions then selected = 1 end
+                until not filteredOptions[selected] or not filteredOptions[selected].separator
+            elseif key == keys.pageUp then
+                for _ = 1, visibleHeight - 1 do
+                    repeat
+                        selected = selected - 1
+                        if selected < 1 then selected = #filteredOptions end
+                    until not filteredOptions[selected] or not filteredOptions[selected].separator
+                end
+            elseif key == keys.pageDown then
+                for _ = 1, visibleHeight - 1 do
+                    repeat
+                        selected = selected + 1
+                        if selected > #filteredOptions then selected = 1 end
+                    until not filteredOptions[selected] or not filteredOptions[selected].separator
+                end
+            elseif key == keys.home then
+                selected = findFirstOption(filteredOptions)
+            elseif key == keys["end"] then
+                selected = #filteredOptions
+                while filteredOptions[selected] and filteredOptions[selected].separator do
+                    selected = selected - 1
+                end
+            elseif key == keys.enter then
+                if filteredOptions[selected] then
+                    return filteredOptions[selected].action
+                end
+            elseif key == keys.q then
+                return nil
+            elseif filterable and (key == keys.slash or key == keys.f) then
+                isFiltering = true
+            elseif filterable and key == keys.escape then
+                filterText = ""
+                currentFilter = ""
+                selected = findFirstOption(getFilteredOptions())
+                scroll = 0
             end
-        elseif key == keys.home then
-            selected = 1
-            while options[selected] and options[selected].separator do
-                selected = selected + 1
-            end
-        elseif key == keys["end"] then
-            selected = #options
-            while options[selected] and options[selected].separator do
-                selected = selected - 1
-            end
-        elseif key == keys.enter then
-            return options[selected].action
-        elseif key == keys.q then
-            return nil
         end
     end
+end
+
+--- Filter function for product options
+---@param opt table The option to check
+---@param filterText string The lowercase filter text
+---@return boolean True if option matches filter
+local function productFilterFn(opt, filterText)
+    if not opt.product then return false end
+    local product = opt.product
+    
+    -- Match product name (line1 + line2)
+    local name = (product.line1 or "") .. " " .. (product.line2 or "")
+    if name:lower():find(filterText, 1, true) then return true end
+    
+    -- Match meta
+    if product.meta and product.meta:lower():find(filterText, 1, true) then return true end
+    
+    -- Match aisle name
+    if product.aisleName and product.aisleName:lower():find(filterText, 1, true) then return true end
+    
+    -- Match mod ID
+    if product.modid and product.modid:lower():find(filterText, 1, true) then return true end
+    
+    return false
 end
 
 --- Display the main menu
@@ -195,10 +316,14 @@ local function mainMenu()
         { label = "Update All Aisles", action = "update_aisles" },
         { separator = true, label = "--- Inventory ---" },
         { label = "Rescan Inventory", action = "rescan" },
+        { separator = true, label = "--- History ---" },
+        { label = "View History", action = "view_history" },
+        { label = "Undo Change", action = "undo_change" },
         { separator = true, label = "--- Settings ---" },
         { label = "Krist Settings", action = "krist" },
         { label = "Modem Settings", action = "modem" },
         { label = "ShopSync Settings", action = "shopsync" },
+        { label = "Monitor Settings", action = "monitor" },
         { separator = true, label = "" },
         { label = "Exit", action = "exit" },
     })
@@ -451,7 +576,7 @@ showProducts = function()
         
         -- Build menu with aisle grouping
         local menuOptions = {
-            { separator = true, label = string.format("Total: %d products", #options) },
+            { separator = true, label = string.format("Total: %d products | Press / or F to filter", #options) },
         }
         
         for _, aisleName in ipairs(aisleNames) do
@@ -473,9 +598,11 @@ showProducts = function()
         table.insert(menuOptions, { label = "Add New Product", action = "add" })
         table.insert(menuOptions, { label = "Back to Main Menu", action = "back" })
         
-        local action = showMenu("Products", menuOptions)
+        -- Use filterable menu with product filter function
+        local action = showMenu("Products", menuOptions, true, productFilterFn)
         
         if action == "back" or action == nil then
+            currentFilter = ""  -- Clear filter when leaving
             return
         elseif action == "add" then
             addProduct()
@@ -1925,17 +2052,264 @@ function config.run()
             updateSigns()
         elseif action == "update_aisles" then
             updateAisles()
+        elseif action == "view_history" then
+            showHistory()
+        elseif action == "undo_change" then
+            showUndoMenu()
         elseif action == "krist" then
             configureKrist()
         elseif action == "modem" then
             configureModem()
         elseif action == "shopsync" then
             configureShopSync()
+        elseif action == "monitor" then
+            configureMonitor()
         elseif action == "exit" or action == nil then
             term.clear()
             term.setCursorPos(1, 1)
             break
         end
+    end
+end
+
+--- View change history
+local function showHistory()
+    local scroll = 0
+    
+    while true do
+        term.clear()
+        term.setCursorPos(1, 1)
+        
+        local w, h = term.getSize()
+        local headerHeight = 3
+        local footerHeight = 2
+        local visibleHeight = h - headerHeight - footerHeight
+        
+        local history = historyManager.getHistory(50)
+        
+        -- Title
+        term.setTextColor(colors.yellow)
+        print("=== Change History ===")
+        term.setTextColor(colors.gray)
+        print(string.rep("-", w))
+        print()
+        
+        if #history == 0 then
+            term.setTextColor(colors.gray)
+            print("No history recorded yet.")
+        else
+            -- Clamp scroll
+            scroll = math.max(0, math.min(scroll, math.max(0, #history - visibleHeight)))
+            
+            -- Draw history entries
+            for i = scroll + 1, math.min(#history, scroll + visibleHeight) do
+                local entry = history[i]
+                
+                local line = string.format("#%d %s - %s",
+                    entry.id,
+                    entry.date or "?",
+                    historyManager.formatEntry(entry))
+                
+                -- Truncate if too long
+                if #line > w - 1 then
+                    line = line:sub(1, w - 4) .. "..."
+                end
+                
+                -- Color based on status
+                if entry.undone then
+                    term.setTextColor(colors.gray)
+                elseif entry.action == "delete" then
+                    term.setTextColor(colors.red)
+                elseif entry.action == "create" then
+                    term.setTextColor(colors.green)
+                else
+                    term.setTextColor(colors.white)
+                end
+                print(line)
+            end
+            
+            -- Draw scroll indicators
+            term.setTextColor(colors.gray)
+            if scroll > 0 then
+                term.setCursorPos(w, headerHeight + 1)
+                write("^")
+            end
+            if scroll + visibleHeight < #history then
+                term.setCursorPos(w, h - footerHeight)
+                write("v")
+            end
+        end
+        
+        -- Footer
+        term.setCursorPos(1, h - 1)
+        term.setTextColor(colors.gray)
+        print("Up/Down: Scroll | Q: Back")
+        
+        local e, key = os.pullEvent("key")
+        if key == keys.q then
+            return
+        elseif key == keys.up then
+            scroll = scroll - 1
+        elseif key == keys.down then
+            scroll = scroll + 1
+        elseif key == keys.pageUp then
+            scroll = scroll - (visibleHeight - 1)
+        elseif key == keys.pageDown then
+            scroll = scroll + (visibleHeight - 1)
+        elseif key == keys.home then
+            scroll = 0
+        elseif key == keys["end"] then
+            scroll = #history - visibleHeight
+        end
+    end
+end
+
+--- Show undo menu with undoable changes
+local function showUndoMenu()
+    local undoable = historyManager.getUndoableChanges(20)
+    
+    if #undoable == 0 then
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.yellow)
+        print("No changes available to undo.")
+        term.setTextColor(colors.gray)
+        print("\nPress any key to continue...")
+        os.pullEvent("key")
+        return
+    end
+    
+    local options = {
+        { separator = true, label = "Select a change to undo:" },
+    }
+    
+    for _, entry in ipairs(undoable) do
+        local label = string.format("#%d %s - %s",
+            entry.id,
+            entry.date or "?",
+            historyManager.formatEntry(entry))
+        table.insert(options, {
+            label = label,
+            action = tostring(entry.id),
+            entry = entry,
+        })
+    end
+    
+    table.insert(options, { separator = true, label = "" })
+    table.insert(options, { label = "Cancel", action = "cancel" })
+    
+    local action = showMenu("Undo Change", options)
+    
+    if action == "cancel" or action == nil then
+        return
+    end
+    
+    local entryId = tonumber(action)
+    if not entryId then return end
+    
+    -- Confirmation
+    local entry = historyManager.getEntry(entryId)
+    if not entry then return end
+    
+    term.clear()
+    term.setCursorPos(1, 1)
+    term.setTextColor(colors.yellow)
+    print("=== Confirm Undo ===")
+    term.setTextColor(colors.white)
+    print()
+    print("You are about to undo:")
+    term.setTextColor(colors.lightBlue)
+    print("  " .. historyManager.formatEntry(entry))
+    print()
+    
+    if entry.action == "create" then
+        term.setTextColor(colors.red)
+        print("This will DELETE the created product.")
+    elseif entry.action == "update" then
+        term.setTextColor(colors.orange)
+        print("This will RESTORE the previous state.")
+    elseif entry.action == "delete" then
+        term.setTextColor(colors.green)
+        print("This will RESTORE the deleted product.")
+    end
+    
+    print()
+    term.setTextColor(colors.white)
+    print("Press Y to confirm, any other key to cancel")
+    
+    local _, key = os.pullEvent("key")
+    if key == keys.y then
+        local success, err = historyManager.undo(entryId, productManager)
+        
+        term.clear()
+        term.setCursorPos(1, 1)
+        if success then
+            term.setTextColor(colors.green)
+            print("Change undone successfully!")
+        else
+            term.setTextColor(colors.red)
+            print("Failed to undo: " .. (err or "Unknown error"))
+        end
+    else
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.yellow)
+        print("Undo cancelled.")
+    end
+    
+    term.setTextColor(colors.gray)
+    print("\nPress any key to continue...")
+    os.pullEvent("key")
+end
+
+--- Configure monitor settings
+local function configureMonitor()
+    local form = formui.new("Monitor Display Settings")
+    
+    local currentEnabled = settings.get("monitor.enabled") or false
+    local currentSide = settings.get("monitor.side") or ""
+    local currentLayout = settings.get("monitor.layout") or "dashboard"
+    local currentRefresh = settings.get("monitor.refresh_rate") or 5
+    
+    local enabledField = form:checkbox("Enable Monitor", currentEnabled)
+    local sideField = form:text("Monitor Side/Name (empty=auto)", currentSide)
+    local layoutField = form:text("Layout (dashboard/sales_feed/stock/custom)", currentLayout)
+    local refreshField = form:number("Refresh Rate (seconds)", currentRefresh,
+        formui.validation.number_range(1, 60))
+    
+    form:label("")
+    form:label("--- Colors (0-15) ---")
+    local bgColorField = form:number("Background Color", settings.get("monitor.colors.background") or colors.black,
+        formui.validation.number_range(0, 15))
+    local headerColorField = form:number("Header Color", settings.get("monitor.colors.header") or colors.yellow,
+        formui.validation.number_range(0, 15))
+    local textColorField = form:number("Text Color", settings.get("monitor.colors.text") or colors.white,
+        formui.validation.number_range(0, 15))
+    local accentColorField = form:number("Accent Color", settings.get("monitor.colors.accent") or colors.lightBlue,
+        formui.validation.number_range(0, 15))
+    
+    form:addSubmitCancel()
+    
+    local result = form:run()
+    if result then
+        settings.set("monitor.enabled", enabledField())
+        settings.set("monitor.side", sideField())
+        settings.set("monitor.layout", layoutField())
+        settings.set("monitor.refresh_rate", refreshField())
+        settings.set("monitor.colors.background", bgColorField())
+        settings.set("monitor.colors.header", headerColorField())
+        settings.set("monitor.colors.text", textColorField())
+        settings.set("monitor.colors.accent", accentColorField())
+        settings.save()
+        
+        term.clear()
+        term.setCursorPos(1, 1)
+        term.setTextColor(colors.green)
+        print("Monitor settings saved!")
+        print("Restart SignShop for changes to take effect.")
+        term.setTextColor(colors.gray)
+        print("\nPress any key to continue...")
+        os.pullEvent("key")
     end
 end
 
