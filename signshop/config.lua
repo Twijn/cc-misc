@@ -28,9 +28,8 @@ local config = {}
 local function mainMenu()
     return menu.show("SignShop v" .. VERSION, {
         { separator = true, label = "--- Products ---" },
-        { label = "View Products", action = "products" },
+        { label = "View/Edit Products", action = "products" },
         { label = "Add Product", action = "add_product" },
-        { label = "Edit Product", action = "edit_product" },
         { label = "Delete Product", action = "delete_product" },
         { separator = true, label = "--- Sales ---" },
         { label = "View Sales Dashboard", action = "sales_dashboard" },
@@ -69,8 +68,6 @@ function config.run()
             productsConfig.showList()
         elseif action == "add_product" then
             productsConfig.add()
-        elseif action == "edit_product" then
-            productsConfig.edit()
         elseif action == "delete_product" then
             productsConfig.delete()
         

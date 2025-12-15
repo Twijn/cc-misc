@@ -260,6 +260,8 @@ function menu.show(title, options, filterable, filterFn)
                 return nil
             elseif filterable and (key == keys.slash or key == keys.f) then
                 isFiltering = true
+                -- Consume the pending char event to prevent the trigger key from being added to filter
+                os.pullEvent("char")
             elseif filterable and key == keys.escape then
                 filterText = ""
                 currentFilter = ""
