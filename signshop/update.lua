@@ -28,19 +28,7 @@ end)
 
 local diskPrefix = fs.exists("disk") and "disk/" or ""
 
--- Progress bar utilities
-local screenWidth = term.getSize()
-local progressBarWidth = math.max(10, screenWidth - 30)
-
-local function drawProgressBar(line, current, total, label, status)
-    local _, curY = term.getCursorPos()
-    term.setCursorPos(1, line)
-    term.clearLine()
-    
-    local progress = current / total
-    local filled = math.floor(progress * progressBarWidth)
-    local empty = progressBarWidth - filled
-    
+local function printFileStatus(fileName, status, current, total)
     -- Status indicator
     if status == "done" then
         term.setTextColor(colors.green)
@@ -58,24 +46,13 @@ local function drawProgressBar(line, current, total, label, status)
     
     -- Label (truncate if needed)
     term.setTextColor(colors.white)
-    local maxLabelLen = 15
-    local displayLabel = #label > maxLabelLen and label:sub(1, maxLabelLen - 2) .. ".." or label
+    local maxLabelLen = 20
+    local displayLabel = #fileName > maxLabelLen and fileName:sub(1, maxLabelLen - 2) .. ".." or fileName
     term.write(string.format("%-" .. maxLabelLen .. "s ", displayLabel))
     
-    -- Progress bar
+    -- Progress
     term.setTextColor(colors.gray)
-    term.write("[")
-    term.setTextColor(colors.green)
-    term.write(string.rep("=", filled))
-    term.setTextColor(colors.gray)
-    term.write(string.rep("-", empty))
-    term.write("]")
-    
-    -- Percentage
-    term.setTextColor(colors.white)
-    term.write(string.format(" %3d%%", math.floor(progress * 100)))
-    
-    term.setCursorPos(1, curY)
+    print(string.format("(%d/%d)", current, total))
 end
 
 local function downloadFile(url, path)
@@ -104,40 +81,25 @@ local function updateLibraries()
         print("")
         print(string.format("Updated %d library(ies)", updated))
     else
-        -- Fallback to manual library download with progress bars
+        -- Fallback to manual library download
         local libs = {"s", "tables", "log", "persist", "formui", "shopk", "updater", "cmd"}
         local libDir = diskPrefix .. "lib"
         local successCount = 0
-        local results = {}
         
-        -- Reserve lines for each library
-        local _, startY = term.getCursorPos()
+        -- Download each library
         for i, lib in ipairs(libs) do
-            print("") -- Reserve a line
-            results[i] = {lib = lib, status = "pending", progress = 0}
-        end
-        
-        -- Download each library and update its progress bar
-        for i, lib in ipairs(libs) do
-            local line = startY + i - 1
-            results[i].status = "working"
-            drawProgressBar(line, i - 0.5, #libs, lib .. ".lua", "working")
-            
+            local fileName = lib .. ".lua"
             local url = BASE_URL .. "/util/" .. lib .. ".lua"
             local path = libDir .. "/" .. lib .. ".lua"
             
             if downloadFile(url, path) then
                 successCount = successCount + 1
-                results[i].status = "done"
-                drawProgressBar(line, i, #libs, lib .. ".lua", "done")
+                printFileStatus(fileName, "done", i, #libs)
             else
-                results[i].status = "fail"
-                drawProgressBar(line, i, #libs, lib .. ".lua", "fail")
+                printFileStatus(fileName, "fail", i, #libs)
             end
         end
         
-        -- Move cursor past progress bars
-        term.setCursorPos(1, startY + #libs)
         print("")
         print(string.format("Updated %d/%d libraries", successCount, #libs))
     end
@@ -183,34 +145,19 @@ local function updateSignShop()
     fs.makeDir(diskPrefix .. "managers")
     
     local successCount = 0
-    local results = {}
     
-    -- Reserve lines for each file
-    local _, startY = term.getCursorPos()
+    -- Download each file
     for i, file in ipairs(files) do
-        print("") -- Reserve a line
-        results[i] = {file = file, status = "pending", progress = 0}
-    end
-    
-    -- Download each file and update its progress bar
-    for i, file in ipairs(files) do
-        local line = startY + i - 1
         local fileName = fs.getName(file.path)
-        results[i].status = "working"
-        drawProgressBar(line, i - 0.5, #files, fileName, "working")
         
         if downloadFile(file.url, file.path) then
             successCount = successCount + 1
-            results[i].status = "done"
-            drawProgressBar(line, i, #files, fileName, "done")
+            printFileStatus(fileName, "done", i, #files)
         else
-            results[i].status = "fail"
-            drawProgressBar(line, i, #files, fileName, "fail")
+            printFileStatus(fileName, "fail", i, #files)
         end
     end
     
-    -- Move cursor past progress bars
-    term.setCursorPos(1, startY + #files)
     print("")
     print(string.format("Updated %d/%d files", successCount, #files))
 end
