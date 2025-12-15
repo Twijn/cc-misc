@@ -2,7 +2,7 @@
 --- Handles Krist transactions and item dispensing.
 --- Includes pending transaction tracking for graceful shutdown.
 ---
----@version 1.5.0
+---@version 1.6.0
 
 local s = require("lib.s")
 local logger = require("lib.log")

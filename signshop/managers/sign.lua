@@ -1,15 +1,19 @@
 --- SignShop Sign Manager ---
 --- Manages shop signs and updates them with product/stock information.
 ---
----@version 1.5.0
+---@version 1.6.0
 
 local logger = require("lib.log")
 local persist = require("lib.persist")
+local s = require("lib.s")
 local aisleManager = require("managers.aisle")
 local productManager = require("managers.product")
 local inventoryManager = require("managers.inventory")
 
 local productSigns = persist("product-signs.json")
+
+-- Maximum stock to display on signs (0 = unlimited)
+local maxStockDisplay = s.number("signshop.max_stock_display", 0, 999999, 0)
 
 local manager = {}
 
@@ -46,10 +50,19 @@ local function createSignIfProduct(sign)
 end
 
 local function formatStock(stock)
-  if stock >= 1000 then
-    return math.floor(stock / 100) / 10 .. "K"
+  -- Apply max stock display limit if configured
+  local displayStock = stock
+  local capped = false
+  if maxStockDisplay > 0 and stock > maxStockDisplay then
+    displayStock = maxStockDisplay
+    capped = true
+  end
+  
+  if displayStock >= 1000 then
+    local formatted = math.floor(displayStock / 100) / 10 .. "K"
+    return capped and formatted .. "+" or formatted
   else
-    return stock
+    return capped and displayStock .. "+" or displayStock
   end
 end
 

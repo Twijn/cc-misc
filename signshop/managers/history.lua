@@ -5,7 +5,7 @@
 --- provides undo capability for recent changes, persists history to disk,
 --- limits history size to prevent unbounded growth.
 ---
----@version 1.5.0
+---@version 1.6.0
 -- @module signshop-history
 
 local persist = require("lib.persist")

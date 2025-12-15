@@ -12,7 +12,7 @@
 ---    print(result.message)
 ---end
 ---
----@version 1.5.0
+---@version 1.6.0
 -- @module errors
 
 local VERSION = "1.5.0"

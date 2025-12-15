@@ -1,7 +1,7 @@
 --- SignShop Aisle ---
 --- Turtle component that dispenses items and responds to server pings.
 ---
----@version 1.5.0
+---@version 1.6.0
 -- @module signshop-aisle
 
 local VERSION = "1.5.0"

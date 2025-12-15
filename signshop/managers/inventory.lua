@@ -2,7 +2,7 @@
 --- Manages inventory scanning and item dispensing.
 --- Includes aisle health checking before dispense operations.
 ---
----@version 1.5.0
+---@version 1.6.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")

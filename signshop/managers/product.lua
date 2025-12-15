@@ -2,7 +2,7 @@
 --- Manages product definitions and metadata.
 --- Integrates with history manager for undo functionality.
 ---
----@version 1.5.0
+---@version 1.6.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")

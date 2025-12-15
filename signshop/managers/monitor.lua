@@ -5,7 +5,7 @@
 --- real-time updates on purchase events, configurable colors and sections,
 --- automatic monitor detection, text scaling for different monitor sizes.
 ---
----@version 1.5.0
+---@version 1.6.0
 -- @module signshop-monitor
 
 local s = require("lib.s")

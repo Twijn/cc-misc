@@ -2,10 +2,10 @@
 --- Main server component that manages aisles, inventory, products, and purchases.
 --- Includes graceful shutdown handling for proper state persistence.
 ---
----@version 1.5.0
+---@version 1.6.0
 -- @module signshop-server
 
-local VERSION = "1.5.0"
+local VERSION = "1.6.0"
 
 if not package.path:find("disk") then
     package.path = package.path .. ";/disk/?.lua;/disk/lib/?.lua"

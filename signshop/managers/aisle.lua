@@ -2,7 +2,7 @@
 --- Handles communication with aisle turtles via modem.
 --- Provides health monitoring for aisle turtles with status tracking.
 ---
----@version 1.5.0
+---@version 1.6.0
 
 local s = require("lib.s")
 local logger = require("lib.log")

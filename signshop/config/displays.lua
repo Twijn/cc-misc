@@ -1,0 +1,73 @@
+--- SignShop Display Monitors Configuration ---
+--- Configures multiple display monitors for the shop.
+---
+---@version 1.0.0
+
+-- Display monitor configuration
+-- Each monitor can have a unique display type and filtering options
+--
+-- Display types:
+--   - "catalog"     : Shows all products with prices, organized by category
+--   - "dashboard"   : Shows sales stats, recent purchases, low stock (original monitor)
+--   - "stock"       : Shows all products with stock levels
+--   - "category"    : Shows products from specific categories only
+--   - "sales_feed"  : Live scrolling sales feed
+--
+-- Filter options:
+--   - categories: List of category IDs to show (nil = all)
+--   - products: List of specific product metas to show (nil = all)
+--   - minStock: Only show items with at least this stock
+--   - maxStock: Only show items with at most this stock
+--   - sortBy: "name", "price", "stock", "category"
+--   - sortDesc: true for descending order
+--
+-- Example configuration:
+return {
+    -- Example: Main catalog display on a large monitor
+    -- {
+    --     id = "main_catalog",
+    --     peripheral = "monitor_0",      -- Peripheral name
+    --     displayType = "catalog",
+    --     title = "Shop Catalog",
+    --     refreshRate = 10,              -- Seconds between updates
+    --     colors = {
+    --         background = colors.black,
+    --         header = colors.yellow,
+    --         text = colors.white,
+    --         accent = colors.lightBlue,
+    --         price = colors.lime,
+    --         lowStock = colors.orange,
+    --         noStock = colors.red,
+    --     },
+    --     filter = {
+    --         categories = nil,          -- All categories
+    --         sortBy = "category",
+    --     },
+    --     options = {
+    --         showStock = true,
+    --         showPrice = true,
+    --         showCategory = true,
+    --         groupByCategory = true,
+    --         scrollSpeed = 5,           -- Seconds per page
+    --     },
+    -- },
+    
+    -- Example: Category-specific display
+    -- {
+    --     id = "tools_display",
+    --     peripheral = "monitor_1",
+    --     displayType = "category",
+    --     title = "Tools",
+    --     refreshRate = 15,
+    --     filter = {
+    --         categories = {"tools"},
+    --     },
+    -- },
+    
+    -- Example: Duplicate display (same content on multiple monitors)
+    -- {
+    --     id = "catalog_mirror",
+    --     peripheral = "monitor_2",
+    --     mirrorOf = "main_catalog",     -- Mirrors another display
+    -- },
+}
