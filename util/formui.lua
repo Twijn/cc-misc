@@ -181,7 +181,7 @@ end
 function FormUI:addField(field)
     table.insert(self.fields, field)
     return function()
-        if not self.result or not self.result[field.label] then
+        if not self.result or self.result[field.label] == nil then
             error("Could not get value for field " .. field.label)
         end
         return self.result[field.label]
