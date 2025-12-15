@@ -77,6 +77,7 @@ local function updateLibraries()
     
     if updater then
         -- Use the updater library for smart updates
+        updater.setVerbose(true)
         local updated = updater.updateAll()
         print("")
         print(string.format("Updated %d library(ies)", updated))
