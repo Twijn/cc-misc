@@ -96,10 +96,11 @@ local products = categoryManager.getProductsInCategory("tools")
 
 ## Stock Display Limits
 
-Limit the maximum stock shown on signs and ShopSync to hide your actual inventory:
+Limit the maximum stock shown on signs and ShopSync per product to hide your actual inventory:
 
-- Set `signshop.max_stock_display` in settings (0 = unlimited)
+- Set `maxStockDisplay` on individual products (0 = unlimited, shows actual stock)
 - Stock above the limit will show as "X+" (e.g., "100+" if limit is 100)
+- Configure via product edit form: "Max Stock Display (0=unlimited)"
 
 ## Requirements
 

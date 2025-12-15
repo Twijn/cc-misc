@@ -11,9 +11,6 @@ local inventoryManager = require("managers.inventory")
 local productManager = require("managers.product")
 local purchaseManager = require("managers.purchase")
 
--- Maximum stock to display on ShopSync (0 = unlimited)
-local maxStockDisplay = s.number("signshop.max_stock_display", 0, 999999, 0)
-
 -- Check if this is first run or settings are missing
 local needsSetup = not settings.get("shopsync.modem")
 
@@ -122,9 +119,10 @@ local function sendShopSync()
         local name = productManager.getName(product)
         local stock = inventoryManager.getItemStock(product.modid, product.itemnbt, product.anyNbt) or 0
         
-        -- Apply max stock display limit if configured
-        if maxStockDisplay > 0 and stock > maxStockDisplay then
-            stock = maxStockDisplay
+        -- Apply per-product max stock display limit if configured
+        local maxStock = product.maxStockDisplay or 0
+        if maxStock > 0 and stock > maxStock then
+            stock = maxStock
         end
         
         table.insert(items, {

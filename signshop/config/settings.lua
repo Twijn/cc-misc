@@ -11,36 +11,6 @@ local formui = require("lib.formui")
 
 local settingsConfig = {}
 
---- Configure general shop settings
-function settingsConfig.configureGeneral()
-    local form = formui.new("General Shop Settings")
-    
-    local currentMaxStock = settings.get("signshop.max_stock_display") or 0
-    
-    form:label("--- Stock Display ---")
-    form:label("Set max stock to limit displayed stock on signs/ShopSync")
-    form:label("(0 = unlimited, shows actual stock)")
-    local maxStockField = form:number("Max Stock Display", currentMaxStock,
-        formui.validation.number_range(0, 999999))
-    
-    form:addSubmitCancel()
-    
-    local result = form:run()
-    if result then
-        settings.set("signshop.max_stock_display", maxStockField())
-        settings.save()
-        
-        term.clear()
-        term.setCursorPos(1, 1)
-        term.setTextColor(colors.green)
-        print("General settings saved!")
-        print("Restart SignShop for changes to take effect.")
-        term.setTextColor(colors.gray)
-        print("\nPress any key to continue...")
-        os.pullEvent("key")
-    end
-end
-
 --- Configure Krist settings
 function settingsConfig.configureKrist()
     local form = formui.new("Krist Settings")

@@ -31,9 +31,6 @@ local displayConfig = persist("display-config.json")
 -- Active display instances
 local activeDisplays = {}
 
--- Maximum stock to display
-local maxStockDisplay = s.number("signshop.max_stock_display", 0, 999999, 0)
-
 --- Default color scheme
 local defaultColors = {
     background = colors.black,
@@ -97,9 +94,11 @@ if ok then salesManager = sm end
 
 --- Format stock for display
 ---@param stock number Raw stock count
+---@param product table|nil Product with optional maxStockDisplay
 ---@return string Formatted stock string
 ---@return number Color for the stock
-local function formatStock(stock)
+local function formatStock(stock, product)
+    local maxStockDisplay = product and product.maxStockDisplay or 0
     local displayStock = stock
     local capped = false
     
@@ -422,7 +421,7 @@ local function drawCatalog(display)
                 
                 -- Stock
                 if showStock then
-                    local stockStr, stockColor = formatStock(item.stock)
+                    local stockStr, stockColor = formatStock(item.stock, item.product)
                     drawText(display, x, itemY, stockStr, stockColor)
                 end
             end
@@ -463,7 +462,7 @@ local function drawCatalog(display)
                 
                 -- Stock
                 if showStock then
-                    local stockStr, stockColor = formatStock(item.stock)
+                    local stockStr, stockColor = formatStock(item.stock, item.product)
                     drawText(display, x, itemY, stockStr, stockColor)
                 end
             end
@@ -498,7 +497,7 @@ local function drawStock(display)
     for i, item in ipairs(products) do
         if y > display.height then break end
         
-        local stockStr, stockColor = formatStock(item.stock)
+        local stockStr, stockColor = formatStock(item.stock, item.product)
         local line = string.format("x%-5s %s", stockStr, item.name)
         drawText(display, 1, y, line, stockColor)
         y = y + 1

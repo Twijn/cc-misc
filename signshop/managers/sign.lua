@@ -12,9 +12,6 @@ local inventoryManager = require("managers.inventory")
 
 local productSigns = persist("product-signs.json")
 
--- Maximum stock to display on signs (0 = unlimited)
-local maxStockDisplay = s.number("signshop.max_stock_display", 0, 999999, 0)
-
 local manager = {}
 
 local function splitBySpaces(str)
@@ -49,12 +46,13 @@ local function createSignIfProduct(sign)
   end
 end
 
-local function formatStock(stock)
-  -- Apply max stock display limit if configured
+local function formatStock(stock, product)
+  -- Apply per-product max stock display limit if configured
+  local maxStock = product and product.maxStockDisplay or 0
   local displayStock = stock
   local capped = false
-  if maxStockDisplay > 0 and stock > maxStockDisplay then
-    displayStock = maxStockDisplay
+  if maxStock and maxStock > 0 and stock > maxStock then
+    displayStock = maxStock
     capped = true
   end
   
@@ -71,7 +69,7 @@ local function updateSign(sign, product)
   sign.setSignText(
     product.line1,
     product.line2,
-    string.format("%.03f KRO | %s", product.cost, formatStock(stock)),
+    string.format("%.03f KRO | %s", product.cost, formatStock(stock, product)),
     product.meta
   )
 end

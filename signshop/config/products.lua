@@ -102,6 +102,10 @@ local function viewProductDetails(product)
             table.insert(contentLines, { label = "NBT: ", value = product.itemnbt, labelColor = colors.lightBlue, valueColor = colors.gray })
         end
         
+        if product.maxStockDisplay and product.maxStockDisplay > 0 then
+            table.insert(contentLines, { label = "Max Stock Display: ", value = tostring(product.maxStockDisplay), labelColor = colors.lightBlue, valueColor = colors.orange })
+        end
+        
         table.insert(contentLines, { text = "", color = colors.white })
         table.insert(contentLines, { text = string.rep("-", w), color = colors.gray })
         table.insert(contentLines, { text = "Actions:", color = colors.yellow })
@@ -205,6 +209,7 @@ local function viewProductDetails(product)
             local aisleField = form:text("Aisle Name", product.aisleName)
             local modidField = form:text("Mod ID", product.modid or "")
             local anyNbtField = form:checkbox("Match Any NBT", product.anyNbt or false)
+            local maxStockField = form:number("Max Stock Display (0=unlimited)", product.maxStockDisplay or 0, formui.validation.number_range(0, 999999))
             
             form:addSubmitCancel()
             
@@ -218,7 +223,8 @@ local function viewProductDetails(product)
                     aisleName = aisleField(),
                     modid = modidField(),
                     itemnbt = product.itemnbt,
-                    anyNbt = anyNbtField()
+                    anyNbt = anyNbtField(),
+                    maxStockDisplay = maxStockField()
                 }
                 
                 local success, err = productManager:updateItem(product, newProduct)
@@ -261,6 +267,7 @@ function products.add()
     local aisleField = form:text("Aisle Name", aisleNames[1] or "")
     local modidField = form:text("Mod ID (e.g., minecraft:diamond)", "")
     local anyNbtField = form:checkbox("Match Any NBT", false)
+    local maxStockField = form:number("Max Stock Display (0=unlimited)", 0, formui.validation.number_range(0, 999999))
     
     form:addSubmitCancel()
     
@@ -285,7 +292,8 @@ function products.add()
             cost = costField(),
             aisleName = aisleField(),
             modid = modidField(),
-            anyNbt = anyNbtField()
+            anyNbt = anyNbtField(),
+            maxStockDisplay = maxStockField()
         }
         
         productManager.set(meta, product)

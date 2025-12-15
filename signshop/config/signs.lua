@@ -210,6 +210,7 @@ local function viewSignDetails(signOpt)
             local aisleField = form:text("Aisle Name", product.aisleName)
             local modidField = form:text("Mod ID", product.modid or "")
             local anyNbtField = form:checkbox("Match Any NBT", product.anyNbt or false)
+            local maxStockField = form:number("Max Stock Display (0=unlimited)", product.maxStockDisplay or 0, formui.validation.number_range(0, 999999))
             
             form:addSubmitCancel()
             
@@ -223,7 +224,8 @@ local function viewSignDetails(signOpt)
                     aisleName = aisleField(),
                     modid = modidField(),
                     itemnbt = product.itemnbt,
-                    anyNbt = anyNbtField()
+                    anyNbt = anyNbtField(),
+                    maxStockDisplay = maxStockField()
                 }
                 
                 local success, err = productManager:updateItem(product, newProduct)
