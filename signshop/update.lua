@@ -9,7 +9,7 @@
 ---update signshop   -- Update only SignShop files
 ---
 
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 local BASE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main"
 
 local args = {...}
@@ -28,10 +28,70 @@ end)
 
 local diskPrefix = fs.exists("disk") and "disk/" or ""
 
+-- Progress bar utilities
+local screenWidth = term.getSize()
+local progressBarWidth = math.max(10, screenWidth - 30)
+
+local function drawProgressBar(line, current, total, label, status)
+    local _, curY = term.getCursorPos()
+    term.setCursorPos(1, line)
+    term.clearLine()
+    
+    local progress = current / total
+    local filled = math.floor(progress * progressBarWidth)
+    local empty = progressBarWidth - filled
+    
+    -- Status indicator
+    if status == "done" then
+        term.setTextColor(colors.green)
+        term.write("[+] ")
+    elseif status == "fail" then
+        term.setTextColor(colors.red)
+        term.write("[!] ")
+    elseif status == "working" then
+        term.setTextColor(colors.yellow)
+        term.write("[>] ")
+    else
+        term.setTextColor(colors.gray)
+        term.write("[ ] ")
+    end
+    
+    -- Label (truncate if needed)
+    term.setTextColor(colors.white)
+    local maxLabelLen = 15
+    local displayLabel = #label > maxLabelLen and label:sub(1, maxLabelLen - 2) .. ".." or label
+    term.write(string.format("%-" .. maxLabelLen .. "s ", displayLabel))
+    
+    -- Progress bar
+    term.setTextColor(colors.gray)
+    term.write("[")
+    term.setTextColor(colors.green)
+    term.write(string.rep("=", filled))
+    term.setTextColor(colors.gray)
+    term.write(string.rep("-", empty))
+    term.write("]")
+    
+    -- Percentage
+    term.setTextColor(colors.white)
+    term.write(string.format(" %3d%%", math.floor(progress * 100)))
+    
+    term.setCursorPos(1, curY)
+end
+
 local function downloadFile(url, path)
     fs.delete(path)
-    local success = shell.run("wget", url, path)
-    return success and fs.exists(path)
+    local response = http.get(url)
+    if response then
+        local content = response.readAll()
+        response.close()
+        local file = fs.open(path, "w")
+        if file then
+            file.write(content)
+            file.close()
+            return true
+        end
+    end
+    return false
 end
 
 local function updateLibraries()
@@ -44,25 +104,40 @@ local function updateLibraries()
         print("")
         print(string.format("Updated %d library(ies)", updated))
     else
-        -- Fallback to manual library download
+        -- Fallback to manual library download with progress bars
         local libs = {"s", "tables", "log", "persist", "formui", "shopk", "updater", "cmd"}
         local libDir = diskPrefix .. "lib"
         local successCount = 0
+        local results = {}
         
-        for _, lib in ipairs(libs) do
-            local url = BASE_URL .. "/util/" .. lib .. ".lua"
-            local path = libDir .. "/" .. lib .. ".lua"
-            if downloadFile(url, path) then
-                successCount = successCount + 1
-                term.setTextColor(colors.green)
-                print("  + " .. lib)
-            else
-                term.setTextColor(colors.red)
-                print("  ! " .. lib)
-            end
-            term.setTextColor(colors.white)
+        -- Reserve lines for each library
+        local _, startY = term.getCursorPos()
+        for i, lib in ipairs(libs) do
+            print("") -- Reserve a line
+            results[i] = {lib = lib, status = "pending", progress = 0}
         end
         
+        -- Download each library and update its progress bar
+        for i, lib in ipairs(libs) do
+            local line = startY + i - 1
+            results[i].status = "working"
+            drawProgressBar(line, i - 0.5, #libs, lib .. ".lua", "working")
+            
+            local url = BASE_URL .. "/util/" .. lib .. ".lua"
+            local path = libDir .. "/" .. lib .. ".lua"
+            
+            if downloadFile(url, path) then
+                successCount = successCount + 1
+                results[i].status = "done"
+                drawProgressBar(line, i, #libs, lib .. ".lua", "done")
+            else
+                results[i].status = "fail"
+                drawProgressBar(line, i, #libs, lib .. ".lua", "fail")
+            end
+        end
+        
+        -- Move cursor past progress bars
+        term.setCursorPos(1, startY + #libs)
         print("")
         print(string.format("Updated %d/%d libraries", successCount, #libs))
     end
@@ -108,18 +183,34 @@ local function updateSignShop()
     fs.makeDir(diskPrefix .. "managers")
     
     local successCount = 0
-    for _, file in ipairs(files) do
-        if downloadFile(file.url, file.path) then
-            successCount = successCount + 1
-            term.setTextColor(colors.green)
-            print("  + " .. fs.getName(file.path))
-        else
-            term.setTextColor(colors.red)
-            print("  ! " .. fs.getName(file.path))
-        end
-        term.setTextColor(colors.white)
+    local results = {}
+    
+    -- Reserve lines for each file
+    local _, startY = term.getCursorPos()
+    for i, file in ipairs(files) do
+        print("") -- Reserve a line
+        results[i] = {file = file, status = "pending", progress = 0}
     end
     
+    -- Download each file and update its progress bar
+    for i, file in ipairs(files) do
+        local line = startY + i - 1
+        local fileName = fs.getName(file.path)
+        results[i].status = "working"
+        drawProgressBar(line, i - 0.5, #files, fileName, "working")
+        
+        if downloadFile(file.url, file.path) then
+            successCount = successCount + 1
+            results[i].status = "done"
+            drawProgressBar(line, i, #files, fileName, "done")
+        else
+            results[i].status = "fail"
+            drawProgressBar(line, i, #files, fileName, "fail")
+        end
+    end
+    
+    -- Move cursor past progress bars
+    term.setCursorPos(1, startY + #files)
     print("")
     print(string.format("Updated %d/%d files", successCount, #files))
 end
