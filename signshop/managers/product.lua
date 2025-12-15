@@ -55,7 +55,8 @@ function products:createProductFromSign(meta, line1, line2, cost, aisleName)
     line2 = line2,
     cost = cost,
     aisleName = aisleName,
-    modid = modid
+    modid = modid,
+    anyNbt = false  -- Default to exact NBT matching
   }
   self.set(meta, product)
   
@@ -70,10 +71,21 @@ function products:createProductFromSign(meta, line1, line2, cost, aisleName)
 end
 
 function products:updateItem(product, newProduct)
+  -- Validate type consistency for existing keys
+  -- Note: We allow nil -> value and value -> nil transitions for optional fields
+  -- Required fields: meta, line1, cost, aisleName, modid
+  local requiredFields = { meta = true, line1 = true, cost = true, aisleName = true, modid = true }
+  
   for key, value in pairs(product) do
     local newValue = newProduct[key]
-    if type(value) ~= type(newValue) then
+    -- Skip type check if either value is nil (optional field)
+    -- But require type match if both are non-nil
+    if value ~= nil and newValue ~= nil and type(value) ~= type(newValue) then
       return false, "Key " .. key .. " must be of type " .. type(value)
+    end
+    -- Ensure required fields are not removed
+    if requiredFields[key] and newValue == nil then
+      return false, "Required field " .. key .. " cannot be removed"
     end
   end
 
