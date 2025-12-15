@@ -1,0 +1,196 @@
+--- AutoCrafter Crafting Library
+--- Handles crafting logic and job preparation.
+---
+---@version 1.0.0
+
+local VERSION = "1.0.0"
+
+local crafting = {}
+
+---Calculate how many of an item can be crafted with available materials
+---@param recipe table The recipe to evaluate
+---@param stockLevels table Current stock levels of all items
+---@return number count How many can be crafted
+function crafting.canCraft(recipe, stockLevels)
+    local minCrafts = math.huge
+    
+    for _, ingredient in ipairs(recipe.ingredients) do
+        local available = stockLevels[ingredient.item] or 0
+        local possible = math.floor(available / ingredient.count)
+        minCrafts = math.min(minCrafts, possible)
+    end
+    
+    if minCrafts == math.huge then
+        return 0
+    end
+    
+    return minCrafts * recipe.outputCount
+end
+
+---Check if a recipe has all required materials
+---@param recipe table The recipe to check
+---@param stockLevels table Current stock levels
+---@param quantity number How many to craft
+---@return boolean hasAll Whether all materials are available
+---@return table missing Table of missing materials {item, needed, have}
+function crafting.hasMaterials(recipe, stockLevels, quantity)
+    local crafts = math.ceil(quantity / recipe.outputCount)
+    local missing = {}
+    local hasAll = true
+    
+    for _, ingredient in ipairs(recipe.ingredients) do
+        local needed = ingredient.count * crafts
+        local have = stockLevels[ingredient.item] or 0
+        
+        if have < needed then
+            hasAll = false
+            table.insert(missing, {
+                item = ingredient.item,
+                needed = needed,
+                have = have,
+                short = needed - have,
+            })
+        end
+    end
+    
+    return hasAll, missing
+end
+
+---Create a crafting job
+---@param recipe table The recipe to craft
+---@param quantity number Desired output quantity
+---@param stockLevels table Current stock levels
+---@return table|nil job The crafting job or nil if not possible
+function crafting.createJob(recipe, quantity, stockLevels)
+    local outputCount = recipe.outputCount
+    local crafts = math.ceil(quantity / outputCount)
+    
+    -- Check if we have materials
+    local hasAll, missing = crafting.hasMaterials(recipe, stockLevels, quantity)
+    if not hasAll then
+        return nil, missing
+    end
+    
+    -- Build the job
+    local job = {
+        id = os.epoch("utc"),
+        recipe = recipe,
+        crafts = crafts,
+        expectedOutput = crafts * outputCount,
+        materials = {},
+        status = "pending",
+        created = os.epoch("utc"),
+    }
+    
+    -- Calculate exact materials needed
+    for _, ingredient in ipairs(recipe.ingredients) do
+        job.materials[ingredient.item] = ingredient.count * crafts
+    end
+    
+    return job
+end
+
+---Convert a slot number to turtle inventory slot
+---Turtle inventory: 1-16, crafting area: depends on crafty turtle API
+---@param gridSlot number 1-9 grid slot
+---@return number turtleSlot The corresponding turtle slot
+function crafting.gridToTurtleSlot(gridSlot)
+    -- Crafty turtle uses slots 1-9 directly for crafting
+    -- We need to map 3x3 grid to turtle slots
+    -- Turtle slots 1-4 are row 1-4 of inventory
+    -- For crafting, we use slots 1,2,3 for row 1, 5,6,7 for row 2, 9,10,11 for row 3
+    local row = math.ceil(gridSlot / 3)
+    local col = ((gridSlot - 1) % 3) + 1
+    return (row - 1) * 4 + col
+end
+
+---Convert turtle slot to grid slot
+---@param turtleSlot number The turtle inventory slot
+---@return number|nil gridSlot The grid slot or nil if not a grid slot
+function crafting.turtleSlotToGrid(turtleSlot)
+    local craftingSlots = {1, 2, 3, 5, 6, 7, 9, 10, 11}
+    for grid, turtle in ipairs(craftingSlots) do
+        if turtle == turtleSlot then
+            return grid
+        end
+    end
+    return nil
+end
+
+---Get list of turtle slots used for crafting
+---@return table slots Array of turtle slot numbers
+function crafting.getCraftingSlots()
+    return {1, 2, 3, 5, 6, 7, 9, 10, 11}
+end
+
+---Get turtle slot for crafting output
+---@return number slot The output slot
+function crafting.getOutputSlot()
+    return 16
+end
+
+---Get available slots for material storage (non-crafting slots)
+---@return table slots Array of available slot numbers
+function crafting.getStorageSlots()
+    return {4, 8, 12, 13, 14, 15, 16}
+end
+
+---Build instructions for turtle to craft
+---@param recipe table The recipe to craft
+---@return table instructions Array of {action, slot, item, count}
+function crafting.buildInstructions(recipe)
+    local grid = {}
+    for i = 1, 9 do grid[i] = nil end
+    
+    if recipe.type == "shaped" then
+        local pattern = recipe.pattern
+        local key = recipe.key
+        
+        for row = 1, #pattern do
+            local line = pattern[row]
+            for col = 1, #line do
+                local char = line:sub(col, col)
+                local gridSlot = (row - 1) * 3 + col
+                if char ~= " " and key[char] then
+                    grid[gridSlot] = key[char]
+                end
+            end
+        end
+    else -- shapeless
+        local slot = 1
+        for _, ingredient in ipairs(recipe.ingredients) do
+            for _ = 1, ingredient.count do
+                grid[slot] = ingredient.item
+                slot = slot + 1
+            end
+        end
+    end
+    
+    -- Convert to turtle instructions
+    local instructions = {}
+    for gridSlot = 1, 9 do
+        if grid[gridSlot] then
+            table.insert(instructions, {
+                action = "place",
+                gridSlot = gridSlot,
+                turtleSlot = crafting.gridToTurtleSlot(gridSlot),
+                item = grid[gridSlot],
+                count = 1,
+            })
+        end
+    end
+    
+    return instructions
+end
+
+---Estimate time to complete a crafting job
+---@param job table The crafting job
+---@return number seconds Estimated time in seconds
+function crafting.estimateTime(job)
+    -- Rough estimate: 0.5 seconds per craft operation + 2 seconds for material gathering
+    return (job.crafts * 0.5) + 2
+end
+
+crafting.VERSION = VERSION
+
+return crafting
