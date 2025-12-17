@@ -22,9 +22,17 @@ function manager.init()
     -- Initialize inventory library from cache
     inventory.init()
     
-    -- Initial scan (uses cache if available)
-    manager.scan()
-    logger.info("Storage manager initialized")
+    -- Check if we have valid cached data, only scan if needed
+    local stock = inventory.getAllStock()
+    local hasCache = stock and next(stock) ~= nil
+    
+    if hasCache then
+        logger.info("Storage manager initialized from cache")
+    else
+        -- No cache, perform initial scan
+        manager.scan()
+        logger.info("Storage manager initialized with full scan")
+    end
 end
 
 ---Set scan interval
@@ -115,10 +123,11 @@ end
 ---Deposit items from a player's inventory via manipulator
 ---@param playerName string Player name to get items from
 ---@param item? string Optional item filter
+---@param maxCount? number Optional max items to deposit
 ---@return number deposited Amount deposited
 ---@return string|nil error Error message if failed
-function manager.depositFromPlayer(playerName, item)
-    local deposited, err = inventory.depositFromPlayer(playerName, item)
+function manager.depositFromPlayer(playerName, item, maxCount)
+    local deposited, err = inventory.depositFromPlayer(playerName, item, maxCount)
     
     if deposited > 0 then
         if item then
@@ -214,6 +223,64 @@ function manager.searchItems(query)
     end)
     
     return results
+end
+
+---Fuzzy match an item name to the best match in storage
+---First tries exact match, then partial match
+---@param query string Item name or partial name
+---@return string|nil item The matched item ID or nil
+---@return number count The stock count (0 if not found)
+function manager.resolveItem(query)
+    if not query or query == "" then
+        return nil, 0
+    end
+    
+    -- Add minecraft: prefix if missing
+    if not query:find(":") then
+        query = "minecraft:" .. query
+    end
+    
+    local stock = inventory.getAllStock()
+    
+    -- Try exact match first
+    if stock[query] then
+        return query, stock[query]
+    end
+    
+    -- Try partial/fuzzy match
+    local queryLower = query:lower()
+    local bestMatch = nil
+    local bestCount = 0
+    local bestScore = 0  -- Higher score = better match
+    
+    for item, count in pairs(stock) do
+        local itemLower = item:lower()
+        
+        -- Check if query matches part of the item name
+        if itemLower:find(queryLower, 1, true) then
+            local score = 0
+            
+            -- Exact suffix match (e.g., "beef" matches "cooked_beef")
+            if itemLower:sub(-#queryLower) == queryLower then
+                score = 3
+            -- Query appears after a separator (e.g., "beef" in "minecraft:beef")
+            elseif itemLower:find("[_:]" .. queryLower:gsub("minecraft:", ""), 1, false) then
+                score = 2
+            -- Any partial match
+            else
+                score = 1
+            end
+            
+            -- Prefer items with higher stock on tie
+            if score > bestScore or (score == bestScore and count > bestCount) then
+                bestMatch = item
+                bestCount = count
+                bestScore = score
+            end
+        end
+    end
+    
+    return bestMatch, bestCount
 end
 
 ---Get top items by count

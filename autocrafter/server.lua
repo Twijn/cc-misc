@@ -410,11 +410,13 @@ local commands = {
         end,
         complete = function(args)
             if #args == 1 then
-                -- Complete item names
-                local results = recipes.search(args[1])
+                -- Complete item names (handle empty string)
+                local query = args[1] or ""
+                if query == "" then return {} end
+                local results = recipes.search(query)
                 local completions = {}
                 for _, r in ipairs(results) do
-                    table.insert(completions, r.output:gsub("minecraft:", ""))
+                    table.insert(completions, (r.output:gsub("minecraft:", "")))
                 end
                 return completions
             end
@@ -445,11 +447,13 @@ local commands = {
         end,
         complete = function(args)
             if #args == 1 then
+                local query = args[1] or ""
+                if query == "" then return {} end
                 local all = targets.getAll()
                 local completions = {}
                 for item in pairs(all) do
-                    if item:lower():find(args[1]:lower(), 1, true) then
-                        table.insert(completions, item:gsub("minecraft:", ""))
+                    if item:lower():find(query:lower(), 1, true) then
+                        table.insert(completions, (item:gsub("minecraft:", "")))
                     end
                 end
                 return completions
@@ -537,22 +541,20 @@ local commands = {
                 return
             end
             
-            local item = args[1]
+            local itemQuery = args[1]
             local count = tonumber(args[2])
             local destInv = args[3]  -- Optional destination inventory
-            
-            if not item:find(":") then
-                item = "minecraft:" .. item
-            end
             
             if not count or count <= 0 then
                 ctx.err("Count must be a positive number")
                 return
             end
             
-            local stock = storageManager.getStock(item)
-            if stock == 0 then
-                ctx.err("Item not found in storage: " .. item)
+            -- Use fuzzy matching to find the item
+            local item, stock = storageManager.resolveItem(itemQuery)
+            
+            if not item or stock == 0 then
+                ctx.err("Item not found in storage: " .. itemQuery)
                 return
             end
             
@@ -575,18 +577,22 @@ local commands = {
         end,
         complete = function(args)
             if #args == 1 then
-                local results = storageManager.searchItems(args[1])
+                local query = args[1] or ""
+                if query == "" then return {} end
+                local results = storageManager.searchItems(query)
                 local completions = {}
                 for _, item in ipairs(results) do
-                    table.insert(completions, item.item:gsub("minecraft:", ""))
+                    table.insert(completions, (item.item:gsub("minecraft:", "")))
                 end
                 return completions
             elseif #args == 3 then
                 -- Complete inventory names
+                local query = args[3] or ""
+                if query == "" then return {} end
                 local invs = inventory.getInventoryNames()
                 local completions = {}
                 for _, name in ipairs(invs) do
-                    if name:lower():find(args[3]:lower(), 1, true) then
+                    if name:lower():find(query:lower(), 1, true) then
                         table.insert(completions, name)
                     end
                 end
@@ -627,10 +633,12 @@ local commands = {
         complete = function(args)
             if #args == 1 then
                 -- Complete inventory names
+                local query = args[1] or ""
+                if query == "" then return {} end
                 local invs = inventory.getInventoryNames()
                 local completions = {}
                 for _, name in ipairs(invs) do
-                    if name:lower():find(args[1]:lower(), 1, true) then
+                    if name:lower():find(query:lower(), 1, true) then
                         table.insert(completions, name)
                     end
                 end
@@ -806,7 +814,7 @@ local function chatboxHandler()
         if command == "help" then
             chatTell(user, "=== AutoCrafter Commands ===")
             chatTell(user, "\\withdraw <item> <count> - Get items from storage")
-            chatTell(user, "\\deposit [item] - Store items from your inventory")
+            chatTell(user, "\\deposit [item] [count] - Store items from your inventory")
             chatTell(user, "\\stock [search] - Search item stock")
             chatTell(user, "\\status - Show system status")
             chatTell(user, "\\list - Show craft targets")
@@ -817,19 +825,17 @@ local function chatboxHandler()
             elseif not args or #args < 2 then
                 chatTell(user, "Usage: \\withdraw <item> <count>", true)
             else
-                local item = args[1]
+                local itemQuery = args[1]
                 local count = tonumber(args[2])
-                
-                if not item:find(":") then
-                    item = "minecraft:" .. item
-                end
                 
                 if not count or count <= 0 then
                     chatTell(user, "Count must be a positive number", true)
                 else
-                    local stock = storageManager.getStock(item)
-                    if stock == 0 then
-                        chatTell(user, "Item not found: " .. item:gsub("minecraft:", ""), true)
+                    -- Use fuzzy matching to find the item
+                    local item, stock = storageManager.resolveItem(itemQuery)
+                    
+                    if not item or stock == 0 then
+                        chatTell(user, "Item not found: " .. itemQuery, true)
                     else
                         local toWithdraw = math.min(count, stock)
                         local withdrawn, err = storageManager.withdrawToPlayer(item, toWithdraw, user)
@@ -847,12 +853,19 @@ local function chatboxHandler()
             if not storageManager.hasManipulator() then
                 chatTell(user, "No manipulator available for item transfers", true)
             else
-                local item = args and args[1] or nil
-                if item and not item:find(":") then
-                    item = "minecraft:" .. item
+                local itemQuery = args and args[1] or nil
+                local count = args and args[2] and tonumber(args[2]) or nil
+                
+                -- Resolve item name using fuzzy matching if specified
+                local item = nil
+                if itemQuery then
+                    item = itemQuery
+                    if not item:find(":") then
+                        item = "minecraft:" .. item
+                    end
                 end
                 
-                local deposited, err = storageManager.depositFromPlayer(user, item)
+                local deposited, err = storageManager.depositFromPlayer(user, item, count)
                 
                 if deposited > 0 then
                     if item then

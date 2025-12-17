@@ -709,9 +709,10 @@ end
 ---Deposit items from a player's inventory via manipulator
 ---@param playerName string The player name to get items from
 ---@param item? string Optional item filter (nil for all items)
+---@param maxCount? number Optional max items to deposit (nil for all)
 ---@return number deposited Amount deposited
 ---@return string|nil error Error message if failed
-function inventory.depositFromPlayer(playerName, item)
+function inventory.depositFromPlayer(playerName, item, maxCount)
     local manip = inventory.getManipulator()
     if not manip then
         return 0, "No manipulator available"
@@ -744,12 +745,29 @@ function inventory.depositFromPlayer(playerName, item)
     end
     
     local deposited = 0
+    local remaining = maxCount  -- nil means unlimited
     local affectedInventories = {}
     local invData = inventoryCache.getAll()
     
     for slot, slotItem in pairs(playerItems) do
-        -- Filter by item if specified
-        if not item or slotItem.name == item then
+        -- Check if we've reached the max count
+        if remaining and remaining <= 0 then
+            break
+        end
+        
+        -- Filter by item if specified (support partial matching)
+        local matches = not item
+        if item then
+            matches = slotItem.name == item or slotItem.name:lower():find(item:lower():gsub("minecraft:", ""), 1, true)
+        end
+        
+        if matches then
+            -- Calculate how many to transfer from this slot
+            local toTransfer = slotItem.count
+            if remaining then
+                toTransfer = math.min(toTransfer, remaining)
+            end
+            
             -- Find a destination storage inventory
             for name in pairs(invData) do
                 local dest = inventory.getPeripheral(name)
@@ -757,7 +775,7 @@ function inventory.depositFromPlayer(playerName, item)
                     -- Push from player inventory to storage
                     local transferred = 0
                     if playerInv.pushItems then
-                        local success, result = pcall(playerInv.pushItems, name, slot)
+                        local success, result = pcall(playerInv.pushItems, name, slot, toTransfer)
                         if success then
                             transferred = result or 0
                         end
@@ -765,6 +783,9 @@ function inventory.depositFromPlayer(playerName, item)
                     
                     if transferred and transferred > 0 then
                         deposited = deposited + transferred
+                        if remaining then
+                            remaining = remaining - transferred
+                        end
                         affectedInventories[name] = true
                         break
                     end
