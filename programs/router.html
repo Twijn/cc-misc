@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hierarchical Router System - CC-Misc Programs</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .header h1 {
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }
+        .header p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            opacity: 0.9;
+        }
+        h2 {
+            margin-top: 2.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.6rem;
+        }
+        h3 {
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
+        }
+        h4 {
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }
+        code {
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        pre {
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+            background: var(--code-bg);
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }
+        a {
+            color: var(--link);
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .back-link {
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }
+        .install-section {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }
+        .install-section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            border-bottom: none;
+        }
+        .install-cmd {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 0.5rem 0;
+            word-break: break-all;
+        }
+        .github-link {
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--link);
+            color: white;
+            border: 1px solid var(--link);
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .github-link:hover {
+            opacity: 0.85;
+            text-decoration: none;
+        }
+        .install-controls {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }
+        .copy-btn {
+            display: inline-block;
+            background: transparent;
+            color: var(--link);
+            border: 1px solid var(--link);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+            text-decoration: none;
+        }
+        .copy-btn:hover {
+            background: var(--link);
+            color: white;
+        }
+        .copy-btn.copied {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .program-badge {
+            display: inline-block;
+            background: #1a4d1a;
+            color: #7fcc7f;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 500;
+            margin-left: 1rem;
+            vertical-align: middle;
+        }
+        ul {
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }
+        li {
+            margin: 0.25rem 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1rem 0;
+        }
+        th, td {
+            border: 1px solid var(--border);
+            padding: 0.5rem;
+            text-align: left;
+        }
+        th {
+            background: var(--code-bg);
+        }
+        .content {
+            line-height: 1.8;
+        }
+        .content p {
+            margin: 1rem 0;
+        }
+        .feature-list {
+            list-style: disc;
+            padding-left: 1.5rem;
+            margin: 1rem 0;
+        }
+        .feature-list li {
+            margin: 0.5rem 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="../index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>Hierarchical Router System<span class="program-badge">Program</span></h1>
+        <p>A modular hierarchical routing system for CC:Tweaked, designed for apartment complex networks.</p>
+    </div>
+    <div class="install-section">
+        <h2>Installation</h2>
+        <div class="install-cmd" id="install-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/router/install.lua</div>
+        <div class="install-controls">
+            <button class="copy-btn" onclick="copyCommand(this, 'install-cmd')">Copy Command</button>
+            <a href="https://github.com/Twijn/cc-misc/tree/main/router" class="github-link" target="_blank">View on GitHub →</a>
+        </div>
+    </div>
+    
+    <script>
+        function copyCommand(btn, cmdId) {
+            const cmd = document.getElementById(cmdId).textContent;
+            navigator.clipboard.writeText(cmd).then(() => {
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                btn.textContent = '✗ Failed';
+                setTimeout(() => {
+                    btn.textContent = 'Copy Command';
+                }, 2000);
+            });
+        }
+    </script>
+    <h2>Features</h2>
+    <ul class='feature-list'>
+        <li>Hierarchical Addressing: 3-digit router IDs (1xx, 2xx, 3xx) for layered network topology</li>
+        <li>Automatic Forwarding: Messages route through the hierarchy until they reach their destination</li>
+        <li>Final Routers: Designated endpoints that execute messages instead of forwarding</li>
+        <li>Configurable Ports: Dynamic port management per modem side</li>
+        <li>Hop Tracking: Full path logging with distance metrics</li>
+        <li>Protocol Filtering: Block specific protocols or ports</li>
+        <li>Extensible Handlers: Register custom protocol handlers for final routers</li>
+    </ul>
+
+    <div class="content">
+        <p><em>Full documentation available in the README on GitHub.</em></p>
+    </div>
+</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
+</html>

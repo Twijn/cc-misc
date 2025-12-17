@@ -57,16 +57,16 @@
         a:hover {
             text-decoration: underline;
         }
-        .module {
+        .module, .program {
             padding: 1rem;
             margin: 0.5rem 0;
             border: 1px solid var(--border);
             border-radius: 4px;
         }
-        .module h3 {
+        .module h3, .program h3 {
             margin: 0 0 0.5rem 0;
         }
-        .module p {
+        .module p, .program p {
             color: var(--text);
             opacity: 0.8;
         }
@@ -81,19 +81,68 @@
             margin-left: 0.5rem;
             vertical-align: middle;
         }
+        .program-badge {
+            display: inline-block;
+            background: #1a4d1a;
+            color: #7fcc7f;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.7em;
+            font-weight: 500;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
         code {
             background: var(--code-bg);
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
             font-family: 'Monaco', 'Courier New', monospace;
         }
+        .section-intro {
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
-    <h1>CC-Misc Utilities Documentation</h1>
-    <p>A collection of utility modules for ComputerCraft development</p>
-    
-    <h2>Modules</h2>
+    <h1>CC-Misc Documentation</h1>
+    <p>A collection of utility modules and programs for ComputerCraft development</p>
+
+    <h2>Programs</h2>
+    <p class="section-intro">Complete applications and systems for ComputerCraft</p>
+    <div class="programs">
+        <div class="program">
+            <h3><a href="programs/signshop.html">SignShop</a><span class="program-badge">Program</span></h3>
+            <p>CC: Tweaked program that creates plugin-like SignShops with automated item dispensing and Krist payment processing.</p>
+        </div>
+        <div class="program">
+            <h3><a href="programs/autocrafter.html">AutoCrafter - Automated Crafting & Storage System</a><span class="program-badge">Program</span></h3>
+            <p>A fully-featured automated crafting and storage system for ComputerCraft that maintains a desired set of items by automatically crafting them when stock runs low.</p>
+        </div>
+        <div class="program">
+            <h3><a href="programs/farm.html">Farming Program</a><span class="program-badge">Program</span></h3>
+            <p>A horrible farming program I made that automatically adjusts what it's farming to what's needed in the network.</p>
+        </div>
+        <div class="program">
+            <h3><a href="programs/netherite.html">Netherite Mining Program</a><span class="program-badge">Program</span></h3>
+            <p>A netherite mining turtle program that uses a Plethora scanner to locate and mine ancient debris in the Nether. Automatically deposits items to an ender storage when inventory gets full.</p>
+        </div>
+        <div class="program">
+            <h3><a href="programs/roadbuilder.html">RBC (Road Builder Controller)</a><span class="program-badge">Program</span></h3>
+            <p>A multi-turtle road building system for ComputerCraft with wireless control. Build roads automatically with GPS positioning, configurable road widths, and ender storage integration for extended operat...</p>
+        </div>
+        <div class="program">
+            <h3><a href="programs/router.html">Hierarchical Router System</a><span class="program-badge">Program</span></h3>
+            <p>A modular hierarchical routing system for CC:Tweaked, designed for apartment complex networks.</p>
+        </div>
+        <div class="program">
+            <h3><a href="programs/spleef.html">Spleef</a><span class="program-badge">Program</span></h3>
+            <p>A horribly programmed spleef minigame.</p>
+        </div>
+    </div>
+
+    <h2>Libraries</h2>
+    <p class="section-intro">Utility libraries for building ComputerCraft applications</p>
     <div class="modules">
         <div class="module">
             <h3><a href="cmd.html">cmd</a><span class="version-badge">v1.0.0</span></h3>
