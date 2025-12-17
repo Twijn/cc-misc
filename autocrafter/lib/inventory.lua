@@ -28,6 +28,7 @@ local inventorySizes = {}      -- Cached inventory sizes
 local modemPeripheral = nil    -- Cached modem peripheral
 local modemName = nil          -- Cached modem name
 local scanInProgress = false
+local manipulator = nil        -- Cached manipulator peripheral
 
 ---Get item detail cache key
 ---@param item table The item with name and optional nbt
@@ -589,6 +590,201 @@ function inventory.init()
     
     -- Ensure we have modem cached
     inventory.getModem()
+    
+    -- Try to find manipulator peripheral
+    inventory.getManipulator()
+end
+
+---Get the manipulator peripheral (for player inventory access)
+---@return table|nil manipulator The manipulator peripheral or nil
+function inventory.getManipulator()
+    if manipulator then
+        return manipulator
+    end
+    
+    -- Look for a manipulator peripheral (plethora neural interface)
+    manipulator = peripheral.find("manipulator")
+    
+    return manipulator
+end
+
+---Check if manipulator is available
+---@return boolean available Whether manipulator is available
+function inventory.hasManipulator()
+    return inventory.getManipulator() ~= nil
+end
+
+---Get player inventory via manipulator introspection
+---@param playerName string The player name to get inventory for
+---@return table|nil playerInv The player's inventory wrapper or nil
+function inventory.getPlayerInventory(playerName)
+    local manip = inventory.getManipulator()
+    if not manip then
+        return nil
+    end
+    
+    -- Use introspection module to get player inventory
+    -- The manipulator must have the introspection module and target the player
+    if manip.getInventory then
+        local success, inv = pcall(manip.getInventory)
+        if success and inv then
+            return inv
+        end
+    end
+    
+    return nil
+end
+
+---Withdraw items to a player's inventory via manipulator
+---@param item string The item ID to withdraw
+---@param count number Amount to withdraw  
+---@param playerName string The player name to send items to
+---@return number withdrawn Amount actually withdrawn
+---@return string|nil error Error message if failed
+function inventory.withdrawToPlayer(item, count, playerName)
+    local manip = inventory.getManipulator()
+    if not manip then
+        return 0, "No manipulator available"
+    end
+    
+    -- Get player's inventory via introspection
+    local playerInv = nil
+    if manip.getInventory then
+        local success, inv = pcall(manip.getInventory)
+        if success and inv then
+            playerInv = inv
+        end
+    end
+    
+    if not playerInv then
+        return 0, "Cannot access player inventory"
+    end
+    
+    -- Find items in storage
+    local locations = inventory.findItem(item)
+    if #locations == 0 then
+        return 0, "Item not found in storage"
+    end
+    
+    local withdrawn = 0
+    local affectedInventories = {}
+    
+    for _, loc in ipairs(locations) do
+        if withdrawn >= count then break end
+        
+        local source = inventory.getPeripheral(loc.inventory)
+        if source then
+            local toWithdraw = math.min(count - withdrawn, loc.count)
+            
+            -- Push items from storage to player inventory
+            local transferred = 0
+            if playerInv.pullItems then
+                -- Player inventory can pull from storage
+                local success, result = pcall(playerInv.pullItems, loc.inventory, loc.slot, toWithdraw)
+                if success then
+                    transferred = result or 0
+                end
+            end
+            
+            withdrawn = withdrawn + transferred
+            
+            if transferred > 0 then
+                affectedInventories[loc.inventory] = true
+            end
+        end
+    end
+    
+    -- Batch update affected inventories
+    for invName in pairs(affectedInventories) do
+        inventory.scanSingle(invName)
+    end
+    
+    if withdrawn == 0 then
+        return 0, "Failed to transfer items"
+    end
+    
+    return withdrawn, nil
+end
+
+---Deposit items from a player's inventory via manipulator
+---@param playerName string The player name to get items from
+---@param item? string Optional item filter (nil for all items)
+---@return number deposited Amount deposited
+---@return string|nil error Error message if failed
+function inventory.depositFromPlayer(playerName, item)
+    local manip = inventory.getManipulator()
+    if not manip then
+        return 0, "No manipulator available"
+    end
+    
+    -- Get player's inventory via introspection
+    local playerInv = nil
+    if manip.getInventory then
+        local success, inv = pcall(manip.getInventory)
+        if success and inv then
+            playerInv = inv
+        end
+    end
+    
+    if not playerInv then
+        return 0, "Cannot access player inventory"
+    end
+    
+    -- List items in player inventory
+    local playerItems = nil
+    if playerInv.list then
+        local success, list = pcall(playerInv.list)
+        if success then
+            playerItems = list
+        end
+    end
+    
+    if not playerItems then
+        return 0, "Cannot list player inventory"
+    end
+    
+    local deposited = 0
+    local affectedInventories = {}
+    local invData = inventoryCache.getAll()
+    
+    for slot, slotItem in pairs(playerItems) do
+        -- Filter by item if specified
+        if not item or slotItem.name == item then
+            -- Find a destination storage inventory
+            for name in pairs(invData) do
+                local dest = inventory.getPeripheral(name)
+                if dest then
+                    -- Push from player inventory to storage
+                    local transferred = 0
+                    if playerInv.pushItems then
+                        local success, result = pcall(playerInv.pushItems, name, slot)
+                        if success then
+                            transferred = result or 0
+                        end
+                    end
+                    
+                    if transferred and transferred > 0 then
+                        deposited = deposited + transferred
+                        affectedInventories[name] = true
+                        break
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Batch update affected inventories
+    for invName in pairs(affectedInventories) do
+        inventory.scanSingle(invName)
+    end
+    
+    if deposited == 0 and not item then
+        return 0, "No items to deposit or failed to transfer"
+    elseif deposited == 0 then
+        return 0, "Item not found in player inventory or failed to transfer"
+    end
+    
+    return deposited, nil
 end
 
 inventory.VERSION = VERSION

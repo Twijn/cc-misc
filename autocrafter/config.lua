@@ -17,6 +17,10 @@ return {
     -- Server label
     serverLabel = "AutoCrafter Server",
     
+    -- Chatbox configuration (for command support)
+    chatboxName = "AutoCrafter",  -- Name shown in chat messages
+    chatboxEnabled = true,        -- Enable/disable chatbox commands
+    
     -- Crafter timeout (seconds) before marking offline
     crafterTimeout = 60,
     
@@ -69,5 +73,16 @@ return {
         SERVER = "server",
         CRAFTER = "crafter",
         UNKNOWN = "unknown",
+    },
+    
+    -- Chatbox commands (via backslash commands in-game)
+    -- These are the commands players can use via \command
+    chatCommands = {
+        "withdraw",   -- \withdraw <item> <count> - Withdraw items to player inventory
+        "deposit",    -- \deposit - Deposit items from player inventory to storage
+        "stock",      -- \stock [search] - Check stock levels
+        "status",     -- \status - Show system status
+        "list",       -- \list - Show craft targets
+        "help",       -- \help - Show available commands
     },
 }

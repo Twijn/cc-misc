@@ -31,6 +31,7 @@ local config = require("config")
 
 local running = true
 local shuttingDown = false
+local chatbox = nil  -- Chatbox peripheral for in-game commands
 
 ---Get the server version
 function _G.acVersion()
@@ -91,6 +92,39 @@ local function initialize()
     
     local targetCount = targets.count()
     print("Craft targets: " .. targetCount)
+    print("")
+    
+    -- Initialize chatbox for in-game commands
+    if config.chatboxEnabled then
+        print("Initializing chatbox...")
+        chatbox = peripheral.find("chatBox")
+        if chatbox then
+            term.setTextColor(colors.lime)
+            print("  Chatbox connected!")
+            print("  Use \\help in-game for commands")
+            term.setTextColor(colors.white)
+        else
+            term.setTextColor(colors.yellow)
+            print("  Warning: No chatbox found")
+            print("  In-game commands disabled")
+            term.setTextColor(colors.white)
+        end
+        print("")
+    end
+    
+    -- Check manipulator for player inventory access
+    print("Checking manipulator...")
+    if storageManager.hasManipulator() then
+        term.setTextColor(colors.lime)
+        print("  Manipulator connected!")
+        print("  Player item transfers enabled")
+        term.setTextColor(colors.white)
+    else
+        term.setTextColor(colors.yellow)
+        print("  Warning: No manipulator found")
+        print("  Player item transfers disabled")
+        term.setTextColor(colors.white)
+    end
     print("")
     
     sleep(1)
@@ -487,12 +521,13 @@ local commands = {
         description = "Withdraw items from storage",
         execute = function(args, ctx)
             if #args < 2 then
-                ctx.err("Usage: withdraw <item> <count>")
+                ctx.err("Usage: withdraw <item> <count> [dest_inventory]")
                 return
             end
             
             local item = args[1]
             local count = tonumber(args[2])
+            local destInv = args[3]  -- Optional destination inventory
             
             if not item:find(":") then
                 item = "minecraft:" .. item
@@ -509,17 +544,87 @@ local commands = {
                 return
             end
             
-            ctx.mess("Place a chest or other inventory adjacent to retrieve items")
-            ctx.mess("(Feature requires destination inventory)")
-            -- TODO: Implement actual withdrawal to player/chest
+            local toWithdraw = math.min(count, stock)
+            
+            if destInv then
+                -- Withdraw to specified inventory
+                local withdrawn = storageManager.withdraw(item, toWithdraw, destInv)
+                if withdrawn > 0 then
+                    ctx.succ(string.format("Withdrew %d %s to %s", withdrawn, item, destInv))
+                else
+                    ctx.err("Failed to withdraw items")
+                end
+            else
+                -- No destination specified
+                ctx.mess("Tip: Use chatbox commands (\\withdraw) to transfer to player")
+                ctx.mess("Or specify a destination inventory:")
+                ctx.mess("  withdraw " .. item:gsub("minecraft:", "") .. " " .. count .. " <inventory_name>")
+            end
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local results = storageManager.searchItems(args[1])
+                local completions = {}
+                for _, item in ipairs(results) do
+                    table.insert(completions, item.item:gsub("minecraft:", ""))
+                end
+                return completions
+            elseif #args == 3 then
+                -- Complete inventory names
+                local invs = inventory.getInventoryNames()
+                local completions = {}
+                for _, name in ipairs(invs) do
+                    if name:lower():find(args[3]:lower(), 1, true) then
+                        table.insert(completions, name)
+                    end
+                end
+                return completions
+            end
+            return {}
         end
     },
     
     deposit = {
         description = "Deposit items to storage",
         execute = function(args, ctx)
-            ctx.mess("Place items in adjacent inventory to deposit")
-            -- TODO: Implement deposit from adjacent inventory
+            local sourceInv = args[1]
+            local item = args[2]
+            
+            if not sourceInv then
+                ctx.mess("Tip: Use chatbox commands (\\deposit) to transfer from player")
+                ctx.mess("Or specify a source inventory:")
+                ctx.mess("  deposit <inventory_name> [item]")
+                return
+            end
+            
+            if item and not item:find(":") then
+                item = "minecraft:" .. item
+            end
+            
+            local deposited = storageManager.deposit(sourceInv, item)
+            if deposited > 0 then
+                if item then
+                    ctx.succ(string.format("Deposited %d %s from %s", deposited, item, sourceInv))
+                else
+                    ctx.succ(string.format("Deposited %d items from %s", deposited, sourceInv))
+                end
+            else
+                ctx.mess("No items deposited (inventory empty or items don't fit)")
+            end
+        end,
+        complete = function(args)
+            if #args == 1 then
+                -- Complete inventory names
+                local invs = inventory.getInventoryNames()
+                local completions = {}
+                for _, name in ipairs(invs) do
+                    if name:lower():find(args[1]:lower(), 1, true) then
+                        table.insert(completions, name)
+                    end
+                end
+                return completions
+            end
+            return {}
         end
     },
     
@@ -656,6 +761,155 @@ local commands = {
     },
 }
 
+--- Send a message to a player via chatbox
+---@param user string The username to send to
+---@param message string The message to send
+---@param isError? boolean Whether this is an error message
+local function chatTell(user, message, isError)
+    if not chatbox then return end
+    
+    local mode = "format"
+    local prefix = isError and "&c" or "&a"
+    local formattedMessage = prefix .. message
+    
+    pcall(chatbox.tell, user, formattedMessage, config.chatboxName, mode)
+end
+
+--- Handle chatbox commands from players
+local function chatboxHandler()
+    if not chatbox then
+        -- No chatbox, just sleep forever
+        while running do
+            sleep(60)
+        end
+        return
+    end
+    
+    while running do
+        local event, user, command, args, data = os.pullEvent("command")
+        
+        -- Handle commands
+        if command == "help" then
+            chatTell(user, "=== AutoCrafter Commands ===")
+            chatTell(user, "\\withdraw <item> <count> - Get items from storage")
+            chatTell(user, "\\deposit [item] - Store items from your inventory")
+            chatTell(user, "\\stock [search] - Search item stock")
+            chatTell(user, "\\status - Show system status")
+            chatTell(user, "\\list - Show craft targets")
+            
+        elseif command == "withdraw" then
+            if not storageManager.hasManipulator() then
+                chatTell(user, "No manipulator available for item transfers", true)
+            elseif not args or #args < 2 then
+                chatTell(user, "Usage: \\withdraw <item> <count>", true)
+            else
+                local item = args[1]
+                local count = tonumber(args[2])
+                
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                if not count or count <= 0 then
+                    chatTell(user, "Count must be a positive number", true)
+                else
+                    local stock = storageManager.getStock(item)
+                    if stock == 0 then
+                        chatTell(user, "Item not found: " .. item:gsub("minecraft:", ""), true)
+                    else
+                        local toWithdraw = math.min(count, stock)
+                        local withdrawn, err = storageManager.withdrawToPlayer(item, toWithdraw, user)
+                        
+                        if withdrawn > 0 then
+                            chatTell(user, string.format("Withdrew %dx %s", withdrawn, item:gsub("minecraft:", "")))
+                        else
+                            chatTell(user, "Failed to withdraw: " .. (err or "unknown error"), true)
+                        end
+                    end
+                end
+            end
+            
+        elseif command == "deposit" then
+            if not storageManager.hasManipulator() then
+                chatTell(user, "No manipulator available for item transfers", true)
+            else
+                local item = args and args[1] or nil
+                if item and not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                local deposited, err = storageManager.depositFromPlayer(user, item)
+                
+                if deposited > 0 then
+                    if item then
+                        chatTell(user, string.format("Deposited %dx %s", deposited, item:gsub("minecraft:", "")))
+                    else
+                        chatTell(user, string.format("Deposited %d items", deposited))
+                    end
+                else
+                    chatTell(user, "Nothing to deposit" .. (err and (": " .. err) or ""), true)
+                end
+            end
+            
+        elseif command == "stock" then
+            local query = args and args[1] or ""
+            local results = storageManager.searchItems(query)
+            
+            if #results == 0 then
+                chatTell(user, "No items found" .. (query ~= "" and " for: " .. query or ""))
+            else
+                chatTell(user, "=== Stock ===")
+                local shown = 0
+                for _, item in ipairs(results) do
+                    if shown >= 10 then
+                        chatTell(user, "... and " .. (#results - 10) .. " more items")
+                        break
+                    end
+                    
+                    local name = item.item:gsub("minecraft:", "")
+                    chatTell(user, string.format("  %s x%d", name, item.count))
+                    shown = shown + 1
+                end
+            end
+            
+        elseif command == "status" then
+            local storageStats = storageManager.getStats()
+            local queueStats = queueManager.getStats()
+            local crafterStats = crafterManager.getStats()
+            
+            chatTell(user, "=== AutoCrafter Status ===")
+            chatTell(user, string.format("Storage: %d items, %d%% full",
+                storageStats.totalItems, storageStats.percentFull))
+            chatTell(user, string.format("Queue: %d pending, %d active",
+                queueStats.pending, queueStats.assigned + queueStats.crafting))
+            chatTell(user, string.format("Crafters: %d/%d online",
+                crafterStats.online, crafterStats.total))
+            
+        elseif command == "list" then
+            local stock = storageManager.getAllStock()
+            local all = targets.getWithStock(stock)
+            
+            if #all == 0 then
+                chatTell(user, "No craft targets configured")
+            else
+                chatTell(user, "=== Craft Targets ===")
+                local shown = 0
+                for _, target in ipairs(all) do
+                    if shown >= 10 then
+                        chatTell(user, "... and " .. (#all - 10) .. " more targets")
+                        break
+                    end
+                    
+                    local item = target.item:gsub("minecraft:", "")
+                    local status = target.current >= target.target and "+" or "*"
+                    chatTell(user, string.format("%s %s: %d/%d", status, item, target.current, target.target))
+                    shown = shown + 1
+                end
+            end
+        end
+    end
+end
+
 --- Handle termination
 local function handleTerminate()
     os.pullEventRaw("terminate")
@@ -684,6 +938,7 @@ local function main()
         handleTerminate,
         periodicTasks,
         messageHandler,
+        chatboxHandler,
         function()
             cmd("AutoCrafter", VERSION, commands)
         end

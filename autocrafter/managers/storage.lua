@@ -96,6 +96,47 @@ function manager.deposit(sourceInv, item)
     return deposited
 end
 
+---Withdraw items to a player's inventory via manipulator
+---@param item string Item ID to withdraw
+---@param count number Amount to withdraw
+---@param playerName string Player name to send items to
+---@return number withdrawn Amount actually withdrawn
+---@return string|nil error Error message if failed
+function manager.withdrawToPlayer(item, count, playerName)
+    local withdrawn, err = inventory.withdrawToPlayer(item, count, playerName)
+    
+    if withdrawn > 0 then
+        logger.info(string.format("Withdrew %d %s to player %s", withdrawn, item, playerName))
+    end
+    
+    return withdrawn, err
+end
+
+---Deposit items from a player's inventory via manipulator
+---@param playerName string Player name to get items from
+---@param item? string Optional item filter
+---@return number deposited Amount deposited
+---@return string|nil error Error message if failed
+function manager.depositFromPlayer(playerName, item)
+    local deposited, err = inventory.depositFromPlayer(playerName, item)
+    
+    if deposited > 0 then
+        if item then
+            logger.info(string.format("Deposited %d %s from player %s", deposited, item, playerName))
+        else
+            logger.info(string.format("Deposited %d items from player %s", deposited, playerName))
+        end
+    end
+    
+    return deposited, err
+end
+
+---Check if manipulator is available for player transfers
+---@return boolean available Whether manipulator is available
+function manager.hasManipulator()
+    return inventory.hasManipulator()
+end
+
 ---Get storage statistics
 ---@return table stats Storage statistics
 function manager.getStats()
