@@ -113,6 +113,18 @@ local function initialize()
                     print("  - Tell capability: " .. (hasTell and "YES" or "NO"))
                     print("  Use \\help in-game for commands")
                     term.setTextColor(colors.white)
+                    
+                    -- Show owner restriction status
+                    if config.chatboxOwner then
+                        term.setTextColor(colors.lime)
+                        print("  Owner: " .. config.chatboxOwner)
+                        term.setTextColor(colors.white)
+                    else
+                        term.setTextColor(colors.yellow)
+                        print("  Warning: No owner set - all players can use commands!")
+                        print("  Set chatboxOwner in config.lua to restrict access")
+                        term.setTextColor(colors.white)
+                    end
                 else
                     term.setTextColor(colors.yellow)
                     print("  Chatbox found but missing 'command' capability")
