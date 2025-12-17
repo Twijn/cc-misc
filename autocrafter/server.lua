@@ -97,22 +97,32 @@ local function initialize()
     -- Initialize chatbox for in-game commands
     if config.chatboxEnabled then
         print("Initializing chatbox...")
-        if chatbox and chatbox.hasCapability then
-            local hasCommand = chatbox.hasCapability("command")
-            local hasTell = chatbox.hasCapability("tell")
+        if chatbox then
+            -- Give chatbox time to fully initialize
+            sleep(0.5)
             
-            if hasCommand then
-                chatboxAvailable = true
-                term.setTextColor(colors.lime)
-                print("  Chatbox available!")
-                print("  - Command capability: YES")
-                print("  - Tell capability: " .. (hasTell and "YES" or "NO"))
-                print("  Use \\help in-game for commands")
-                term.setTextColor(colors.white)
+            if chatbox.hasCapability then
+                local hasCommand = chatbox.hasCapability("command")
+                local hasTell = chatbox.hasCapability("tell")
+                
+                if hasCommand then
+                    chatboxAvailable = true
+                    term.setTextColor(colors.lime)
+                    print("  Chatbox available!")
+                    print("  - Command capability: YES")
+                    print("  - Tell capability: " .. (hasTell and "YES" or "NO"))
+                    print("  Use \\help in-game for commands")
+                    term.setTextColor(colors.white)
+                else
+                    term.setTextColor(colors.yellow)
+                    print("  Chatbox found but missing 'command' capability")
+                    print("  Register a license with /chatbox license register")
+                    term.setTextColor(colors.white)
+                end
             else
                 term.setTextColor(colors.yellow)
-                print("  Chatbox found but missing 'command' capability")
-                print("  Register a license with /chatbox license register")
+                print("  Warning: Chatbox API not available")
+                print("  In-game commands disabled")
                 term.setTextColor(colors.white)
             end
         else
