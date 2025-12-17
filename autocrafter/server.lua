@@ -97,7 +97,6 @@ local function initialize()
     -- Initialize chatbox for in-game commands
     if config.chatboxEnabled then
         print("Initializing chatbox...")
-        chatbox = peripheral.find("chatBox")
         if chatbox then
             term.setTextColor(colors.lime)
             print("  Chatbox connected!")
