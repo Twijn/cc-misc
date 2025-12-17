@@ -171,6 +171,10 @@ end
 local function main()
     local clientConfig = loadConfig()
     
+    -- Debug: show what we loaded
+    -- print("DEBUG: configPath = " .. configPath)
+    -- print("DEBUG: role = " .. tostring(clientConfig.role))
+    
     -- Determine the role from local config
     local role = clientConfig.role
     
@@ -207,24 +211,18 @@ local function main()
         shell.run(diskPrefix .. "crafter")
         
     else
-        -- Unknown role
+        -- Unknown role - need to configure
+        
         -- Check if setup should be hidden
         if clientConfig.hideSetup then
-            -- Just run local startup.lua if it exists
-            if fs.exists("startup.lua") and diskPrefix ~= "" then
+            -- Just run local startup.lua if it exists (and we're on disk)
+            if diskPrefix ~= "" and fs.exists("startup.lua") then
                 shell.run("startup.lua")
             end
             return
         end
         
-        -- Check if there's a local startup.lua
-        if fs.exists("startup.lua") and diskPrefix ~= "" then
-            print("No AutoCrafter role configured, running local startup...")
-            shell.run("startup.lua")
-            return
-        end
-        
-        -- Show setup menu
+        -- Show setup menu (don't skip to local startup - we need configuration!)
         local choice = showSetupMenu()
         
         if choice == "server" then
