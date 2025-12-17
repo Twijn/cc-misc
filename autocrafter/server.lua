@@ -31,7 +31,7 @@ local config = require("config")
 
 local running = true
 local shuttingDown = false
-local chatbox = nil  -- Chatbox peripheral for in-game commands
+local chatboxAvailable = false  -- Whether chatbox API is available with required capabilities
 
 ---Get the server version
 function _G.acVersion()
@@ -97,14 +97,27 @@ local function initialize()
     -- Initialize chatbox for in-game commands
     if config.chatboxEnabled then
         print("Initializing chatbox...")
-        if chatbox then
-            term.setTextColor(colors.lime)
-            print("  Chatbox connected!")
-            print("  Use \\help in-game for commands")
-            term.setTextColor(colors.white)
+        if chatbox and chatbox.hasCapability then
+            local hasCommand = chatbox.hasCapability("command")
+            local hasTell = chatbox.hasCapability("tell")
+            
+            if hasCommand then
+                chatboxAvailable = true
+                term.setTextColor(colors.lime)
+                print("  Chatbox available!")
+                print("  - Command capability: YES")
+                print("  - Tell capability: " .. (hasTell and "YES" or "NO"))
+                print("  Use \\help in-game for commands")
+                term.setTextColor(colors.white)
+            else
+                term.setTextColor(colors.yellow)
+                print("  Chatbox found but missing 'command' capability")
+                print("  Register a license with /chatbox license register")
+                term.setTextColor(colors.white)
+            end
         else
             term.setTextColor(colors.yellow)
-            print("  Warning: No chatbox found")
+            print("  Warning: Chatbox API not available")
             print("  In-game commands disabled")
             term.setTextColor(colors.white)
         end
@@ -765,7 +778,9 @@ local commands = {
 ---@param message string The message to send
 ---@param isError? boolean Whether this is an error message
 local function chatTell(user, message, isError)
-    if not chatbox then return end
+    if not chatbox or not chatbox.hasCapability or not chatbox.hasCapability("tell") then
+        return
+    end
     
     local mode = "format"
     local prefix = isError and "&c" or "&a"
@@ -776,8 +791,8 @@ end
 
 --- Handle chatbox commands from players
 local function chatboxHandler()
-    if not chatbox then
-        -- No chatbox, just sleep forever
+    if not chatboxAvailable then
+        -- No chatbox with command capability, just sleep forever
         while running do
             sleep(60)
         end
