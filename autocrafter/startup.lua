@@ -13,7 +13,10 @@ if not package.path:find(diskPrefix .. "lib") then
 end
 
 local isTurtle = turtle ~= nil
-local configPath = diskPrefix .. "client-config.json"
+
+-- Config is stored LOCALLY on each computer, not on the shared disk
+-- This allows each machine to have its own role
+local configPath = "autocrafter-config.json"
 
 ---Load client configuration
 ---@return table config The client configuration
@@ -168,10 +171,10 @@ end
 local function main()
     local clientConfig = loadConfig()
     
-    -- Determine the role
+    -- Determine the role from local config
     local role = clientConfig.role
     
-    -- Check if files exist for the role
+    -- Verify files exist for the role (on disk or local)
     if role == "server" and not fs.exists(diskPrefix .. "server.lua") then
         role = nil
     elseif role == "crafter" and not fs.exists(diskPrefix .. "crafter.lua") then
