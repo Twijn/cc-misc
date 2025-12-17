@@ -544,16 +544,20 @@ local commands = {
     },
     
     withdraw = {
-        description = "Withdraw items from storage",
+        description = "Withdraw items from storage to player",
         execute = function(args, ctx)
             if #args < 2 then
-                ctx.err("Usage: withdraw <item> <count> [dest_inventory]")
+                ctx.err("Usage: withdraw <item> <count>")
+                return
+            end
+            
+            if not storageManager.hasManipulator() then
+                ctx.err("No manipulator available for player transfers")
                 return
             end
             
             local itemQuery = args[1]
             local count = tonumber(args[2])
-            local destInv = args[3]  -- Optional destination inventory
             
             if not count or count <= 0 then
                 ctx.err("Count must be a positive number")
@@ -569,20 +573,12 @@ local commands = {
             end
             
             local toWithdraw = math.min(count, stock)
+            local withdrawn, err = storageManager.withdrawToPlayer(item, toWithdraw, "player")
             
-            if destInv then
-                -- Withdraw to specified inventory
-                local withdrawn = storageManager.withdraw(item, toWithdraw, destInv)
-                if withdrawn > 0 then
-                    ctx.succ(string.format("Withdrew %d %s to %s", withdrawn, item, destInv))
-                else
-                    ctx.err("Failed to withdraw items")
-                end
+            if withdrawn > 0 then
+                ctx.succ(string.format("Withdrew %d %s to player", withdrawn, item:gsub("minecraft:", "")))
             else
-                -- No destination specified
-                ctx.mess("Tip: Use chatbox commands (\\withdraw) to transfer to player")
-                ctx.mess("Or specify a destination inventory:")
-                ctx.mess("  withdraw " .. item:gsub("minecraft:", "") .. " " .. count .. " <inventory_name>")
+                ctx.err("Failed to withdraw: " .. (err or "unknown error"))
             end
         end,
         complete = function(args)
@@ -595,65 +591,38 @@ local commands = {
                     table.insert(completions, (item.item:gsub("minecraft:", "")))
                 end
                 return completions
-            elseif #args == 3 then
-                -- Complete inventory names
-                local query = args[3] or ""
-                if query == "" then return {} end
-                local invs = inventory.getInventoryNames()
-                local completions = {}
-                for _, name in ipairs(invs) do
-                    if name:lower():find(query:lower(), 1, true) then
-                        table.insert(completions, name)
-                    end
-                end
-                return completions
             end
             return {}
         end
     },
     
     deposit = {
-        description = "Deposit items to storage",
+        description = "Deposit items from player to storage",
         execute = function(args, ctx)
-            local sourceInv = args[1]
-            local item = args[2]
-            
-            if not sourceInv then
-                ctx.mess("Tip: Use chatbox commands (\\deposit) to transfer from player")
-                ctx.mess("Or specify a source inventory:")
-                ctx.mess("  deposit <inventory_name> [item]")
+            if not storageManager.hasManipulator() then
+                ctx.err("No manipulator available for player transfers")
                 return
             end
+            
+            local item = args[1]
+            local count = args[2] and tonumber(args[2]) or nil
             
             if item and not item:find(":") then
                 item = "minecraft:" .. item
             end
             
-            local deposited = storageManager.deposit(sourceInv, item)
+            local deposited, err = storageManager.depositFromPlayer("player", item, count)
             if deposited > 0 then
                 if item then
-                    ctx.succ(string.format("Deposited %d %s from %s", deposited, item, sourceInv))
+                    ctx.succ(string.format("Deposited %d %s from player", deposited, item:gsub("minecraft:", "")))
                 else
-                    ctx.succ(string.format("Deposited %d items from %s", deposited, sourceInv))
+                    ctx.succ(string.format("Deposited %d items from player", deposited))
                 end
             else
-                ctx.mess("No items deposited (inventory empty or items don't fit)")
+                ctx.mess("Nothing to deposit" .. (err and (": " .. err) or ""))
             end
         end,
         complete = function(args)
-            if #args == 1 then
-                -- Complete inventory names
-                local query = args[1] or ""
-                if query == "" then return {} end
-                local invs = inventory.getInventoryNames()
-                local completions = {}
-                for _, name in ipairs(invs) do
-                    if name:lower():find(query:lower(), 1, true) then
-                        table.insert(completions, name)
-                    end
-                end
-                return completions
-            end
             return {}
         end
     },
@@ -820,8 +789,10 @@ local function chatboxHandler()
     while running do
         local event, user, command, args, data = os.pullEvent("command")
         
-        -- Handle commands
-        if command == "help" then
+        -- Check if user is allowed to use commands
+        if config.chatboxOwner and user ~= config.chatboxOwner then
+            -- Ignore commands from other players
+        elseif command == "help" then
             chatTell(user, "=== AutoCrafter Commands ===")
             chatTell(user, "\\withdraw <item> <count> - Get items from storage")
             chatTell(user, "\\deposit [item] [count] - Store items from your inventory")

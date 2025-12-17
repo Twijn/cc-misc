@@ -20,6 +20,7 @@ return {
     -- Chatbox configuration (for command support)
     chatboxName = "AutoCrafter",  -- Name shown in chat messages
     chatboxEnabled = true,        -- Enable/disable chatbox commands
+    chatboxOwner = nil,           -- Player name allowed to use commands (nil = all players)
     
     -- Crafter timeout (seconds) before marking offline
     crafterTimeout = 60,
