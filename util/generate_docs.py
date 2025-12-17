@@ -10,11 +10,21 @@ import json
 from pathlib import Path
 from typing import List, Dict, Any
 
+try:
+    import markdown
+    HAS_MARKDOWN = True
+except ImportError:
+    HAS_MARKDOWN = False
+
 class LuaDocGenerator:
     def __init__(self, input_dir: str, output_dir: str):
-        self.input_dir = Path(input_dir)
-        self.output_dir = Path(output_dir)
+        self.input_dir = Path(input_dir).resolve()
+        self.output_dir = Path(output_dir).resolve()
         self.modules = []
+        self.programs = []
+        
+        # Programs to include from parent directory
+        self.program_dirs = ['signshop', 'autocrafter', 'farm', 'netherite', 'roadbuilder', 'router', 'spleef', 'brewery']
         
     def parse_file(self, filepath: Path) -> Dict[str, Any]:
         """Parse a Lua file and extract documentation"""
@@ -163,6 +173,101 @@ class LuaDocGenerator:
         
         return module
     
+    def parse_program_readme(self, program_dir: Path) -> Dict[str, Any] | None:
+        """Parse a program's README.md and extract documentation"""
+        readme_path = program_dir / 'README.md'
+        if not readme_path.exists():
+            return None
+        
+        with open(readme_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        program = {
+            'name': program_dir.name,
+            'title': '',
+            'description': '',
+            'features': [],
+            'installation': '',
+            'components': [],
+            'requirements': [],
+            'content': content  # Store full markdown content
+        }
+        
+        lines = content.split('\n')
+        
+        # Extract title from first heading
+        for line in lines:
+            if line.startswith('# '):
+                program['title'] = line[2:].strip()
+                break
+        
+        # Extract description (text after title, before first ## or feature list or code block or install instructions)
+        in_description = False
+        desc_lines = []
+        for line in lines:
+            if line.startswith('# '):
+                in_description = True
+                continue
+            if in_description:
+                stripped = line.strip().lower()
+                if (line.startswith('##') or line.startswith('- **') or 
+                    line.startswith('```') or stripped.startswith('install')):
+                    break
+                if line.strip():
+                    desc_lines.append(line.strip())
+        program['description'] = ' '.join(desc_lines)
+        
+        # Extract features section
+        in_features = False
+        for line in lines:
+            if '## Features' in line or '## features' in line:
+                in_features = True
+                continue
+            if in_features:
+                if line.startswith('##'):
+                    break
+                if line.startswith('- '):
+                    # Extract feature text, strip bold markers
+                    feature = line[2:].strip()
+                    feature = re.sub(r'\*\*([^*]+)\*\*', r'\1', feature)
+                    program['features'].append(feature)
+        
+        # Extract installation command
+        install_pattern = r'```(?:text|lua)?\s*\n(wget run [^\n]+)\n```'
+        install_match = re.search(install_pattern, content)
+        if install_match:
+            program['installation'] = install_match.group(1).strip()
+        
+        # Extract components section
+        in_components = False
+        for line in lines:
+            if '## Components' in line:
+                in_components = True
+                continue
+            if in_components:
+                if line.startswith('##'):
+                    break
+                if line.startswith('- **') or line.startswith('### '):
+                    component = line.lstrip('- #').strip()
+                    component = re.sub(r'\*\*([^*]+)\*\*', r'\1', component)
+                    program['components'].append(component)
+        
+        # Extract requirements
+        in_requirements = False
+        for line in lines:
+            if '## Requirements' in line:
+                in_requirements = True
+                continue
+            if in_requirements:
+                if line.startswith('##'):
+                    break
+                if line.startswith('- '):
+                    req = line[2:].strip()
+                    req = re.sub(r'\*\*([^*]+)\*\*', r'\1', req)
+                    program['requirements'].append(req)
+        
+        return program
+    
     def generate_markdown(self, module: Dict[str, Any]) -> str:
         """Generate Markdown documentation for a module"""
         md = f"# {module['name']}\n\n"
@@ -222,7 +327,7 @@ class LuaDocGenerator:
         
         return md
     
-    def generate_html_index(self, modules: List[Dict[str, Any]]) -> str:
+    def generate_html_index(self, modules: List[Dict[str, Any]], programs: List[Dict[str, Any]] = None) -> str:
         """Generate HTML index page"""
         html = """<!DOCTYPE html>
 <html lang="en">
@@ -283,16 +388,16 @@ class LuaDocGenerator:
         a:hover {
             text-decoration: underline;
         }
-        .module {
+        .module, .program {
             padding: 1rem;
             margin: 0.5rem 0;
             border: 1px solid var(--border);
             border-radius: 4px;
         }
-        .module h3 {
+        .module h3, .program h3 {
             margin: 0 0 0.5rem 0;
         }
-        .module p {
+        .module p, .program p {
             color: var(--text);
             opacity: 0.8;
         }
@@ -307,19 +412,54 @@ class LuaDocGenerator:
             margin-left: 0.5rem;
             vertical-align: middle;
         }
+        .program-badge {
+            display: inline-block;
+            background: #1a4d1a;
+            color: #7fcc7f;
+            padding: 0.15rem 0.4rem;
+            border-radius: 3px;
+            font-size: 0.7em;
+            font-weight: 500;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
         code {
             background: var(--code-bg);
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
             font-family: 'Monaco', 'Courier New', monospace;
         }
+        .section-intro {
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
     </style>
 </head>
 <body>
-    <h1>CC-Misc Utilities Documentation</h1>
-    <p>A collection of utility modules for ComputerCraft development</p>
-    
-    <h2>Modules</h2>
+    <h1>CC-Misc Documentation</h1>
+    <p>A collection of utility modules and programs for ComputerCraft development</p>
+"""
+        
+        # Programs section first
+        if programs:
+            html += """
+    <h2>Programs</h2>
+    <p class="section-intro">Complete applications and systems for ComputerCraft</p>
+    <div class="programs">
+"""
+            for program in programs:
+                html += f"""        <div class="program">
+            <h3><a href="programs/{program['name']}.html">{program['title'] or program['name']}</a><span class="program-badge">Program</span></h3>
+            <p>{program['description'][:200]}{'...' if len(program['description']) > 200 else ''}</p>
+        </div>
+"""
+            html += """    </div>
+"""
+        
+        # Libraries section
+        html += """
+    <h2>Libraries</h2>
+    <p class="section-intro">Utility libraries for building ComputerCraft applications</p>
     <div class="modules">
 """
         
@@ -803,10 +943,337 @@ local {module['name']} = require(libDir .. "{module['name']}")
 """
         return html
     
+    def generate_html_program(self, program: Dict[str, Any]) -> str:
+        """Generate HTML documentation for a program from its README"""
+        title = program['title'] or program['name']
+        description = program['description'].replace('<', '&lt;').replace('>', '&gt;')
+        github_repo_url = f"https://github.com/Twijn/cc-misc/tree/main/{program['name']}"
+        
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title} - CC-Misc Programs</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        :root {{
+            --bg: #ffffff;
+            --text: #1a1a1a;
+            --link: #0066cc;
+            --border: #e0e0e0;
+            --code-bg: #f5f5f5;
+        }}
+        @media (prefers-color-scheme: dark) {{
+            :root {{
+                --bg: #1a1a1a;
+                --text: #e0e0e0;
+                --link: #4d9fff;
+                --border: #333333;
+                --code-bg: #2a2a2a;
+            }}
+        }}
+        * {{
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text);
+            background: var(--bg);
+            padding: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }}
+        .header {{
+            border-bottom: 2px solid var(--border);
+            padding-bottom: 1.5rem;
+            margin-bottom: 2rem;
+        }}
+        .header h1 {{
+            margin-bottom: 1rem;
+            font-size: 2.5rem;
+        }}
+        .header p {{
+            font-size: 1.1rem;
+            line-height: 1.8;
+            opacity: 0.9;
+        }}
+        h2 {{
+            margin-top: 2.5rem;
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.6rem;
+        }}
+        h3 {{
+            margin-top: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-size: 1.3rem;
+        }}
+        h4 {{
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+            font-size: 1.1rem;
+        }}
+        code {{
+            background: var(--code-bg);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+        }}
+        pre {{
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid var(--border);
+            background: var(--code-bg);
+        }}
+        pre code {{
+            background: none;
+            padding: 0;
+            font-size: 0.95em;
+        }}
+        a {{
+            color: var(--link);
+            text-decoration: none;
+        }}
+        a:hover {{
+            text-decoration: underline;
+        }}
+        .back-link {{
+            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+        }}
+        .install-section {{
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.5rem;
+            margin: 2rem 0;
+        }}
+        .install-section h2 {{
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.5rem;
+            border-bottom: none;
+        }}
+        .install-cmd {{
+            background: var(--bg);
+            border: 1px solid var(--border);
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            margin: 0.5rem 0;
+            word-break: break-all;
+        }}
+        .github-link {{
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            background: var(--link);
+            color: white;
+            border: 1px solid var(--link);
+            border-radius: 4px;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+        }}
+        .github-link:hover {{
+            opacity: 0.85;
+            text-decoration: none;
+        }}
+        .install-controls {{
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-top: 1rem;
+        }}
+        .copy-btn {{
+            display: inline-block;
+            background: transparent;
+            color: var(--link);
+            border: 1px solid var(--link);
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.2s;
+            font-family: inherit;
+            line-height: 1.5;
+            text-align: center;
+            vertical-align: middle;
+            text-decoration: none;
+        }}
+        .copy-btn:hover {{
+            background: var(--link);
+            color: white;
+        }}
+        .copy-btn.copied {{
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }}
+        .program-badge {{
+            display: inline-block;
+            background: #1a4d1a;
+            color: #7fcc7f;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.75em;
+            font-weight: 500;
+            margin-left: 1rem;
+            vertical-align: middle;
+        }}
+        ul {{
+            margin: 0.5rem 0;
+            padding-left: 1.5rem;
+        }}
+        li {{
+            margin: 0.25rem 0;
+        }}
+        table {{
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1rem 0;
+        }}
+        th, td {{
+            border: 1px solid var(--border);
+            padding: 0.5rem;
+            text-align: left;
+        }}
+        th {{
+            background: var(--code-bg);
+        }}
+        .content {{
+            line-height: 1.8;
+        }}
+        .content p {{
+            margin: 1rem 0;
+        }}
+        .feature-list {{
+            list-style: disc;
+            padding-left: 1.5rem;
+            margin: 1rem 0;
+        }}
+        .feature-list li {{
+            margin: 0.5rem 0;
+        }}
+    </style>
+</head>
+<body>
+    <div class="back-link"><a href="../index.html">← Back to index</a></div>
+    <div class="header">
+        <h1>{title}<span class="program-badge">Program</span></h1>
+        <p>{description}</p>
+    </div>
+"""
+        
+        # Installation section
+        if program['installation']:
+            html += f"""    <div class="install-section">
+        <h2>Installation</h2>
+        <div class="install-cmd" id="install-cmd">{program['installation']}</div>
+        <div class="install-controls">
+            <button class="copy-btn" onclick="copyCommand(this, 'install-cmd')">Copy Command</button>
+            <a href="{github_repo_url}" class="github-link" target="_blank">View on GitHub →</a>
+        </div>
+    </div>
+    
+    <script>
+        function copyCommand(btn, cmdId) {{
+            const cmd = document.getElementById(cmdId).textContent;
+            navigator.clipboard.writeText(cmd).then(() => {{
+                const originalText = btn.textContent;
+                btn.textContent = '✓ Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {{
+                    btn.textContent = originalText;
+                    btn.classList.remove('copied');
+                }}, 2000);
+            }}).catch(err => {{
+                console.error('Failed to copy:', err);
+                btn.textContent = '✗ Failed';
+                setTimeout(() => {{
+                    btn.textContent = 'Copy Command';
+                }}, 2000);
+            }});
+        }}
+    </script>
+"""
+        
+        # Features section
+        if program['features']:
+            html += "    <h2>Features</h2>\n"
+            html += "    <ul class='feature-list'>\n"
+            for feature in program['features']:
+                html += f"        <li>{feature}</li>\n"
+            html += "    </ul>\n"
+        
+        # Components section
+        if program['components']:
+            html += "    <h2>Components</h2>\n"
+            html += "    <ul class='feature-list'>\n"
+            for component in program['components']:
+                html += f"        <li>{component}</li>\n"
+            html += "    </ul>\n"
+        
+        # Requirements section
+        if program['requirements']:
+            html += "    <h2>Requirements</h2>\n"
+            html += "    <ul class='feature-list'>\n"
+            for req in program['requirements']:
+                html += f"        <li>{req}</li>\n"
+            html += "    </ul>\n"
+        
+        # Full README content (rendered as markdown)
+        # Convert markdown to HTML for the full content
+        if HAS_MARKDOWN:
+            md_content = program['content']
+            # Remove the first heading since we already displayed it
+            md_content = re.sub(r'^#\s+[^\n]+\n+', '', md_content)
+            # Remove installation section since we displayed it specially
+            md_content = re.sub(r'## Installation\n+```[^`]+```\n*', '', md_content)
+            
+            html_content = markdown.markdown(md_content, extensions=['fenced_code', 'tables'])
+            html += f"""
+    <div class="content">
+        <h2>Full Documentation</h2>
+        {html_content}
+    </div>
+"""
+        else:
+            # Fallback: just show basic content
+            html += """
+    <div class="content">
+        <p><em>Full documentation available in the README on GitHub.</em></p>
+    </div>
+"""
+        
+        html += """</body>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
+</html>
+"""
+        return html
+    
     def generate(self):
-        """Generate documentation for all Lua files"""
+        """Generate documentation for all Lua files and programs"""
         # Create output directory
         self.output_dir.mkdir(exist_ok=True, parents=True)
+        
+        # Create programs subdirectory
+        programs_dir = self.output_dir / 'programs'
+        programs_dir.mkdir(exist_ok=True)
         
         # Find all Lua files in the util directory (excluding subdirectories)
         lua_files = list(self.input_dir.glob('*.lua'))
@@ -828,15 +1295,30 @@ local {module['name']} = require(libDir .. "{module['name']}")
             with open(html_path, 'w', encoding='utf-8') as f:
                 f.write(html_content)
         
+        # Parse and generate documentation for programs
+        parent_dir = self.input_dir.parent
+        for program_name in self.program_dirs:
+            program_dir = parent_dir / program_name
+            if program_dir.exists():
+                program = self.parse_program_readme(program_dir)
+                if program:
+                    self.programs.append(program)
+                    
+                    # Generate HTML for program
+                    html_content = self.generate_html_program(program)
+                    html_path = programs_dir / f"{program['name']}.html"
+                    with open(html_path, 'w', encoding='utf-8') as f:
+                        f.write(html_content)
+        
         # Generate index
-        index_html = self.generate_html_index(self.modules)
+        index_html = self.generate_html_index(self.modules, self.programs)
         with open(self.output_dir / 'index.html', 'w', encoding='utf-8') as f:
             f.write(index_html)
         
         # Generate JSON API
         self.generate_api()
         
-        print(f"Generated documentation for {len(self.modules)} modules")
+        print(f"Generated documentation for {len(self.modules)} modules and {len(self.programs)} programs")
         print(f"Output directory: {self.output_dir}")
     
     def generate_api(self):

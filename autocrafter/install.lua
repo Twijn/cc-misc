@@ -66,12 +66,12 @@ local diskPrefix = fs.exists("disk") and "disk/" or ""
 local commonFiles = {
     {url = BASE_URL .. "/autocrafter/config.lua", path = diskPrefix .. "config.lua"},
     {url = BASE_URL .. "/autocrafter/update.lua", path = diskPrefix .. "update.lua"},
+    {url = BASE_URL .. "/autocrafter/startup.lua", path = diskPrefix .. "startup.lua"},
     {url = BASE_URL .. "/autocrafter/lib/comms.lua", path = diskPrefix .. "lib/comms.lua"},
 }
 
 local serverFiles = {
     {url = BASE_URL .. "/autocrafter/server.lua", path = diskPrefix .. "server.lua"},
-    {url = BASE_URL .. "/autocrafter/startup.lua", path = diskPrefix .. "startup.lua"},
     {url = BASE_URL .. "/autocrafter/lib/recipes.lua", path = diskPrefix .. "lib/recipes.lua"},
     {url = BASE_URL .. "/autocrafter/lib/inventory.lua", path = diskPrefix .. "lib/inventory.lua"},
     {url = BASE_URL .. "/autocrafter/lib/crafting.lua", path = diskPrefix .. "lib/crafting.lua"},
@@ -86,7 +86,6 @@ local serverFiles = {
 
 local crafterFiles = {
     {url = BASE_URL .. "/autocrafter/crafter.lua", path = diskPrefix .. "crafter.lua"},
-    {url = BASE_URL .. "/autocrafter/startup_crafter.lua", path = diskPrefix .. "startup.lua"},
 }
 
 -- Collect files to download

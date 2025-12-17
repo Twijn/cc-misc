@@ -1,20 +1,25 @@
 --- AutoCrafter Monitor Manager
 --- Manages display output to monitors.
 ---
----@version 1.0.0
+---@version 2.0.0
 
 local logger = require("lib.log")
 
 local manager = {}
 
 local monitor = nil
-local refreshInterval = 2
+local refreshInterval = 5  -- Default, can be overridden
 local lastRefresh = 0
 
 ---Find and attach to a monitor
+---@param interval? number Optional refresh interval override
 ---@return boolean success Whether a monitor was found
-function manager.init()
+function manager.init(interval)
     monitor = peripheral.find("monitor")
+    
+    if interval then
+        refreshInterval = interval
+    end
     
     if monitor then
         monitor.setTextScale(0.5)

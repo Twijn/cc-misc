@@ -1,7 +1,8 @@
 --- AutoCrafter Storage Manager
 --- Manages storage operations and inventory tracking.
+--- Uses cached inventory system to minimize peripheral calls.
 ---
----@version 1.0.0
+---@version 2.0.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
@@ -18,7 +19,10 @@ function manager.init()
     storageConfig.setDefault("ignoredInventories", {})
     storageConfig.setDefault("priorityInventories", {})
     
-    -- Initial scan
+    -- Initialize inventory library from cache
+    inventory.init()
+    
+    -- Initial scan (uses cache if available)
     manager.scan()
     logger.info("Storage manager initialized")
 end
@@ -30,9 +34,10 @@ function manager.setScanInterval(seconds)
 end
 
 ---Perform inventory scan
+---@param forceRefresh? boolean Force rediscovery of peripherals
 ---@return table stockLevels Current stock levels
-function manager.scan()
-    local stock = inventory.scan()
+function manager.scan(forceRefresh)
+    local stock = inventory.scan(forceRefresh)
     lastScanTime = os.clock()
     return stock
 end
@@ -43,14 +48,14 @@ function manager.needsScan()
     return (os.clock() - lastScanTime) >= scanInterval
 end
 
----Get stock level for an item
+---Get stock level for an item (from cache)
 ---@param item string Item ID
 ---@return number count Stock count
 function manager.getStock(item)
     return inventory.getStock(item)
 end
 
----Get all stock levels
+---Get all stock levels (from cache)
 ---@return table stock All stock levels
 function manager.getAllStock()
     return inventory.getAllStock()
@@ -66,8 +71,7 @@ function manager.withdraw(item, count, destInv)
     
     if withdrawn > 0 then
         logger.info(string.format("Withdrew %d %s to %s", withdrawn, item, destInv))
-        -- Rescan affected inventories
-        manager.scan()
+        -- Note: inventory.withdraw() already updates affected caches
     end
     
     return withdrawn
@@ -86,7 +90,7 @@ function manager.deposit(sourceInv, item)
         else
             logger.info(string.format("Deposited %d items from %s", deposited, sourceInv))
         end
-        manager.scan()
+        -- Note: inventory.deposit() already updates affected caches
     end
     
     return deposited
@@ -126,17 +130,22 @@ function manager.getInventories()
     
     for _, name in ipairs(names) do
         local details = inventory.getInventoryDetails(name)
-        local usedSlots = 0
-        for _ in pairs(details.slots) do
-            usedSlots = usedSlots + 1
+        if details then
+            local usedSlots = 0
+            if details.slots then
+                for _ in pairs(details.slots) do
+                    usedSlots = usedSlots + 1
+                end
+            end
+            
+            local size = details.size or 0
+            table.insert(result, {
+                name = name,
+                size = size,
+                used = usedSlots,
+                free = size - usedSlots,
+            })
         end
-        
-        table.insert(result, {
-            name = name,
-            size = details.size,
-            used = usedSlots,
-            free = details.size - usedSlots,
-        })
     end
     
     return result
@@ -204,6 +213,19 @@ function manager.unignoreInventory(name)
     local ignored = storageConfig.get("ignoredInventories") or {}
     ignored[name] = nil
     storageConfig.set("ignoredInventories", ignored)
+end
+
+---Get cache statistics
+---@return table stats Cache statistics
+function manager.getCacheStats()
+    return inventory.getCacheStats()
+end
+
+---Clear all caches and force rescan
+function manager.clearCaches()
+    inventory.clearCaches()
+    manager.scan(true)
+    logger.info("Caches cleared and rescanned")
 end
 
 ---Shutdown handler

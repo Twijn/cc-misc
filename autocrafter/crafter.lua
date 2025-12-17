@@ -1,9 +1,10 @@
 --- AutoCrafter Crafter Turtle
 --- Turtle component that executes crafting jobs from the server.
+--- All inventory operations are requested from the server to minimize peripheral calls.
 ---
----@version 1.0.0
+---@version 2.0.0
 
-local VERSION = "1.0.0"
+local VERSION = "2.0.0"
 
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""
@@ -19,6 +20,12 @@ local running = true
 local currentJob = nil
 local status = "idle"
 
+-- Cached peripherals (avoid repeated peripheral calls)
+local cachedModem = nil
+local cachedModemName = nil
+local cachedInventories = nil
+local cachedInventoryPeripherals = {}
+
 -- Crafting slot mapping: 3x3 grid to turtle inventory
 -- Turtle slots: 1-16
 -- Crafting uses slots 1,2,3 for top row, 5,6,7 for middle, 9,10,11 for bottom
@@ -33,6 +40,64 @@ local STORAGE_SLOTS = {4, 8, 12, 13, 14, 15, 16}
 
 ---Get the output slot
 local OUTPUT_SLOT = 16
+
+---Get cached modem peripheral
+---@return table|nil modem The modem peripheral
+---@return string|nil name The modem name
+local function getModem()
+    if cachedModem then
+        return cachedModem, cachedModemName
+    end
+    
+    cachedModem = peripheral.find("modem")
+    if cachedModem then
+        cachedModemName = peripheral.getName(cachedModem)
+    end
+    
+    return cachedModem, cachedModemName
+end
+
+---Get cached inventory peripheral
+---@param name string The inventory name
+---@return table|nil inv The inventory peripheral
+local function getInventory(name)
+    if cachedInventoryPeripherals[name] then
+        return cachedInventoryPeripherals[name]
+    end
+    
+    local inv = peripheral.wrap(name)
+    if inv then
+        cachedInventoryPeripherals[name] = inv
+    end
+    
+    return inv
+end
+
+---Find connected inventories (cached)
+---@param forceRefresh? boolean Force rediscovery
+---@return table inventories Array of inventory peripheral names
+local function getInventories(forceRefresh)
+    if cachedInventories and not forceRefresh then
+        return cachedInventories
+    end
+    
+    cachedInventories = {}
+    cachedInventoryPeripherals = {}
+    
+    for _, name in ipairs(peripheral.getNames()) do
+        local types = {peripheral.getType(name)}
+        for _, t in ipairs(types) do
+            if t == "inventory" then
+                table.insert(cachedInventories, name)
+                -- Pre-cache the peripheral
+                cachedInventoryPeripherals[name] = peripheral.wrap(name)
+                break
+            end
+        end
+    end
+    
+    return cachedInventories
+end
 
 ---Initialize the crafter
 local function initialize()
@@ -69,6 +134,10 @@ local function initialize()
     end
     print("")
     
+    -- Cache modem and inventories
+    getModem()
+    getInventories()
+    
     -- Set label if not set
     if not os.getComputerLabel() then
         os.setComputerLabel("Crafter-" .. os.getComputerID())
@@ -84,75 +153,68 @@ local function initialize()
     return true
 end
 
----Find connected inventories
----@return table inventories Array of inventory peripheral names
-local function getInventories()
-    local inventories = {}
-    for _, name in ipairs(peripheral.getNames()) do
-        local types = {peripheral.getType(name)}
-        for _, t in ipairs(types) do
-            if t == "inventory" then
-                table.insert(inventories, name)
-                break
-            end
-        end
-    end
-    return inventories
-end
-
----Find an item in connected inventories
----@param item string Item ID to find
+---Request server to push items to us
+---@param item string Item ID
 ---@param count number Amount needed
----@return table|nil locations Array of {inventory, slot, count} or nil
-local function findItem(item, count)
-    local inventories = getInventories()
-    local found = {}
-    local foundCount = 0
+---@param destInv string Our inventory name (modem name)
+---@return number withdrawn Amount actually received
+local function requestWithdraw(item, count, destInv)
+    comms.broadcast(config.messageTypes.REQUEST_WITHDRAW, {
+        item = item,
+        count = count,
+        destInv = destInv,
+    })
     
-    for _, invName in ipairs(inventories) do
-        local inv = peripheral.wrap(invName)
-        if inv then
-            local list = inv.list()
-            if list then
-                for slot, slotItem in pairs(list) do
-                    if slotItem.name == item then
-                        table.insert(found, {
-                            inventory = invName,
-                            slot = slot,
-                            count = slotItem.count,
-                        })
-                        foundCount = foundCount + slotItem.count
-                        
-                        if foundCount >= count then
-                            return found
-                        end
-                    end
-                end
-            end
+    -- Wait for response
+    local timeout = os.clock() + 5
+    while os.clock() < timeout do
+        local message = comms.receive(0.5)
+        if message and message.type == config.messageTypes.RESPONSE_WITHDRAW then
+            return message.data.withdrawn or 0
         end
     end
     
-    if foundCount > 0 then
-        return found
-    end
-    return nil
+    return 0
 end
 
----Clear the turtle inventory to storage
-local function clearInventory()
-    local inventories = getInventories()
-    if #inventories == 0 then return end
+---Request server to accept items from us
+---@param sourceInv string Our inventory name (modem name)
+---@param item? string Optional item filter
+---@return number deposited Amount deposited
+local function requestDeposit(sourceInv, item)
+    comms.broadcast(config.messageTypes.REQUEST_DEPOSIT, {
+        sourceInv = sourceInv,
+        item = item,
+    })
     
-    local targetInv = inventories[1]
+    -- Wait for response
+    local timeout = os.clock() + 5
+    while os.clock() < timeout do
+        local message = comms.receive(0.5)
+        if message and message.type == config.messageTypes.RESPONSE_DEPOSIT then
+            return message.data.deposited or 0
+        end
+    end
+    
+    return 0
+end
+
+---Clear the turtle inventory to storage (via server request)
+local function clearInventory()
+    local _, modemName = getModem()
+    if not modemName then return end
+    
+    -- First, try to push items through adjacent inventories
+    local inventories = getInventories()
     
     for slot = 1, 16 do
         if turtle.getItemCount(slot) > 0 then
             turtle.select(slot)
-            -- Try to push to inventory
+            -- Try to push to any adjacent inventory
             for _, invName in ipairs(inventories) do
-                local inv = peripheral.wrap(invName)
+                local inv = getInventory(invName)
                 if inv then
-                    local pushed = inv.pullItems(peripheral.getName(peripheral.find("modem")), slot)
+                    local pushed = inv.pullItems(modemName, slot)
                     if pushed and pushed > 0 then
                         break
                     end
@@ -164,32 +226,52 @@ local function clearInventory()
     turtle.select(1)
 end
 
----Pull item from inventory to turtle slot
+---Pull item from storage to turtle slot (via server request)
 ---@param item string Item ID
 ---@param count number Amount to pull
 ---@param turtleSlot number Destination slot
 ---@return number pulled Amount actually pulled
 local function pullItem(item, count, turtleSlot)
-    local locations = findItem(item, count)
-    if not locations then
+    local _, modemName = getModem()
+    if not modemName then
+        logger.warn("No modem found for pullItem")
         return 0
     end
     
-    local pulled = 0
     turtle.select(turtleSlot)
     
-    for _, loc in ipairs(locations) do
-        if pulled >= count then break end
-        
-        local inv = peripheral.wrap(loc.inventory)
-        if inv then
-            local toPull = math.min(count - pulled, loc.count)
-            local modemName = peripheral.getName(peripheral.find("modem"))
-            
-            -- Use suck if modem not available, otherwise pushItems
-            if modemName then
-                local amount = inv.pushItems(modemName, loc.slot, toPull, turtleSlot)
-                pulled = pulled + (amount or 0)
+    -- Request server to push items to our adjacent inventory
+    -- Then we pull from there
+    local inventories = getInventories()
+    if #inventories == 0 then
+        logger.warn("No adjacent inventories for item transfer")
+        return 0
+    end
+    
+    -- Use first adjacent inventory as staging
+    local stagingInv = inventories[1]
+    
+    -- Request items from server to staging inventory
+    local withdrawn = requestWithdraw(item, count, stagingInv)
+    if withdrawn == 0 then
+        return 0
+    end
+    
+    -- Now pull from staging inventory to turtle
+    local pulled = 0
+    local inv = getInventory(stagingInv)
+    if inv then
+        local list = inv.list()
+        if list then
+            for slot, slotItem in pairs(list) do
+                if slotItem.name == item then
+                    local toPull = math.min(count - pulled, slotItem.count)
+                    local amount = inv.pushItems(modemName, slot, toPull, turtleSlot)
+                    pulled = pulled + (amount or 0)
+                    if pulled >= count then
+                        break
+                    end
+                end
             end
         end
     end
@@ -285,13 +367,13 @@ local function executeCraft(job)
         if craftSuccess then
             craftsCompleted = craftsCompleted + 1
             
-            -- Move output to storage
+            -- Move output to storage via cached peripherals
             local outputCount = turtle.getItemCount(OUTPUT_SLOT)
-            for _, invName in ipairs(getInventories()) do
-                local inv = peripheral.wrap(invName)
-                if inv then
-                    local modemName = peripheral.getName(peripheral.find("modem"))
-                    if modemName then
+            local _, modemName = getModem()
+            if modemName then
+                for _, invName in ipairs(getInventories()) do
+                    local inv = getInventory(invName)
+                    if inv then
                         local pushed = inv.pullItems(modemName, OUTPUT_SLOT, outputCount)
                         if pushed and pushed > 0 then
                             break

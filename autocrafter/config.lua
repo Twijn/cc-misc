@@ -1,5 +1,5 @@
 --- AutoCrafter Default Configuration
----@version 1.0.0
+---@version 2.0.0
 
 return {
     -- Network channel for crafter communication
@@ -20,6 +20,12 @@ return {
     -- Crafter timeout (seconds) before marking offline
     crafterTimeout = 60,
     
+    -- Monitor refresh interval (seconds)
+    monitorRefreshInterval = 5,
+    
+    -- Ping interval for crafters (seconds)
+    pingInterval = 30,
+    
     -- Recipe search paths
     recipePaths = {
         "/rom/mcdata/minecraft/recipes/",
@@ -28,14 +34,40 @@ return {
     
     -- Message types for network communication
     messageTypes = {
+        -- Heartbeat messages
         PING = "ping",
         PONG = "pong",
         STATUS = "status",
+        
+        -- Crafting messages
         CRAFT_REQUEST = "craft_request",
         CRAFT_COMPLETE = "craft_complete",
         CRAFT_FAILED = "craft_failed",
+        
+        -- Inventory messages (server -> crafter responses)
         INVENTORY_UPDATE = "inventory_update",
-        WITHDRAW = "withdraw",
-        DEPOSIT = "deposit",
+        
+        -- Crafter -> Server requests
+        REQUEST_STOCK = "request_stock",           -- Request stock levels
+        REQUEST_FIND_ITEM = "request_find_item",   -- Request item locations
+        REQUEST_WITHDRAW = "request_withdraw",     -- Request items to be pushed to crafter
+        REQUEST_DEPOSIT = "request_deposit",       -- Request to accept items from crafter
+        
+        -- Server -> Crafter responses
+        RESPONSE_STOCK = "response_stock",
+        RESPONSE_FIND_ITEM = "response_find_item",
+        RESPONSE_WITHDRAW = "response_withdraw",
+        RESPONSE_DEPOSIT = "response_deposit",
+        
+        -- Server discovery
+        SERVER_ANNOUNCE = "server_announce",       -- Server broadcasts presence
+        SERVER_QUERY = "server_query",             -- Client asks for server info
+    },
+    
+    -- Client roles
+    roles = {
+        SERVER = "server",
+        CRAFTER = "crafter",
+        UNKNOWN = "unknown",
     },
 }

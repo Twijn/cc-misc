@@ -16,6 +16,7 @@ local recipes = require("lib.recipes")
 local comms = require("lib.comms")
 local cmd = require("lib.cmd")
 local FormUI = require("lib.formui")
+local inventory = require("lib.inventory")
 
 -- Load managers
 local queueManager = require("managers.queue")
@@ -26,6 +27,7 @@ local monitorManager = require("managers.monitor")
 -- Load config modules
 local settings = require("config.settings")
 local targets = require("config.targets")
+local config = require("config")
 
 local running = true
 local shuttingDown = false
@@ -76,7 +78,7 @@ local function initialize()
     storageManager.init()
     storageManager.setScanInterval(settings.get("scanInterval"))
     crafterManager.init()
-    monitorManager.init()
+    monitorManager.init(config.monitorRefreshInterval)
     print("")
     
     -- Initial stats
@@ -147,10 +149,58 @@ local function messageHandler()
             if result then
                 if result.type == "craft_complete" then
                     queueManager.completeJob(result.jobId, result.actualOutput)
+                    -- Rescan storage since crafting produced output
                     storageManager.scan()
                 elseif result.type == "craft_failed" then
                     queueManager.failJob(result.jobId, result.reason)
                 end
+            end
+            
+            -- Handle inventory requests from crafters
+            local msgType = message.type
+            local sender = message.sender
+            local data = message.data or {}
+            
+            if msgType == config.messageTypes.REQUEST_STOCK then
+                -- Crafter requesting stock levels
+                local stock = storageManager.getAllStock()
+                comms.send(config.messageTypes.RESPONSE_STOCK, {
+                    stock = stock,
+                    timestamp = os.epoch("utc"),
+                }, sender)
+                
+            elseif msgType == config.messageTypes.REQUEST_FIND_ITEM then
+                -- Crafter requesting item locations
+                local locations = inventory.findItem(data.item)
+                comms.send(config.messageTypes.RESPONSE_FIND_ITEM, {
+                    item = data.item,
+                    locations = locations,
+                }, sender)
+                
+            elseif msgType == config.messageTypes.REQUEST_WITHDRAW then
+                -- Crafter requesting items to be pushed to it
+                local withdrawn = storageManager.withdraw(data.item, data.count, data.destInv)
+                comms.send(config.messageTypes.RESPONSE_WITHDRAW, {
+                    item = data.item,
+                    requested = data.count,
+                    withdrawn = withdrawn,
+                }, sender)
+                
+            elseif msgType == config.messageTypes.REQUEST_DEPOSIT then
+                -- Crafter wants to deposit items
+                local deposited = storageManager.deposit(data.sourceInv, data.item)
+                comms.send(config.messageTypes.RESPONSE_DEPOSIT, {
+                    deposited = deposited,
+                }, sender)
+                
+            elseif msgType == config.messageTypes.SERVER_QUERY then
+                -- Client asking if server exists
+                comms.send(config.messageTypes.SERVER_ANNOUNCE, {
+                    serverId = os.getComputerID(),
+                    serverLabel = settings.get("serverLabel"),
+                    version = VERSION,
+                    online = true,
+                }, sender)
             end
         end
     end
@@ -160,12 +210,15 @@ end
 local function periodicTasks()
     local lastCraftCheck = 0
     local lastPing = 0
+    local lastAnnounce = 0
     local craftCheckInterval = settings.get("craftCheckInterval")
+    local pingInterval = config.pingInterval or 30
+    local monitorRefreshInterval = config.monitorRefreshInterval or 5
     
     while running do
         local now = os.clock()
         
-        -- Scan storage if needed
+        -- Scan storage if needed (respects scan interval)
         if storageManager.needsScan() then
             storageManager.scan()
         end
@@ -177,13 +230,26 @@ local function periodicTasks()
             lastCraftCheck = now
         end
         
-        -- Ping crafters
-        if now - lastPing >= 10 then
+        -- Ping crafters (less frequently than before)
+        if now - lastPing >= pingInterval then
             crafterManager.pingAll()
             lastPing = now
         end
         
-        -- Update monitor
+        -- Announce server presence periodically
+        if now - lastAnnounce >= 60 then
+            if comms.isConnected() then
+                comms.broadcast(config.messageTypes.SERVER_ANNOUNCE, {
+                    serverId = os.getComputerID(),
+                    serverLabel = settings.get("serverLabel"),
+                    version = VERSION,
+                    online = true,
+                })
+            end
+            lastAnnounce = now
+        end
+        
+        -- Update monitor (less frequently)
         if monitorManager.needsRefresh() then
             local stock = storageManager.getAllStock()
             monitorManager.drawStatus({
@@ -382,11 +448,38 @@ local commands = {
     scan = {
         description = "Force inventory rescan",
         execute = function(args, ctx)
-            ctx.mess("Scanning inventories...")
-            storageManager.scan()
+            local forceRefresh = args[1] == "full" or args[1] == "-f"
+            if forceRefresh then
+                ctx.mess("Performing full rescan (rediscovering peripherals)...")
+            else
+                ctx.mess("Scanning inventories...")
+            end
+            storageManager.scan(forceRefresh)
             local stats = storageManager.getStats()
             ctx.succ(string.format("Found %d items in %d slots",
                 stats.totalItems, stats.usedSlots))
+        end
+    },
+    
+    cache = {
+        description = "View or clear cache statistics",
+        execute = function(args, ctx)
+            if args[1] == "clear" then
+                ctx.mess("Clearing all caches...")
+                storageManager.clearCaches()
+                ctx.succ("Caches cleared and rescanned")
+                return
+            end
+            
+            local stats = storageManager.getCacheStats()
+            print("")
+            ctx.mess("=== Cache Statistics ===")
+            print(string.format("  Cached inventories: %d", stats.inventories))
+            print(string.format("  Cached item details: %d", stats.itemDetails))
+            print(string.format("  Wrapped peripherals: %d", stats.wrappedPeripherals))
+            print(string.format("  Time since last scan: %.1fs", stats.timeSinceScan))
+            print("")
+            ctx.mess("Use 'cache clear' to clear all caches")
         end
     },
     
