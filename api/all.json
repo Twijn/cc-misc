@@ -1205,7 +1205,7 @@
           "params": [],
           "returns": "boolean Success",
           "description": "Interactive UI for project updater",
-          "line": 764
+          "line": 797
         },
         {
           "name": "module.withProject",
@@ -1218,7 +1218,7 @@
           ],
           "returns": "table Builder object for chaining",
           "description": "Start project mode with optional name",
-          "line": 1235
+          "line": 1312
         }
       ],
       "classes": []
@@ -1742,5 +1742,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-18T03:30:37Z"
+  "updated": "2025-12-18T03:34:39Z"
 }
