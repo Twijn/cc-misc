@@ -1193,7 +1193,7 @@
             {
               "name": "files",
               "type": "table",
-              "description": "Array of {url, path, required?, name?, category?}"
+              "description": "Array of {url, path, required?, name?, category?, isConfig?}"
             }
           ],
           "returns": "table Builder object for chaining",
@@ -1205,7 +1205,7 @@
           "params": [],
           "returns": "boolean Success",
           "description": "Interactive UI for project updater",
-          "line": 797
+          "line": 857
         },
         {
           "name": "module.withProject",
@@ -1218,7 +1218,7 @@
           ],
           "returns": "table Builder object for chaining",
           "description": "Start project mode with optional name",
-          "line": 1312
+          "line": 1424
         }
       ],
       "classes": []
@@ -1742,5 +1742,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-18T03:34:39Z"
+  "updated": "2025-12-18T04:28:22Z"
 }

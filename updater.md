@@ -196,7 +196,7 @@ Add project files to manage
 
 **Parameters:**
 
-- `files` (table): Array of {url, path, required?, name?, category?}
+- `files` (table): Array of {url, path, required?, name?, category?, isConfig?}
 
 **Returns:** table Builder object for chaining
 
