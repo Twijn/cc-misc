@@ -246,8 +246,8 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>updater <span class="version-badge">v1.1.0</span></h1>
-        <p>A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, and detailed logging for debugging.</p>
+        <h1>updater <span class="version-badge">v2.0.0</span></h1>
+        <p>A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, project file management, interactive UI mode, and detailed logging for debugging.</p>
     </div>
     
     <div class="install-section">
@@ -380,11 +380,20 @@ updater.update("s")
 -- Update all packages
 updater.updateAll()
 -- Enable verbose mode for debugging
-updater.setVerbose(true)</code></pre>
+updater.setVerbose(true)
+-- Project mode (for application updaters)
+updater.withProject("AutoCrafter")
+ .withRequiredLibs({"s", "tables", "log"})
+ .withOptionalLibs({"formui", "cmd"})
+ .withFiles({
+   {url = "https://...", path = "server.lua", required = true},
+   {url = "https://...", path = "lib/ui.lua", required = true},
+ })
+ .run()</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.setVerbose(enabled)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L41' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L60' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Enable or disable verbose output</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -395,24 +404,24 @@ updater.setVerbose(true)</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.getLog()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L47' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L66' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get the current log entries</p>
         <div class='returns'><strong>Returns:</strong> table Array of log entries</div>
     </div>
     <div class='function'>
         <h3><code>module.clearLog()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L53' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L72' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Clear the log</p>
     </div>
     <div class='function'>
         <h3><code>module.getLibraries()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L230' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L249' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get information about all available libraries</p>
         <div class='returns'><strong>Returns:</strong> table|nil List of library info or nil on error</div>
     </div>
     <div class='function'>
         <h3><code>module.getLibraryInfo(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L236' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L255' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get information about a specific library</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -424,13 +433,13 @@ updater.setVerbose(true)</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.checkUpdates()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L243' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L262' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Check for updates to installed libraries</p>
         <div class='returns'><strong>Returns:</strong> table List of libraries with available updates</div>
     </div>
     <div class='function'>
         <h3><code>module.hasUpdate(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L275' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L294' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Check if a specific library has an update available</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -442,7 +451,7 @@ updater.setVerbose(true)</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.update(name, silent?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L297' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L316' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Install or update a library</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -455,7 +464,7 @@ updater.setVerbose(true)</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.updateAll(silent?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L362' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L381' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Update all installed libraries that have updates available</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -467,13 +476,13 @@ updater.setVerbose(true)</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.listInstalled()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L425' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L444' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>List all installed libraries with their versions</p>
         <div class='returns'><strong>Returns:</strong> table List of {name, version, path} for installed libraries</div>
     </div>
     <div class='function'>
         <h3><code>module.install(name, silent?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L450' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L469' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Install a new library with its dependencies</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -486,14 +495,118 @@ updater.setVerbose(true)</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.showLog()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L512' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L531' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Show the update log in a scrollable view (interactive)</p>
     </div>
     <div class='function'>
         <h3><code>module.getLogFile()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L579' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L598' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get the log file path for the current day</p>
         <div class='returns'><strong>Returns:</strong> string Log file path</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.fetchJSON(url)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L620' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Fetch JSON data from URL (exported version)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>url</code> (string): URL to fetch</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table|nil Parsed JSON data or nil on error</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.downloadFile(url, filepath, name)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L627' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Download and install a file (exported version)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>url</code> (string): The URL to download from</li>
+                <li><code>filepath</code> (string): The local file path to save to</li>
+                <li><code>name</code> (string?): Optional name for logging</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> boolean Success</div>
+    </div>
+    <div class='function'>
+        <h3><code>ProjectBuilder:withName(name)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L640' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Set the project name</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string): Project name (displayed in header)</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table Builder object for chaining</div>
+    </div>
+    <div class='function'>
+        <h3><code>ProjectBuilder:withDiskPrefix(prefix)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L648' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Set the disk prefix for file paths</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>prefix</code> (string): Disk prefix (e.g., "disk/")</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table Builder object for chaining</div>
+    </div>
+    <div class='function'>
+        <h3><code>ProjectBuilder:withRequiredLibs(libs)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L656' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add required libraries (must be installed)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>libs</code> (table): Array of library names</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table Builder object for chaining</div>
+    </div>
+    <div class='function'>
+        <h3><code>ProjectBuilder:withOptionalLibs(libs)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L666' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add optional libraries (can be toggled)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>libs</code> (table): Array of library names</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table Builder object for chaining</div>
+    </div>
+    <div class='function'>
+        <h3><code>ProjectBuilder:withFiles(files)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L676' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add project files to manage</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>files</code> (table): Array of {url, path, required?, name?, category?}</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table Builder object for chaining</div>
+    </div>
+    <div class='function'>
+        <h3><code>ProjectBuilder:run()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L764' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Interactive UI for project updater</p>
+        <div class='returns'><strong>Returns:</strong> boolean Success</div>
+    </div>
+    <div class='function'>
+        <h3><code>module.withProject(name)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/updater.lua#L1235' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Start project mode with optional name</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>name</code> (string?): Project name</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table Builder object for chaining</div>
     </div>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>

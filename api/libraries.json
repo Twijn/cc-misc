@@ -150,8 +150,8 @@
     },
     {
       "name": "updater",
-      "version": "1.1.0",
-      "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, and detailed logging for debugging.",
+      "version": "2.0.0",
+      "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, project file management, interactive UI mode, and detailed logging for debugging.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua",
       "documentation_url": "https://ccmisc.twijn.dev/updater.html",
@@ -168,7 +168,16 @@
         "module.listInstalled",
         "module.install",
         "module.showLog",
-        "module.getLogFile"
+        "module.getLogFile",
+        "module.fetchJSON",
+        "module.downloadFile",
+        "ProjectBuilder:withName",
+        "ProjectBuilder:withDiskPrefix",
+        "ProjectBuilder:withRequiredLibs",
+        "ProjectBuilder:withOptionalLibs",
+        "ProjectBuilder:withFiles",
+        "ProjectBuilder:run",
+        "module.withProject"
       ],
       "classes": []
     },
@@ -236,5 +245,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-12-17T05:08:07Z"
+  "updated": "2025-12-18T03:30:37Z"
 }

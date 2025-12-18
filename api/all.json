@@ -956,8 +956,8 @@
     },
     "updater": {
       "name": "updater",
-      "version": "1.1.0",
-      "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, and detailed logging for debugging.",
+      "version": "2.0.0",
+      "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, project file management, interactive UI mode, and detailed logging for debugging.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/updater.lua",
       "documentation_url": "https://ccmisc.twijn.dev/updater.html",
@@ -973,28 +973,28 @@
           ],
           "returns": "",
           "description": "Enable or disable verbose output",
-          "line": 41
+          "line": 60
         },
         {
           "name": "module.getLog",
           "params": [],
           "returns": "table Array of log entries",
           "description": "Get the current log entries",
-          "line": 47
+          "line": 66
         },
         {
           "name": "module.clearLog",
           "params": [],
           "returns": "",
           "description": "Clear the log",
-          "line": 53
+          "line": 72
         },
         {
           "name": "module.getLibraries",
           "params": [],
           "returns": "table|nil List of library info or nil on error",
           "description": "Get information about all available libraries",
-          "line": 230
+          "line": 249
         },
         {
           "name": "module.getLibraryInfo",
@@ -1007,14 +1007,14 @@
           ],
           "returns": "table|nil Library info or nil on error",
           "description": "Get information about a specific library",
-          "line": 236
+          "line": 255
         },
         {
           "name": "module.checkUpdates",
           "params": [],
           "returns": "table List of libraries with available updates",
           "description": "Check for updates to installed libraries",
-          "line": 243
+          "line": 262
         },
         {
           "name": "module.hasUpdate",
@@ -1027,7 +1027,7 @@
           ],
           "returns": "boolean, string|nil, string|nil Has update, current version, latest version",
           "description": "Check if a specific library has an update available",
-          "line": 275
+          "line": 294
         },
         {
           "name": "module.update",
@@ -1045,7 +1045,7 @@
           ],
           "returns": "boolean Success",
           "description": "Install or update a library",
-          "line": 297
+          "line": 316
         },
         {
           "name": "module.updateAll",
@@ -1058,14 +1058,14 @@
           ],
           "returns": "number Number of successful updates",
           "description": "Update all installed libraries that have updates available",
-          "line": 362
+          "line": 381
         },
         {
           "name": "module.listInstalled",
           "params": [],
           "returns": "table List of {name, version, path} for installed libraries",
           "description": "List all installed libraries with their versions",
-          "line": 425
+          "line": 444
         },
         {
           "name": "module.install",
@@ -1083,21 +1083,142 @@
           ],
           "returns": "boolean Success",
           "description": "Install a new library with its dependencies",
-          "line": 450
+          "line": 469
         },
         {
           "name": "module.showLog",
           "params": [],
           "returns": "",
           "description": "Show the update log in a scrollable view (interactive)",
-          "line": 512
+          "line": 531
         },
         {
           "name": "module.getLogFile",
           "params": [],
           "returns": "string Log file path",
           "description": "Get the log file path for the current day",
-          "line": 579
+          "line": 598
+        },
+        {
+          "name": "module.fetchJSON",
+          "params": [
+            {
+              "name": "url",
+              "type": "string",
+              "description": "URL to fetch"
+            }
+          ],
+          "returns": "table|nil Parsed JSON data or nil on error",
+          "description": "Fetch JSON data from URL (exported version)",
+          "line": 620
+        },
+        {
+          "name": "module.downloadFile",
+          "params": [
+            {
+              "name": "url",
+              "type": "string",
+              "description": "The URL to download from"
+            },
+            {
+              "name": "filepath",
+              "type": "string",
+              "description": "The local file path to save to"
+            },
+            {
+              "name": "name",
+              "type": "string?",
+              "description": "Optional name for logging"
+            }
+          ],
+          "returns": "boolean Success",
+          "description": "Download and install a file (exported version)",
+          "line": 627
+        },
+        {
+          "name": "ProjectBuilder:withName",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "Project name (displayed in header)"
+            }
+          ],
+          "returns": "table Builder object for chaining",
+          "description": "Set the project name",
+          "line": 640
+        },
+        {
+          "name": "ProjectBuilder:withDiskPrefix",
+          "params": [
+            {
+              "name": "prefix",
+              "type": "string",
+              "description": "Disk prefix (e.g., \"disk/\")"
+            }
+          ],
+          "returns": "table Builder object for chaining",
+          "description": "Set the disk prefix for file paths",
+          "line": 648
+        },
+        {
+          "name": "ProjectBuilder:withRequiredLibs",
+          "params": [
+            {
+              "name": "libs",
+              "type": "table",
+              "description": "Array of library names"
+            }
+          ],
+          "returns": "table Builder object for chaining",
+          "description": "Add required libraries (must be installed)",
+          "line": 656
+        },
+        {
+          "name": "ProjectBuilder:withOptionalLibs",
+          "params": [
+            {
+              "name": "libs",
+              "type": "table",
+              "description": "Array of library names"
+            }
+          ],
+          "returns": "table Builder object for chaining",
+          "description": "Add optional libraries (can be toggled)",
+          "line": 666
+        },
+        {
+          "name": "ProjectBuilder:withFiles",
+          "params": [
+            {
+              "name": "files",
+              "type": "table",
+              "description": "Array of {url, path, required?, name?, category?}"
+            }
+          ],
+          "returns": "table Builder object for chaining",
+          "description": "Add project files to manage",
+          "line": 676
+        },
+        {
+          "name": "ProjectBuilder:run",
+          "params": [],
+          "returns": "boolean Success",
+          "description": "Interactive UI for project updater",
+          "line": 764
+        },
+        {
+          "name": "module.withProject",
+          "params": [
+            {
+              "name": "name",
+              "type": "string?",
+              "description": "Project name"
+            }
+          ],
+          "returns": "table Builder object for chaining",
+          "description": "Start project mode with optional name",
+          "line": 1235
         }
       ],
       "classes": []
@@ -1621,5 +1742,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-17T05:08:07Z"
+  "updated": "2025-12-18T03:30:37Z"
 }

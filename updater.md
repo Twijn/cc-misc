@@ -1,6 +1,6 @@
 # updater
 
-A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, and detailed logging for debugging.
+A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, project file management, interactive UI mode, and detailed logging for debugging.
 
 ## Examples
 
@@ -17,6 +17,15 @@ updater.update("s")
 updater.updateAll()
 -- Enable verbose mode for debugging
 updater.setVerbose(true)
+-- Project mode (for application updaters)
+updater.withProject("AutoCrafter")
+ .withRequiredLibs({"s", "tables", "log"})
+ .withOptionalLibs({"formui", "cmd"})
+ .withFiles({
+   {url = "https://...", path = "server.lua", required = true},
+   {url = "https://...", path = "lib/ui.lua", required = true},
+ })
+ .run()
 ```
 
 ## Functions
@@ -118,4 +127,92 @@ Show the update log in a scrollable view (interactive)
 Get the log file path for the current day
 
 **Returns:** string Log file path
+
+### `module.fetchJSON(url)`
+
+Fetch JSON data from URL (exported version)
+
+**Parameters:**
+
+- `url` (string): URL to fetch
+
+**Returns:** table|nil Parsed JSON data or nil on error
+
+### `module.downloadFile(url, filepath, name)`
+
+Download and install a file (exported version)
+
+**Parameters:**
+
+- `url` (string): The URL to download from
+- `filepath` (string): The local file path to save to
+- `name` (string?): Optional name for logging
+
+**Returns:** boolean Success
+
+### `ProjectBuilder:withName(name)`
+
+Set the project name
+
+**Parameters:**
+
+- `name` (string): Project name (displayed in header)
+
+**Returns:** table Builder object for chaining
+
+### `ProjectBuilder:withDiskPrefix(prefix)`
+
+Set the disk prefix for file paths
+
+**Parameters:**
+
+- `prefix` (string): Disk prefix (e.g., "disk/")
+
+**Returns:** table Builder object for chaining
+
+### `ProjectBuilder:withRequiredLibs(libs)`
+
+Add required libraries (must be installed)
+
+**Parameters:**
+
+- `libs` (table): Array of library names
+
+**Returns:** table Builder object for chaining
+
+### `ProjectBuilder:withOptionalLibs(libs)`
+
+Add optional libraries (can be toggled)
+
+**Parameters:**
+
+- `libs` (table): Array of library names
+
+**Returns:** table Builder object for chaining
+
+### `ProjectBuilder:withFiles(files)`
+
+Add project files to manage
+
+**Parameters:**
+
+- `files` (table): Array of {url, path, required?, name?, category?}
+
+**Returns:** table Builder object for chaining
+
+### `ProjectBuilder:run()`
+
+Interactive UI for project updater
+
+**Returns:** boolean Success
+
+### `module.withProject(name)`
+
+Start project mode with optional name
+
+**Parameters:**
+
+- `name` (string?): Project name
+
+**Returns:** table Builder object for chaining
 
