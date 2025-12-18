@@ -761,6 +761,39 @@ local function resolveDeps(libNames, libData)
     return resolved
 end
 
+---Category sort order (lower = higher priority)
+local CATEGORY_ORDER = {
+    ["Core Files"] = 1,
+    ["Server"] = 2,
+    ["Crafter"] = 3,
+    ["Managers"] = 4,
+    ["Libraries"] = 5,
+    ["Config"] = 6,
+    ["Required Libraries"] = 10,
+    ["Optional Libraries"] = 11,
+    ["Dependencies"] = 12,
+}
+
+---Get category sort priority
+---@param category string Category name
+---@return number Sort priority
+local function getCategoryOrder(category)
+    return CATEGORY_ORDER[category] or 50
+end
+
+---Sort items by category order, then by name
+---@param items table Array of items
+local function sortItemsByCategory(items)
+    table.sort(items, function(a, b)
+        local orderA = getCategoryOrder(a.category)
+        local orderB = getCategoryOrder(b.category)
+        if orderA ~= orderB then
+            return orderA < orderB
+        end
+        return a.name < b.name
+    end)
+end
+
 ---Interactive UI for project updater
 ---@return boolean Success
 function ProjectBuilder:run()
@@ -866,8 +899,30 @@ function ProjectBuilder:run()
         end
     end
     
+    -- Sort items by category
+    sortItemsByCategory(items)
+    
+    -- Build display list with category headers
+    local displayItems = {}
+    local lastCategory = nil
+    for _, item in ipairs(items) do
+        if item.category ~= lastCategory then
+            lastCategory = item.category
+            table.insert(displayItems, {
+                type = "header",
+                category = item.category,
+            })
+        end
+        table.insert(displayItems, item)
+    end
+    
     -- UI state
     local cursor = 1
+    -- Skip to first non-header item
+    while cursor <= #displayItems and displayItems[cursor].type == "header" do
+        cursor = cursor + 1
+    end
+    
     local w, h = term.getSize()
     
     while true do
@@ -888,147 +943,33 @@ function ProjectBuilder:run()
         local footerLines = 2
         local maxVisibleItems = h - headerLines - footerLines
         
-        -- Calculate scroll
-        local totalItems = #items
-        local scroll = math.max(0, math.min(cursor - math.floor(maxVisibleItems / 2), totalItems - maxVisibleItems))
+        -- Calculate scroll based on displayItems
+        local totalDisplayItems = #displayItems
+        local scroll = math.max(0, math.min(cursor - math.floor(maxVisibleItems / 2), totalDisplayItems - maxVisibleItems))
         scroll = math.max(0, scroll)
         
         local startIdx = scroll + 1
-        local endIdx = math.min(startIdx + maxVisibleItems - 1, totalItems)
-        
-        -- Track current category for headers
-        local lastCategory = nil
-        local displayLine = 0
+        local endIdx = math.min(startIdx + maxVisibleItems - 1, totalDisplayItems)
         
         for i = startIdx, endIdx do
-            local item = items[i]
-            local key = item.type == "file" and item.path or item.name
-            local isCursor = (i == cursor)
-            local isSelected = selected[key]
-            local isForced = forceSelected[key]
+            local item = displayItems[i]
             
-            -- Check if required by selected libraries (dependency)
-            local isRequiredBy = nil
-            if item.type == "library" then
-                for _, otherItem in ipairs(items) do
-                    if otherItem.type == "library" and selected[otherItem.name] and otherItem.dependencies then
-                        for _, dep in ipairs(otherItem.dependencies) do
-                            if dep == item.name then
-                                isRequiredBy = otherItem.name
-                                break
-                            end
-                        end
-                    end
-                    if isRequiredBy then break end
-                end
-            end
-            
-            -- Category header (inline)
-            local catPrefix = ""
-            if item.category ~= lastCategory then
-                lastCategory = item.category
-                catPrefix = "[" .. item.category .. "] "
-            end
-            
-            -- Determine marker
-            local marker
-            if isForced then
-                marker = "[R]" -- Required
-            elseif isRequiredBy then
-                marker = "[+]" -- Dependency
-                if not selected[key] then
-                    selected[key] = true -- Auto-select dependencies
-                end
-            elseif isSelected then
-                marker = "[X]"
-            else
-                marker = "[ ]"
-            end
-            
-            -- Status indicator
-            local status = ""
-            if item.type == "library" then
-                if item.exists and item.currentVersion then
-                    if item.currentVersion == item.version then
-                        status = " (v" .. item.currentVersion .. " - current)"
-                    else
-                        status = " (v" .. (item.currentVersion or "?") .. " -> v" .. item.version .. ")"
-                    end
-                elseif item.exists then
-                    status = " (installed)"
-                else
-                    status = " (v" .. item.version .. " - new)"
-                end
-            else
-                status = item.exists and " (update)" or " (new)"
-            end
-            
-            -- Cursor highlighting
-            if isCursor then
+            -- Handle category headers
+            if item.type == "header" then
                 term.setTextColor(colors.black)
-                term.setBackgroundColor(colors.white)
-            else
-                -- Color based on status
-                if isForced then
-                    term.setTextColor(colors.orange)
-                elseif isRequiredBy then
-                    term.setTextColor(colors.cyan)
-                elseif isSelected then
-                    if item.exists then
-                        term.setTextColor(colors.yellow)
-                    else
-                        term.setTextColor(colors.green)
-                    end
-                else
-                    term.setTextColor(colors.lightGray)
-                end
+                term.setBackgroundColor(colors.lightGray)
+                local headerLine = " >> " .. item.category .. " "
+                headerLine = headerLine .. string.rep("-", math.max(0, w - #headerLine))
+                print(headerLine)
                 term.setBackgroundColor(colors.black)
-            end
-            
-            local line = marker .. " " .. catPrefix .. item.name .. status
-            if #line > w then
-                line = line:sub(1, w)
             else
-                line = line .. string.rep(" ", w - #line)
-            end
-            print(line)
-            displayLine = displayLine + 1
-        end
-        
-        -- Reset colors
-        term.setTextColor(colors.white)
-        term.setBackgroundColor(colors.black)
-        
-        -- Footer
-        local selectedCount = 0
-        for _ in pairs(selected) do selectedCount = selectedCount + 1 end
-        
-        term.setCursorPos(1, h)
-        term.setTextColor(colors.lightGray)
-        write(string.format("Selected: %d/%d items", selectedCount, totalItems))
-        term.setTextColor(colors.white)
-        
-        -- Handle input
-        local event, key = os.pullEvent("key")
-        
-        if key == keys.up then
-            cursor = math.max(1, cursor - 1)
-        elseif key == keys.down then
-            cursor = math.min(totalItems, cursor + 1)
-        elseif key == keys.space then
-            local item = items[cursor]
-            local itemKey = item.type == "file" and item.path or item.name
-            
-            if forceSelected[itemKey] then
-                -- Cannot toggle required items
-                term.setCursorPos(1, h - 1)
-                term.clearLine()
-                term.setTextColor(colors.red)
-                write("Cannot deselect: required for project")
-                term.setTextColor(colors.white)
-                sleep(1.5)
-            else
-                -- Check if it's a dependency
+                -- Regular item
+                local key = item.type == "file" and item.path or item.name
+                local isCursor = (i == cursor)
+                local isSelected = selected[key]
+                local isForced = forceSelected[key]
+                
+                -- Check if required by selected libraries (dependency)
                 local isRequiredBy = nil
                 if item.type == "library" then
                     for _, otherItem in ipairs(items) do
@@ -1044,15 +985,151 @@ function ProjectBuilder:run()
                     end
                 end
                 
-                if isRequiredBy and selected[itemKey] then
+                -- Determine marker
+                local marker
+                if isForced then
+                    marker = "[R]" -- Required
+                elseif isRequiredBy then
+                    marker = "[+]" -- Dependency
+                    if not selected[key] then
+                        selected[key] = true -- Auto-select dependencies
+                    end
+                elseif isSelected then
+                    marker = "[X]"
+                else
+                    marker = "[ ]"
+                end
+                
+                -- Status indicator
+                local status = ""
+                if item.type == "library" then
+                    if item.exists and item.currentVersion then
+                        if item.currentVersion == item.version then
+                            status = " (v" .. item.currentVersion .. " - current)"
+                        else
+                            status = " (v" .. (item.currentVersion or "?") .. " -> v" .. item.version .. ")"
+                        end
+                    elseif item.exists then
+                        status = " (installed)"
+                    else
+                        status = " (v" .. item.version .. " - new)"
+                    end
+                else
+                    status = item.exists and " (update)" or " (new)"
+                end
+                
+                -- Cursor highlighting
+                if isCursor then
+                    term.setTextColor(colors.black)
+                    term.setBackgroundColor(colors.white)
+                else
+                    -- Color based on status
+                    if isForced then
+                        term.setTextColor(colors.orange)
+                    elseif isRequiredBy then
+                        term.setTextColor(colors.cyan)
+                    elseif isSelected then
+                        if item.exists then
+                            term.setTextColor(colors.yellow)
+                        else
+                            term.setTextColor(colors.green)
+                        end
+                    else
+                        term.setTextColor(colors.lightGray)
+                    end
+                    term.setBackgroundColor(colors.black)
+                end
+                
+                local line = "  " .. marker .. " " .. item.name .. status
+                if #line > w then
+                    line = line:sub(1, w)
+                else
+                    line = line .. string.rep(" ", w - #line)
+                end
+                print(line)
+            end
+        end
+        
+        -- Reset colors
+        term.setTextColor(colors.white)
+        term.setBackgroundColor(colors.black)
+        
+        -- Footer
+        local selectedCount = 0
+        for _ in pairs(selected) do selectedCount = selectedCount + 1 end
+        
+        term.setCursorPos(1, h)
+        term.setTextColor(colors.lightGray)
+        write(string.format("Selected: %d/%d items", selectedCount, #items))
+        term.setTextColor(colors.white)
+        
+        -- Handle input
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            -- Move up, skipping headers
+            repeat
+                cursor = cursor - 1
+            until cursor < 1 or displayItems[cursor].type ~= "header"
+            if cursor < 1 then cursor = 1 end
+            -- If we landed on a header at the top, find the first non-header
+            while cursor <= #displayItems and displayItems[cursor].type == "header" do
+                cursor = cursor + 1
+            end
+        elseif key == keys.down then
+            -- Move down, skipping headers
+            repeat
+                cursor = cursor + 1
+            until cursor > #displayItems or displayItems[cursor].type ~= "header"
+            if cursor > #displayItems then
+                cursor = #displayItems
+                -- If we landed on a header at the bottom, go back up
+                while cursor > 1 and displayItems[cursor].type == "header" do
+                    cursor = cursor - 1
+                end
+            end
+        elseif key == keys.space then
+            local item = displayItems[cursor]
+            if item.type == "header" then
+                -- Skip headers
+            else
+                local itemKey = item.type == "file" and item.path or item.name
+                
+                if forceSelected[itemKey] then
+                    -- Cannot toggle required items
                     term.setCursorPos(1, h - 1)
                     term.clearLine()
                     term.setTextColor(colors.red)
-                    write("Cannot deselect: required by " .. isRequiredBy)
+                    write("Cannot deselect: required for project")
                     term.setTextColor(colors.white)
                     sleep(1.5)
                 else
-                    selected[itemKey] = not selected[itemKey]
+                    -- Check if it's a dependency
+                    local isRequiredBy = nil
+                    if item.type == "library" then
+                        for _, otherItem in ipairs(items) do
+                            if otherItem.type == "library" and selected[otherItem.name] and otherItem.dependencies then
+                                for _, dep in ipairs(otherItem.dependencies) do
+                                    if dep == item.name then
+                                        isRequiredBy = otherItem.name
+                                        break
+                                    end
+                                end
+                            end
+                            if isRequiredBy then break end
+                        end
+                    end
+                    
+                    if isRequiredBy and selected[itemKey] then
+                        term.setCursorPos(1, h - 1)
+                        term.clearLine()
+                        term.setTextColor(colors.red)
+                        write("Cannot deselect: required by " .. isRequiredBy)
+                        term.setTextColor(colors.white)
+                        sleep(1.5)
+                    else
+                        selected[itemKey] = not selected[itemKey]
+                    end
                 end
             end
         elseif key == keys.enter then
