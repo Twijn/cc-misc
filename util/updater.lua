@@ -3,7 +3,7 @@
 ---
 --- Features: Check for available updates, programmatic package installation and updates,
 --- version comparison, dependency resolution, batch update operations, JSON API integration,
---- and detailed logging for debugging.
+--- project file management, interactive UI mode, and detailed logging for debugging.
 ---
 ---@usage
 ---local updater = require("updater")
@@ -23,10 +23,20 @@
 ----- Enable verbose mode for debugging
 ---updater.setVerbose(true)
 ---
----@version 1.1.0
+----- Project mode (for application updaters)
+---updater.withProject("AutoCrafter")
+---  .withRequiredLibs({"s", "tables", "log"})
+---  .withOptionalLibs({"formui", "cmd"})
+---  .withFiles({
+---    {url = "https://...", path = "server.lua", required = true},
+---    {url = "https://...", path = "lib/ui.lua", required = true},
+---  })
+---  .run()
+---
+---@version 2.0.0
 -- @module updater
 
-local VERSION = "1.1.0"
+local VERSION = "2.0.0"
 
 local API_BASE = "https://ccmisc.twijn.dev/api/"
 local DOWNLOAD_BASE = "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/"
@@ -37,6 +47,15 @@ local module = {}
 -- Internal state
 local verboseMode = false
 local updateLog = {}
+
+-- Project context state (for project mode)
+---@class ProjectContext
+---@field name string|nil Project name
+---@field requiredLibs table Required library names
+---@field optionalLibs table Optional library names
+---@field files table Project files
+---@field diskPrefix string Disk prefix for paths
+local projectContext = nil
 
 ---Enable or disable verbose output
 ---@param enabled boolean Whether to enable verbose output
@@ -580,6 +599,648 @@ end
 ---@return string Log file path
 function module.getLogFile()
     return LOG_DIR .. "/updater-" .. os.date("%Y-%m-%d") .. ".txt"
+end
+
+--------------------------------------------------------------------------------
+-- Project Mode API
+-- These functions enable the updater to manage project files alongside libraries
+--------------------------------------------------------------------------------
+
+---Reset project context
+local function resetProjectContext()
+    projectContext = {
+        name = nil,
+        requiredLibs = {},
+        optionalLibs = {},
+        files = {},
+        diskPrefix = (fs.exists("disk") and fs.isDir("disk")) and "disk/" or "",
+    }
+end
+
+---Fetch JSON data from URL (exported version)
+---@param url string URL to fetch
+---@return table|nil Parsed JSON data or nil on error
+function module.fetchJSON(url)
+    return fetchJSON(url)
+end
+
+---Download and install a file (exported version)
+---@param url string The URL to download from
+---@param filepath string The local file path to save to
+---@param name string? Optional name for logging
+---@return boolean Success
+function module.downloadFile(url, filepath, name)
+    return downloadFile(url, filepath, name)
+end
+
+---Builder object for project configuration
+local ProjectBuilder = {}
+ProjectBuilder.__index = ProjectBuilder
+
+---Set the project name
+---@param name string Project name (displayed in header)
+---@return table Builder object for chaining
+function ProjectBuilder:withName(name)
+    projectContext.name = name
+    return self
+end
+
+---Set the disk prefix for file paths
+---@param prefix string Disk prefix (e.g., "disk/")
+---@return table Builder object for chaining
+function ProjectBuilder:withDiskPrefix(prefix)
+    projectContext.diskPrefix = prefix
+    return self
+end
+
+---Add required libraries (must be installed)
+---@param libs table Array of library names
+---@return table Builder object for chaining
+function ProjectBuilder:withRequiredLibs(libs)
+    for _, lib in ipairs(libs) do
+        table.insert(projectContext.requiredLibs, lib)
+    end
+    return self
+end
+
+---Add optional libraries (can be toggled)
+---@param libs table Array of library names
+---@return table Builder object for chaining
+function ProjectBuilder:withOptionalLibs(libs)
+    for _, lib in ipairs(libs) do
+        table.insert(projectContext.optionalLibs, lib)
+    end
+    return self
+end
+
+---Add project files to manage
+---@param files table Array of {url, path, required?, name?, category?}
+---@return table Builder object for chaining
+function ProjectBuilder:withFiles(files)
+    for _, file in ipairs(files) do
+        table.insert(projectContext.files, {
+            url = file.url,
+            path = file.path,
+            required = file.required ~= false, -- default true
+            name = file.name or fs.getName(file.path),
+            category = file.category or "Project Files",
+        })
+    end
+    return self
+end
+
+---Clear screen helper
+local function clearScreen()
+    term.clear()
+    term.setCursorPos(1, 1)
+end
+
+---Fetch library data from API
+---@return table|nil Array of library info
+local function fetchLibraryData()
+    local data = fetchJSON(API_BASE .. "all.json")
+    if not data or not data.libraries then
+        return nil
+    end
+    
+    local libs = {}
+    for name, info in pairs(data.libraries) do
+        libs[name] = {
+            name = name,
+            version = info.version or "unknown",
+            description = info.description or "No description",
+            dependencies = info.dependencies or {},
+            download_url = info.download_url or (DOWNLOAD_BASE .. name .. ".lua"),
+        }
+    end
+    return libs
+end
+
+---Get library info for dependency resolution
+---@param name string Library name
+---@param libData table Library data map
+---@return table|nil Library info
+local function getLibInfo(name, libData)
+    return libData and libData[name]
+end
+
+---Resolve dependencies recursively
+---@param libNames table Array of library names
+---@param libData table Library data map
+---@return table Ordered list of libraries with dependencies first
+local function resolveDeps(libNames, libData)
+    local resolved = {}
+    local resolvedSet = {}
+    local visiting = {}
+    
+    local function resolve(name)
+        if resolvedSet[name] then return end
+        if visiting[name] then return end -- circular dep
+        
+        visiting[name] = true
+        
+        local lib = getLibInfo(name, libData)
+        if lib and lib.dependencies then
+            for _, dep in ipairs(lib.dependencies) do
+                resolve(dep)
+            end
+        end
+        
+        visiting[name] = nil
+        
+        if not resolvedSet[name] then
+            table.insert(resolved, name)
+            resolvedSet[name] = true
+        end
+    end
+    
+    for _, name in ipairs(libNames) do
+        resolve(name)
+    end
+    
+    return resolved
+end
+
+---Interactive UI for project updater
+---@return boolean Success
+function ProjectBuilder:run()
+    if not projectContext then
+        log("error", "No project context - call withProject() first")
+        return false
+    end
+    
+    log("info", "Starting project updater for: " .. (projectContext.name or "Unknown"))
+    
+    -- Load library data from API
+    clearScreen()
+    term.setTextColor(colors.lightGray)
+    print("Loading library information...")
+    term.setTextColor(colors.white)
+    
+    local libData = fetchLibraryData()
+    if not libData then
+        term.setTextColor(colors.yellow)
+        print("Warning: Could not load library data from API")
+        term.setTextColor(colors.white)
+        sleep(1)
+    end
+    
+    -- Build list of all items (files + libraries)
+    local items = {}
+    local selected = {}
+    local forceSelected = {}
+    
+    -- Add project files
+    for _, file in ipairs(projectContext.files) do
+        local fullPath = projectContext.diskPrefix .. file.path
+        local exists = fs.exists(fullPath)
+        local item = {
+            type = "file",
+            name = file.name,
+            path = file.path,
+            fullPath = fullPath,
+            url = file.url,
+            category = file.category,
+            required = file.required,
+            exists = exists,
+            description = file.path,
+        }
+        table.insert(items, item)
+        
+        if file.required or exists then
+            selected[file.path] = true
+            if file.required then
+                forceSelected[file.path] = true
+            end
+        end
+    end
+    
+    -- Add required libraries
+    for _, libName in ipairs(projectContext.requiredLibs) do
+        local lib = libData and libData[libName]
+        local existingPath = findExistingLibrary(libName)
+        local currentVer = existingPath and parseVersion(existingPath) or nil
+        
+        local item = {
+            type = "library",
+            name = libName,
+            category = "Required Libraries",
+            required = true,
+            exists = existingPath ~= nil,
+            existingPath = existingPath,
+            version = lib and lib.version or "unknown",
+            currentVersion = currentVer,
+            description = lib and lib.description or "CC-Misc library",
+            download_url = lib and lib.download_url,
+            dependencies = lib and lib.dependencies or {},
+        }
+        table.insert(items, item)
+        selected[libName] = true
+        forceSelected[libName] = true
+    end
+    
+    -- Add optional libraries
+    for _, libName in ipairs(projectContext.optionalLibs) do
+        local lib = libData and libData[libName]
+        local existingPath = findExistingLibrary(libName)
+        local currentVer = existingPath and parseVersion(existingPath) or nil
+        
+        local item = {
+            type = "library",
+            name = libName,
+            category = "Optional Libraries",
+            required = false,
+            exists = existingPath ~= nil,
+            existingPath = existingPath,
+            version = lib and lib.version or "unknown",
+            currentVersion = currentVer,
+            description = lib and lib.description or "CC-Misc library",
+            download_url = lib and lib.download_url,
+            dependencies = lib and lib.dependencies or {},
+        }
+        table.insert(items, item)
+        
+        -- Pre-select if already installed
+        if existingPath then
+            selected[libName] = true
+        end
+    end
+    
+    -- UI state
+    local cursor = 1
+    local w, h = term.getSize()
+    
+    while true do
+        clearScreen()
+        
+        -- Header
+        local headerText = projectContext.name and (projectContext.name .. " Updater") or "Project Updater"
+        term.setTextColor(colors.yellow)
+        print("================================")
+        print("  " .. headerText)
+        print("================================")
+        term.setTextColor(colors.lightGray)
+        print("Up/Down: Move | Space: Toggle | Enter: Install | Q: Quit")
+        term.setTextColor(colors.white)
+        print()
+        
+        local headerLines = 6
+        local footerLines = 2
+        local maxVisibleItems = h - headerLines - footerLines
+        
+        -- Calculate scroll
+        local totalItems = #items
+        local scroll = math.max(0, math.min(cursor - math.floor(maxVisibleItems / 2), totalItems - maxVisibleItems))
+        scroll = math.max(0, scroll)
+        
+        local startIdx = scroll + 1
+        local endIdx = math.min(startIdx + maxVisibleItems - 1, totalItems)
+        
+        -- Track current category for headers
+        local lastCategory = nil
+        local displayLine = 0
+        
+        for i = startIdx, endIdx do
+            local item = items[i]
+            local key = item.type == "file" and item.path or item.name
+            local isCursor = (i == cursor)
+            local isSelected = selected[key]
+            local isForced = forceSelected[key]
+            
+            -- Check if required by selected libraries (dependency)
+            local isRequiredBy = nil
+            if item.type == "library" then
+                for _, otherItem in ipairs(items) do
+                    if otherItem.type == "library" and selected[otherItem.name] and otherItem.dependencies then
+                        for _, dep in ipairs(otherItem.dependencies) do
+                            if dep == item.name then
+                                isRequiredBy = otherItem.name
+                                break
+                            end
+                        end
+                    end
+                    if isRequiredBy then break end
+                end
+            end
+            
+            -- Category header (inline)
+            local catPrefix = ""
+            if item.category ~= lastCategory then
+                lastCategory = item.category
+                catPrefix = "[" .. item.category .. "] "
+            end
+            
+            -- Determine marker
+            local marker
+            if isForced then
+                marker = "[R]" -- Required
+            elseif isRequiredBy then
+                marker = "[+]" -- Dependency
+                if not selected[key] then
+                    selected[key] = true -- Auto-select dependencies
+                end
+            elseif isSelected then
+                marker = "[X]"
+            else
+                marker = "[ ]"
+            end
+            
+            -- Status indicator
+            local status = ""
+            if item.type == "library" then
+                if item.exists and item.currentVersion then
+                    if item.currentVersion == item.version then
+                        status = " (v" .. item.currentVersion .. " - current)"
+                    else
+                        status = " (v" .. (item.currentVersion or "?") .. " -> v" .. item.version .. ")"
+                    end
+                elseif item.exists then
+                    status = " (installed)"
+                else
+                    status = " (v" .. item.version .. " - new)"
+                end
+            else
+                status = item.exists and " (update)" or " (new)"
+            end
+            
+            -- Cursor highlighting
+            if isCursor then
+                term.setTextColor(colors.black)
+                term.setBackgroundColor(colors.white)
+            else
+                -- Color based on status
+                if isForced then
+                    term.setTextColor(colors.orange)
+                elseif isRequiredBy then
+                    term.setTextColor(colors.cyan)
+                elseif isSelected then
+                    if item.exists then
+                        term.setTextColor(colors.yellow)
+                    else
+                        term.setTextColor(colors.green)
+                    end
+                else
+                    term.setTextColor(colors.lightGray)
+                end
+                term.setBackgroundColor(colors.black)
+            end
+            
+            local line = marker .. " " .. catPrefix .. item.name .. status
+            if #line > w then
+                line = line:sub(1, w)
+            else
+                line = line .. string.rep(" ", w - #line)
+            end
+            print(line)
+            displayLine = displayLine + 1
+        end
+        
+        -- Reset colors
+        term.setTextColor(colors.white)
+        term.setBackgroundColor(colors.black)
+        
+        -- Footer
+        local selectedCount = 0
+        for _ in pairs(selected) do selectedCount = selectedCount + 1 end
+        
+        term.setCursorPos(1, h)
+        term.setTextColor(colors.lightGray)
+        write(string.format("Selected: %d/%d items", selectedCount, totalItems))
+        term.setTextColor(colors.white)
+        
+        -- Handle input
+        local event, key = os.pullEvent("key")
+        
+        if key == keys.up then
+            cursor = math.max(1, cursor - 1)
+        elseif key == keys.down then
+            cursor = math.min(totalItems, cursor + 1)
+        elseif key == keys.space then
+            local item = items[cursor]
+            local itemKey = item.type == "file" and item.path or item.name
+            
+            if forceSelected[itemKey] then
+                -- Cannot toggle required items
+                term.setCursorPos(1, h - 1)
+                term.clearLine()
+                term.setTextColor(colors.red)
+                write("Cannot deselect: required for project")
+                term.setTextColor(colors.white)
+                sleep(1.5)
+            else
+                -- Check if it's a dependency
+                local isRequiredBy = nil
+                if item.type == "library" then
+                    for _, otherItem in ipairs(items) do
+                        if otherItem.type == "library" and selected[otherItem.name] and otherItem.dependencies then
+                            for _, dep in ipairs(otherItem.dependencies) do
+                                if dep == item.name then
+                                    isRequiredBy = otherItem.name
+                                    break
+                                end
+                            end
+                        end
+                        if isRequiredBy then break end
+                    end
+                end
+                
+                if isRequiredBy and selected[itemKey] then
+                    term.setCursorPos(1, h - 1)
+                    term.clearLine()
+                    term.setTextColor(colors.red)
+                    write("Cannot deselect: required by " .. isRequiredBy)
+                    term.setTextColor(colors.white)
+                    sleep(1.5)
+                else
+                    selected[itemKey] = not selected[itemKey]
+                end
+            end
+        elseif key == keys.enter then
+            break
+        elseif key == keys.q then
+            clearScreen()
+            term.setTextColor(colors.yellow)
+            print("Update cancelled.")
+            term.setTextColor(colors.white)
+            log("info", "Project update cancelled by user")
+            return false
+        end
+    end
+    
+    -- Perform installation
+    clearScreen()
+    term.setTextColor(colors.yellow)
+    print("================================")
+    print("  Installing/Updating...")
+    print("================================")
+    term.setTextColor(colors.white)
+    print()
+    
+    local success = 0
+    local failed = 0
+    local total = 0
+    
+    -- Count selected items
+    for _, item in ipairs(items) do
+        local key = item.type == "file" and item.path or item.name
+        if selected[key] then
+            total = total + 1
+        end
+    end
+    
+    -- Collect libraries for dependency resolution
+    local selectedLibs = {}
+    for _, item in ipairs(items) do
+        if item.type == "library" then
+            local key = item.name
+            if selected[key] then
+                table.insert(selectedLibs, item.name)
+            end
+        end
+    end
+    
+    -- Resolve library dependencies
+    local resolvedLibs = resolveDeps(selectedLibs, libData)
+    
+    -- Add any new dependencies that weren't in original list
+    for _, libName in ipairs(resolvedLibs) do
+        local found = false
+        for _, item in ipairs(items) do
+            if item.type == "library" and item.name == libName then
+                found = true
+                break
+            end
+        end
+        if not found then
+            -- Add dependency that wasn't in original list
+            local lib = libData and libData[libName]
+            local existingPath = findExistingLibrary(libName)
+            if not existingPath then
+                -- Need to install this dependency
+                total = total + 1
+                local item = {
+                    type = "library",
+                    name = libName,
+                    category = "Dependencies",
+                    required = true,
+                    exists = false,
+                    version = lib and lib.version or "unknown",
+                    download_url = lib and lib.download_url,
+                }
+                table.insert(items, item)
+                selected[libName] = true
+                term.setTextColor(colors.cyan)
+                print("  + Adding dependency: " .. libName)
+                term.setTextColor(colors.white)
+            end
+        end
+    end
+    
+    print()
+    
+    -- Install files first
+    local fileCount = 1
+    for _, item in ipairs(items) do
+        if item.type == "file" and selected[item.path] then
+            term.setTextColor(colors.lightGray)
+            local action = item.exists and "Updating" or "Installing"
+            write(string.format("[%d/%d] %s %s... ", fileCount, total, action, item.name))
+            
+            local fullPath = projectContext.diskPrefix .. item.path
+            
+            -- Create directory if needed
+            local dir = fs.getDir(fullPath)
+            if dir ~= "" and not fs.exists(dir) then
+                fs.makeDir(dir)
+            end
+            
+            if downloadFile(item.url, fullPath, item.name) then
+                term.setTextColor(colors.green)
+                print("OK")
+                success = success + 1
+            else
+                term.setTextColor(colors.red)
+                print("FAILED")
+                failed = failed + 1
+            end
+            fileCount = fileCount + 1
+        end
+    end
+    
+    -- Install libraries
+    local libCount = fileCount
+    for _, libName in ipairs(resolvedLibs) do
+        if selected[libName] or not findExistingLibrary(libName) then
+            local lib = libData and libData[libName]
+            local existingPath = findExistingLibrary(libName)
+            local currentVer = existingPath and parseVersion(existingPath) or nil
+            
+            term.setTextColor(colors.lightGray)
+            local action, verInfo
+            if existingPath then
+                action = "Updating"
+                verInfo = (currentVer or "?") .. " -> " .. (lib and lib.version or "?")
+            else
+                action = "Installing"
+                verInfo = "v" .. (lib and lib.version or "?")
+            end
+            write(string.format("[%d/%d] %s %s (%s)... ", libCount, total, action, libName, verInfo))
+            
+            -- Determine target path
+            local targetPath
+            if existingPath then
+                targetPath = existingPath
+            else
+                local libDir = projectContext.diskPrefix .. "lib"
+                if not fs.exists(libDir) then
+                    fs.makeDir(libDir)
+                end
+                targetPath = libDir .. "/" .. libName .. ".lua"
+            end
+            
+            local url = lib and lib.download_url or (DOWNLOAD_BASE .. libName .. ".lua")
+            if downloadFile(url, targetPath, libName) then
+                term.setTextColor(colors.green)
+                print("OK")
+                success = success + 1
+            else
+                term.setTextColor(colors.red)
+                print("FAILED")
+                failed = failed + 1
+            end
+            libCount = libCount + 1
+        end
+    end
+    
+    -- Summary
+    print()
+    if failed == 0 then
+        term.setTextColor(colors.green)
+        print("================================")
+        print("  Update Complete!")
+        print("================================")
+        log("info", "Project update complete: " .. success .. " items installed/updated")
+    else
+        term.setTextColor(colors.yellow)
+        print("================================")
+        print(string.format("  Update finished: %d OK, %d failed", success, failed))
+        print("================================")
+        log("warn", "Project update finished with errors: " .. success .. " ok, " .. failed .. " failed")
+    end
+    term.setTextColor(colors.white)
+    
+    return failed == 0
+end
+
+---Start project mode with optional name
+---@param name string? Project name
+---@return table Builder object for chaining
+function module.withProject(name)
+    resetProjectContext()
+    if name then
+        projectContext.name = name
+    end
+    return setmetatable({}, ProjectBuilder)
 end
 
 module.VERSION = VERSION
