@@ -674,7 +674,7 @@ function ProjectBuilder:withOptionalLibs(libs)
 end
 
 ---Add project files to manage
----@param files table Array of {url, path, required?, name?, category?}
+---@param files table Array of {url, path, required?, name?, category?, isConfig?}
 ---@return table Builder object for chaining
 function ProjectBuilder:withFiles(files)
     for _, file in ipairs(files) do
@@ -684,9 +684,69 @@ function ProjectBuilder:withFiles(files)
             required = file.required ~= false, -- default true
             name = file.name or fs.getName(file.path),
             category = file.category or "Project Files",
+            isConfig = file.isConfig or false, -- if true, merge with existing config
         })
     end
     return self
+end
+
+---Deep merge tables, preserving user values from old config
+---@param defaults table The new default config
+---@param userConfig table The user's existing config
+---@return table The merged config
+local function mergeConfigs(defaults, userConfig)
+    local result = {}
+    for k, v in pairs(defaults) do
+        if type(v) == "table" and type(userConfig[k]) == "table" then
+            result[k] = mergeConfigs(v, userConfig[k])
+        elseif userConfig[k] ~= nil then
+            result[k] = userConfig[k]
+        else
+            result[k] = v
+        end
+    end
+    return result
+end
+
+---Serialize a Lua value to string
+---@param val any The value to serialize
+---@param indent number Current indentation level
+---@return string Serialized value
+local function serializeValue(val, indent)
+    local pad = string.rep("    ", indent)
+    if type(val) == "table" then
+        local lines = {"{"}
+        for k, v in pairs(val) do
+            local key
+            if type(k) == "string" then
+                key = k
+            else
+                key = "[" .. tostring(k) .. "]"
+            end
+            table.insert(lines, pad .. "    " .. key .. " = " .. serializeValue(v, indent + 1) .. ",")
+        end
+        table.insert(lines, pad .. "}")
+        return table.concat(lines, "\n")
+    elseif type(val) == "string" then
+        return "\"" .. val:gsub("\\", "\\\\"):gsub("\"", "\\\""):gsub("\n", "\\n") .. "\""
+    elseif type(val) == "nil" then
+        return "nil"
+    else
+        return tostring(val)
+    end
+end
+
+---Serialize a config table to a Lua file string
+---@param tbl table The config table
+---@param header string? Optional header comment
+---@return string Lua file content
+local function serializeConfig(tbl, header)
+    local lines = {}
+    if header then
+        table.insert(lines, header)
+    end
+    table.insert(lines, "return " .. serializeValue(tbl, 0))
+    return table.concat(lines, "\n")
 end
 
 ---Clear screen helper
@@ -1231,14 +1291,66 @@ function ProjectBuilder:run()
                 fs.makeDir(dir)
             end
             
-            if downloadFile(item.url, fullPath, item.name) then
-                term.setTextColor(colors.green)
-                print("OK")
-                success = success + 1
+            -- Handle config files specially - merge with existing
+            if item.isConfig and item.exists then
+                -- Load existing config
+                local oldConfig = nil
+                local loadOk, loadedConfig = pcall(dofile, fullPath)
+                if loadOk and type(loadedConfig) == "table" then
+                    oldConfig = loadedConfig
+                end
+                
+                -- Download new config to temp location
+                local tempPath = fullPath .. ".new"
+                if downloadFile(item.url, tempPath, item.name) then
+                    -- Load new config
+                    local newOk, newConfig = pcall(dofile, tempPath)
+                    fs.delete(tempPath)
+                    
+                    if newOk and type(newConfig) == "table" and oldConfig then
+                        -- Merge configs (preserve user values)
+                        local mergedConfig = mergeConfigs(newConfig, oldConfig)
+                        local configContent = serializeConfig(mergedConfig, "--- AutoCrafter Configuration\n--- User values preserved during update\n")
+                        local f = fs.open(fullPath, "w")
+                        if f then
+                            f.write(configContent)
+                            f.close()
+                            term.setTextColor(colors.green)
+                            print("OK (merged)")
+                            success = success + 1
+                        else
+                            term.setTextColor(colors.red)
+                            print("FAILED (write)")
+                            failed = failed + 1
+                        end
+                    else
+                        -- Couldn't parse new config, just use downloaded version
+                        if downloadFile(item.url, fullPath, item.name) then
+                            term.setTextColor(colors.green)
+                            print("OK")
+                            success = success + 1
+                        else
+                            term.setTextColor(colors.red)
+                            print("FAILED")
+                            failed = failed + 1
+                        end
+                    end
+                else
+                    term.setTextColor(colors.red)
+                    print("FAILED")
+                    failed = failed + 1
+                end
             else
-                term.setTextColor(colors.red)
-                print("FAILED")
-                failed = failed + 1
+                -- Normal file download
+                if downloadFile(item.url, fullPath, item.name) then
+                    term.setTextColor(colors.green)
+                    print("OK")
+                    success = success + 1
+                else
+                    term.setTextColor(colors.red)
+                    print("FAILED")
+                    failed = failed + 1
+                end
             end
             fileCount = fileCount + 1
         end

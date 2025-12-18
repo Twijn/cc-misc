@@ -73,7 +73,7 @@ end
 
 -- Build file lists based on installation type
 local commonFiles = {
-    {url = BASE_URL .. "/autocrafter/config.lua", path = "config.lua", name = "config.lua", category = "Core Files"},
+    {url = BASE_URL .. "/autocrafter/config.lua", path = "config.lua", name = "config.lua", category = "Config", isConfig = true},
     {url = BASE_URL .. "/autocrafter/update.lua", path = "update.lua", name = "update.lua", category = "Core Files"},
     {url = BASE_URL .. "/autocrafter/startup.lua", path = "startup.lua", name = "startup.lua", category = "Core Files"},
     {url = BASE_URL .. "/autocrafter/lib/comms.lua", path = "lib/comms.lua", name = "comms.lua", category = "Libraries"},
