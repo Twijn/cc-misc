@@ -169,10 +169,11 @@ shopk.on("transaction", function(transaction)
       local dispensed = 0
       
       if errors.isError(result) then
-        logger.warn(string.format("Dispense error: %s", result.message))
+        logger.warn(string.format("Dispense error [%s]: %s", result.type, result.message))
         dispensed = 0
       else
         dispensed = result.data.dispensed
+        logger.info(string.format("Dispensed %d/%d %s to aisle %s", dispensed, purchased, product.modid, product.aisleName))
       end
       
       local refundAmount = transaction.value - (product.cost * dispensed)
@@ -189,12 +190,18 @@ shopk.on("transaction", function(transaction)
       end
 
       if refundAmount > 0 then
+        if dispensed == 0 then
+          logger.warn(string.format("No items dispensed for %s, issuing full refund of %.03f KRO", product.modid, refundAmount))
+        else
+          logger.info(string.format("Partial refund of %.03f KRO (dispensed %d of %d requested)", refundAmount, dispensed, purchased))
+        end
         refund(transaction.from, refundAmount, refundMessage)
       end
 
       if dispensed > 0 then
         -- Record the sale
         salesManager.recordSale(product, dispensed, transaction, refundAmount)
+        logger.info(string.format("Sale recorded: %d %s for %.03f KRO from %s", dispensed, productManager.getName(product), product.cost * dispensed, transaction.from))
         os.queueEvent("purchase", product, dispensed, transaction, refundAmount)
       end
       
