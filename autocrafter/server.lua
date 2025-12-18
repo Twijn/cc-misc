@@ -699,6 +699,123 @@ local commands = {
         end
     },
     
+    recipe = {
+        description = "View recipe details",
+        execute = function(args, ctx)
+            if #args < 1 then
+                ctx.err("Usage: recipe <item>")
+                return
+            end
+            
+            local item = args[1]
+            if not item:find(":") then
+                item = "minecraft:" .. item
+            end
+            
+            local allRecipes = recipes.getRecipesFor(item)
+            
+            if #allRecipes == 0 then
+                ctx.err("No recipe found for: " .. item)
+                return
+            end
+            
+            print("")
+            local displayName = item:gsub("minecraft:", "")
+            ctx.mess("=== Recipe: " .. displayName .. " ===")
+            
+            for i, recipe in ipairs(allRecipes) do
+                if i > 1 then
+                    print("")
+                    ctx.mess("--- Alternative Recipe " .. i .. " ---")
+                end
+                
+                -- Show output count
+                term.setTextColor(colors.lightGray)
+                write("  Output: ")
+                term.setTextColor(colors.lime)
+                print(recipe.outputCount .. "x " .. displayName)
+                
+                -- Show recipe type
+                term.setTextColor(colors.lightGray)
+                write("  Type: ")
+                term.setTextColor(colors.white)
+                print(recipe.type)
+                
+                -- Show ingredients
+                term.setTextColor(colors.lightGray)
+                print("  Ingredients:")
+                for _, ingredient in ipairs(recipe.ingredients) do
+                    local ingName = ingredient.item:gsub("minecraft:", "")
+                    -- Handle tags (prefixed with #)
+                    if ingName:sub(1, 1) == "#" then
+                        ingName = ingName:sub(2) .. " (tag)"
+                    end
+                    term.setTextColor(colors.yellow)
+                    write("    " .. ingredient.count .. "x ")
+                    term.setTextColor(colors.white)
+                    print(ingName)
+                end
+                
+                -- Show crafting grid for shaped recipes
+                if recipe.type == "shaped" and recipe.pattern then
+                    term.setTextColor(colors.lightGray)
+                    print("  Pattern:")
+                    for _, row in ipairs(recipe.pattern) do
+                        term.setTextColor(colors.gray)
+                        write("    [")
+                        for c = 1, #row do
+                            local char = row:sub(c, c)
+                            if char == " " then
+                                term.setTextColor(colors.gray)
+                                write(" ")
+                            else
+                                term.setTextColor(colors.cyan)
+                                write(char)
+                            end
+                        end
+                        term.setTextColor(colors.gray)
+                        print("]")
+                    end
+                    
+                    -- Show key legend
+                    term.setTextColor(colors.lightGray)
+                    print("  Key:")
+                    for char, keyItem in pairs(recipe.key) do
+                        local keyName = keyItem:gsub("minecraft:", "")
+                        if keyName:sub(1, 1) == "#" then
+                            keyName = keyName:sub(2) .. " (tag)"
+                        end
+                        term.setTextColor(colors.cyan)
+                        write("    " .. char .. " = ")
+                        term.setTextColor(colors.white)
+                        print(keyName)
+                    end
+                end
+                
+                -- Only show first 3 recipes max
+                if i >= 3 and #allRecipes > 3 then
+                    print("")
+                    ctx.mess("... and " .. (#allRecipes - 3) .. " more alternative recipes")
+                    break
+                end
+            end
+            term.setTextColor(colors.white)
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = args[1] or ""
+                if query == "" then return {} end
+                local results = recipes.search(query)
+                local completions = {}
+                for _, r in ipairs(results) do
+                    table.insert(completions, (r.output:gsub("minecraft:", "")))
+                end
+                return completions
+            end
+            return {}
+        end
+    },
+    
     settings = {
         description = "View/edit settings",
         execute = function(args, ctx)
@@ -809,6 +926,7 @@ local function chatboxHandler()
             chatTell(user, "\\withdraw <item> <count> - Get items from storage")
             chatTell(user, "\\deposit [item] [count] - Store items from your inventory")
             chatTell(user, "\\stock [search] - Search item stock")
+            chatTell(user, "\\recipe <item> - View recipe details")
             chatTell(user, "\\status - Show system status")
             chatTell(user, "\\list - Show craft targets")
             
@@ -924,6 +1042,41 @@ local function chatboxHandler()
                     local status = target.current >= target.target and "+" or "*"
                     chatTell(user, string.format("%s %s: %d/%d", status, item, target.current, target.target))
                     shown = shown + 1
+                end
+            end
+            
+        elseif command == "recipe" then
+            if not args or #args < 1 then
+                chatTell(user, "Usage: \\recipe <item>", true)
+            else
+                local item = args[1]
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                local allRecipes = recipes.getRecipesFor(item)
+                
+                if #allRecipes == 0 then
+                    chatTell(user, "No recipe found for: " .. item, true)
+                else
+                    local recipe = allRecipes[1]
+                    local displayName = item:gsub("minecraft:", "")
+                    
+                    chatTell(user, "=== Recipe: " .. displayName .. " ===")
+                    chatTell(user, string.format("Output: %dx %s (%s)", recipe.outputCount, displayName, recipe.type))
+                    
+                    chatTell(user, "Ingredients:")
+                    for _, ingredient in ipairs(recipe.ingredients) do
+                        local ingName = ingredient.item:gsub("minecraft:", "")
+                        if ingName:sub(1, 1) == "#" then
+                            ingName = ingName:sub(2) .. " (tag)"
+                        end
+                        chatTell(user, string.format("  %dx %s", ingredient.count, ingName))
+                    end
+                    
+                    if #allRecipes > 1 then
+                        chatTell(user, string.format("(%d alternative recipes available)", #allRecipes - 1))
+                    end
                 end
             end
         end

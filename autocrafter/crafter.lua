@@ -23,6 +23,7 @@ local status = "idle"
 -- Cached peripherals (avoid repeated peripheral calls)
 local cachedModem = nil
 local cachedModemName = nil
+local cachedTurtleName = nil  -- The turtle's name on the network (from getNameLocal)
 local cachedInventories = nil
 local cachedInventoryPeripherals = {}
 
@@ -44,17 +45,22 @@ local OUTPUT_SLOT = 16
 ---Get cached modem peripheral
 ---@return table|nil modem The modem peripheral
 ---@return string|nil name The modem name
+---@return string|nil turtleName The turtle's name on the network
 local function getModem()
     if cachedModem then
-        return cachedModem, cachedModemName
+        return cachedModem, cachedModemName, cachedTurtleName
     end
     
     cachedModem = peripheral.find("modem")
     if cachedModem then
         cachedModemName = peripheral.getName(cachedModem)
+        -- Get the turtle's network name for item transfers
+        if cachedModem.getNameLocal then
+            cachedTurtleName = cachedModem.getNameLocal()
+        end
     end
     
-    return cachedModem, cachedModemName
+    return cachedModem, cachedModemName, cachedTurtleName
 end
 
 ---Get cached inventory peripheral
@@ -201,8 +207,8 @@ end
 
 ---Clear the turtle inventory to storage (via server request)
 local function clearInventory()
-    local _, modemName = getModem()
-    if not modemName then return end
+    local _, _, turtleName = getModem()
+    if not turtleName then return end
     
     -- First, try to push items through adjacent inventories
     local inventories = getInventories()
@@ -210,11 +216,11 @@ local function clearInventory()
     for slot = 1, 16 do
         if turtle.getItemCount(slot) > 0 then
             turtle.select(slot)
-            -- Try to push to any adjacent inventory
+            -- Try to push to any adjacent inventory (inv pulls from turtle)
             for _, invName in ipairs(inventories) do
                 local inv = getInventory(invName)
                 if inv then
-                    local pushed = inv.pullItems(modemName, slot)
+                    local pushed = inv.pullItems(turtleName, slot)
                     if pushed and pushed > 0 then
                         break
                     end
@@ -232,8 +238,8 @@ end
 ---@param turtleSlot number Destination slot
 ---@return number pulled Amount actually pulled
 local function pullItem(item, count, turtleSlot)
-    local _, modemName = getModem()
-    if not modemName then
+    local _, _, turtleName = getModem()
+    if not turtleName then
         logger.warn("No modem found for pullItem")
         return 0
     end
@@ -258,6 +264,7 @@ local function pullItem(item, count, turtleSlot)
     end
     
     -- Now pull from staging inventory to turtle
+    -- The chest pushes items to the turtle using the turtle's network name
     local pulled = 0
     local inv = getInventory(stagingInv)
     if inv then
@@ -266,7 +273,7 @@ local function pullItem(item, count, turtleSlot)
             for slot, slotItem in pairs(list) do
                 if slotItem.name == item then
                     local toPull = math.min(count - pulled, slotItem.count)
-                    local amount = inv.pushItems(modemName, slot, toPull, turtleSlot)
+                    local amount = inv.pushItems(turtleName, slot, toPull, turtleSlot)
                     pulled = pulled + (amount or 0)
                     if pulled >= count then
                         break
@@ -369,12 +376,12 @@ local function executeCraft(job)
             
             -- Move output to storage via cached peripherals
             local outputCount = turtle.getItemCount(OUTPUT_SLOT)
-            local _, modemName = getModem()
-            if modemName then
+            local _, _, turtleName = getModem()
+            if turtleName then
                 for _, invName in ipairs(getInventories()) do
                     local inv = getInventory(invName)
                     if inv then
-                        local pushed = inv.pullItems(modemName, OUTPUT_SLOT, outputCount)
+                        local pushed = inv.pullItems(turtleName, OUTPUT_SLOT, outputCount)
                         if pushed and pushed > 0 then
                             break
                         end
