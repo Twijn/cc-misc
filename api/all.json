@@ -906,7 +906,7 @@
     },
     "log": {
       "name": "log",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, and buffered writes for performance.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/log.lua",
@@ -923,7 +923,7 @@
           ],
           "returns": "",
           "description": "Log a debug message in gray (only to file, not console by default)",
-          "line": 91
+          "line": 92
         },
         {
           "name": "module.info",
@@ -936,7 +936,7 @@
           ],
           "returns": "",
           "description": "Log an informational message in blue",
-          "line": 97
+          "line": 98
         },
         {
           "name": "module.warn",
@@ -949,7 +949,7 @@
           ],
           "returns": "",
           "description": "Log a warning message in yellow",
-          "line": 103
+          "line": 104
         },
         {
           "name": "module.error",
@@ -962,14 +962,14 @@
           ],
           "returns": "",
           "description": "Log an error message in red",
-          "line": 109
+          "line": 110
         },
         {
           "name": "module.flush",
           "params": [],
           "returns": "",
           "description": "Flush any pending log entries to disk",
-          "line": 115
+          "line": 116
         }
       ],
       "classes": []
@@ -1762,5 +1762,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-19T05:01:44Z"
+  "updated": "2025-12-19T05:03:49Z"
 }
