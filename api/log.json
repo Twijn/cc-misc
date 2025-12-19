@@ -6,6 +6,7 @@
   "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/log.lua",
   "documentation_url": "https://ccmisc.twijn.dev/log.html",
   "functions": [
+    "module.debug",
     "module.info",
     "module.warn",
     "module.error",

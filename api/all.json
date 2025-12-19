@@ -913,6 +913,19 @@
       "documentation_url": "https://ccmisc.twijn.dev/log.html",
       "functions": [
         {
+          "name": "module.debug",
+          "params": [
+            {
+              "name": "msg",
+              "type": "string",
+              "description": "The message to log"
+            }
+          ],
+          "returns": "",
+          "description": "Log a debug message in gray (only to file, not console by default)",
+          "line": 91
+        },
+        {
           "name": "module.info",
           "params": [
             {
@@ -923,7 +936,7 @@
           ],
           "returns": "",
           "description": "Log an informational message in blue",
-          "line": 89
+          "line": 97
         },
         {
           "name": "module.warn",
@@ -936,7 +949,7 @@
           ],
           "returns": "",
           "description": "Log a warning message in yellow",
-          "line": 95
+          "line": 103
         },
         {
           "name": "module.error",
@@ -949,14 +962,14 @@
           ],
           "returns": "",
           "description": "Log an error message in red",
-          "line": 101
+          "line": 109
         },
         {
           "name": "module.flush",
           "params": [],
           "returns": "",
           "description": "Flush any pending log entries to disk",
-          "line": 107
+          "line": 115
         }
       ],
       "classes": []
@@ -1749,5 +1762,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-19T04:40:16Z"
+  "updated": "2025-12-19T05:01:44Z"
 }

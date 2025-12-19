@@ -13,6 +13,14 @@ log.error("Failed to connect to database")
 
 ## Functions
 
+### `module.debug(msg)`
+
+Log a debug message in gray (only to file, not console by default)
+
+**Parameters:**
+
+- `msg` (string): The message to log
+
 ### `module.info(msg)`
 
 Log an informational message in blue
