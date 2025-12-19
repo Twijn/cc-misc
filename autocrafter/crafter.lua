@@ -201,7 +201,14 @@ local function pullItem(item, count, turtleSlot)
     -- Request items from server directly to turtle slot
     local withdrawn = requestWithdraw(item, count, turtleName, turtleSlot)
     
-    return withdrawn
+    -- Verify the item actually arrived
+    local actualCount = turtle.getItemCount(turtleSlot)
+    if actualCount < count then
+        logger.warn(string.format("Requested %d %s, server reported %d, turtle has %d", 
+            count, item, withdrawn, actualCount))
+    end
+    
+    return actualCount
 end
 
 ---Execute a crafting job
@@ -250,17 +257,15 @@ local function executeCraft(job)
     local craftsToDo = job.crafts or 1
     
     for craft = 1, craftsToDo do
-        -- Clear crafting area
-        for gridSlot = 1, 9 do
-            local turtleSlot = CRAFT_SLOTS[gridSlot]
-            if turtle.getItemCount(turtleSlot) > 0 then
-                turtle.select(turtleSlot)
-                turtle.drop()
-            end
+        -- Clear any leftover items from previous craft to storage
+        -- (On first craft, inventory is already clear)
+        if craft > 1 then
+            clearInventory()
         end
         
         -- Gather materials for this craft
         local materialsOk = true
+        local failedItem = nil
         for gridSlot = 1, 9 do
             local item = grid[gridSlot]
             if item then
@@ -269,7 +274,8 @@ local function executeCraft(job)
                 
                 if pulled == 0 then
                     materialsOk = false
-                    logger.warn("Failed to get " .. item .. " for slot " .. gridSlot)
+                    failedItem = item
+                    logger.warn("Failed to get " .. item .. " for grid slot " .. gridSlot .. " (turtle slot " .. turtleSlot .. ")")
                     break
                 end
             end
@@ -281,7 +287,7 @@ local function executeCraft(job)
             if craftsCompleted > 0 then
                 return true, craftsCompleted * (recipe.outputCount or 1)
             else
-                return false, "Missing materials"
+                return false, "Missing materials: " .. (failedItem or "unknown")
             end
         end
         

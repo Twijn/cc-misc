@@ -466,7 +466,7 @@ function inventory.withdraw(item, count, destInv, destSlot)
     if #locations == 0 then return 0 end
     
     local withdrawn = 0
-    local affectedInventories = {[destInv] = true}
+    local affectedInventories = {}
     
     for _, loc in ipairs(locations) do
         if withdrawn >= count then break end
@@ -483,7 +483,7 @@ function inventory.withdraw(item, count, destInv, destSlot)
         end
     end
     
-    -- Batch update affected inventories
+    -- Batch update affected source inventories (not destination - it may be a turtle)
     for invName in pairs(affectedInventories) do
         inventory.scanSingle(invName)
     end
@@ -492,20 +492,13 @@ function inventory.withdraw(item, count, destInv, destSlot)
 end
 
 ---Deposit items from an inventory into storage (batch update)
----Only deposits to storage-type inventories (configured via setStorageType)
----@param sourceInv string Source inventory name
----@param item? string Optional item filter
+---Storage inventories pull from the source (works with turtles)
+---@param sourceInv string Source inventory name (can be a turtle)
+---@param item? string Optional item filter (not used when pulling from turtle)
 ---@return number deposited Amount deposited
 function inventory.deposit(sourceInv, item)
-    local source = inventory.getPeripheral(sourceInv)
-    if not source then return 0 end
-    
     local deposited = 0
-    local sourceList = source.list()
-    
-    if not sourceList then return 0 end
-    
-    local affectedInventories = {[sourceInv] = true}
+    local affectedInventories = {}
     
     -- Get storage inventories only
     local storageInvs = inventory.getStorageInventories()
@@ -519,24 +512,25 @@ function inventory.deposit(sourceInv, item)
         end
     end
     
-    for slot, slotItem in pairs(sourceList) do
-        if not item or slotItem.name == item then
-            -- Find a destination from storage inventories
-            for _, name in ipairs(storageInvs) do
-                if name ~= sourceInv then
-                    local transferred = source.pushItems(name, slot)
-                    deposited = deposited + (transferred or 0)
-                    
-                    if transferred and transferred > 0 then
+    -- Have each storage inventory pull from the source
+    -- This works even when source is a turtle (which can't be wrapped from server)
+    for _, name in ipairs(storageInvs) do
+        if name ~= sourceInv then
+            local dest = inventory.getPeripheral(name)
+            if dest and dest.pullItems then
+                -- Try to pull from all 16 slots (turtle has 16 slots)
+                for slot = 1, 16 do
+                    local pulled = dest.pullItems(sourceInv, slot)
+                    if pulled and pulled > 0 then
+                        deposited = deposited + pulled
                         affectedInventories[name] = true
-                        break
                     end
                 end
             end
         end
     end
     
-    -- Batch update affected inventories
+    -- Batch update affected storage inventories
     for invName in pairs(affectedInventories) do
         inventory.scanSingle(invName)
     end
