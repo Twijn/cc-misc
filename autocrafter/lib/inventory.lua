@@ -474,8 +474,12 @@ function inventory.withdraw(item, count, destInv, destSlot)
     local locations = inventory.findItem(item)
     if #locations == 0 then return 0 end
     
+    -- Sort locations by count (largest first) for efficiency
+    table.sort(locations, function(a, b) return a.count > b.count end)
+    
     local withdrawn = 0
     local affectedInventories = {}
+    local maxRetries = 2
     
     for _, loc in ipairs(locations) do
         if withdrawn >= count then break end
@@ -483,11 +487,31 @@ function inventory.withdraw(item, count, destInv, destSlot)
         local source = inventory.getPeripheral(loc.inventory)
         if source then
             local toWithdraw = math.min(count - withdrawn, loc.count)
-            local transferred = source.pushItems(destInv, loc.slot, toWithdraw, destSlot) or 0
+            local transferred = 0
+            
+            -- Try with retries for reliability
+            for attempt = 1, maxRetries do
+                local result = source.pushItems(destInv, loc.slot, toWithdraw, destSlot)
+                if result and result > 0 then
+                    transferred = result
+                    break
+                end
+                if attempt < maxRetries then
+                    -- Small yield before retry
+                    os.queueEvent("yield")
+                    os.pullEvent("yield")
+                end
+            end
+            
             withdrawn = withdrawn + transferred
             
             if transferred > 0 then
                 affectedInventories[loc.inventory] = true
+                -- If we're pushing to a specific slot and it's now full, 
+                -- clear destSlot so next push can go anywhere
+                if destSlot and transferred < toWithdraw then
+                    destSlot = nil
+                end
             end
         end
     end

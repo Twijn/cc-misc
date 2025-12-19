@@ -206,49 +206,17 @@ local function clearInventory()
     turtle.select(1)
 end
 
----Pull item from storage to turtle slot (via server request)
----@param item string Item ID
----@param count number Amount to pull
----@param turtleSlot number Destination slot
----@return number pulled Amount actually pulled
-local function pullItem(item, count, turtleSlot)
-    local _, _, turtleName = getModem()
-    if not turtleName then
-        logger.warn("No modem found for pullItem")
-        return 0
-    end
-    
-    turtle.select(turtleSlot)
-    
-    -- Request items from server directly to turtle slot
-    local withdrawn = requestWithdraw(item, count, turtleName, turtleSlot)
-    
-    -- Verify the item actually arrived
-    local actualCount = turtle.getItemCount(turtleSlot)
-    if actualCount < count then
-        logger.warn(string.format("Requested %d %s, server reported %d, turtle has %d", 
-            count, item, withdrawn, actualCount))
-    end
-    
-    return actualCount
-end
-
----Execute a crafting job
----@param job table The crafting job
----@return boolean success Whether crafting succeeded
----@return number|string result Output count or error message
-local function executeCraft(job)
-    local recipe = job.recipe
-    if not recipe then
-        return false, "No recipe in job"
-    end
-    
-    -- Clear inventory first
-    clearInventory()
-    
-    -- Build crafting grid based on recipe type
+---Calculate how many items are needed per slot in the crafting grid
+---@param recipe table The recipe
+---@return table grid Grid slot -> item mapping
+---@return table counts Grid slot -> count per craft mapping
+local function buildCraftingGrid(recipe)
     local grid = {}
-    for i = 1, 9 do grid[i] = nil end
+    local counts = {}
+    for i = 1, 9 do 
+        grid[i] = nil 
+        counts[i] = 0
+    end
     
     if recipe.type == "shaped" then
         local pattern = recipe.pattern
@@ -261,6 +229,7 @@ local function executeCraft(job)
                 local gridSlot = (row - 1) * 3 + col
                 if char ~= " " and key[char] then
                     grid[gridSlot] = key[char]
+                    counts[gridSlot] = 1
                 end
             end
         end
@@ -269,36 +238,155 @@ local function executeCraft(job)
         for _, ingredient in ipairs(recipe.ingredients) do
             for _ = 1, ingredient.count do
                 grid[slot] = ingredient.item
+                counts[slot] = 1
                 slot = slot + 1
             end
         end
     end
     
-    -- Gather materials for each craft
-    local craftsCompleted = 0
-    local craftsToDo = job.crafts or 1
+    return grid, counts
+end
+
+---Calculate maximum batch size based on stack limits
+---@param craftsNeeded number Total crafts needed
+---@return number batchSize Maximum crafts per batch (limited by stack size 64)
+local function calculateBatchSize(craftsNeeded)
+    -- Each slot can hold max 64 items, so max batch is 64 crafts
+    -- But we also need room for output, so be conservative
+    local maxPerSlot = 64
+    return math.min(craftsNeeded, maxPerSlot)
+end
+
+---Pull items for a batch craft with retry logic
+---@param item string Item ID
+---@param count number Amount to pull
+---@param turtleSlot number Destination slot
+---@param maxRetries? number Max retry attempts (default 3)
+---@return number pulled Amount actually pulled
+local function pullItemWithRetry(item, count, turtleSlot, maxRetries)
+    maxRetries = maxRetries or 3
+    local _, _, turtleName = getModem()
+    if not turtleName then
+        logger.warn("No modem found for pullItemWithRetry")
+        return 0
+    end
     
-    for craft = 1, craftsToDo do
-        -- Clear any leftover items from previous craft to storage
-        -- (On first craft, inventory is already clear)
-        if craft > 1 then
-            clearInventory()
+    turtle.select(turtleSlot)
+    local totalPulled = 0
+    local attempts = 0
+    
+    while totalPulled < count and attempts < maxRetries do
+        attempts = attempts + 1
+        local remaining = count - totalPulled
+        
+        -- Request items from server directly to turtle slot
+        local withdrawn = requestWithdraw(item, remaining, turtleName, turtleSlot)
+        
+        -- Verify the item actually arrived
+        local actualCount = turtle.getItemCount(turtleSlot)
+        
+        if actualCount > totalPulled then
+            totalPulled = actualCount
+        elseif withdrawn > 0 and actualCount == totalPulled then
+            -- Server says it sent items but we didn't receive them, wait and retry
+            sleep(0.2)
         end
         
-        -- Gather materials for this craft
+        if totalPulled >= count then
+            break
+        end
+        
+        -- Small delay before retry
+        if attempts < maxRetries and totalPulled < count then
+            sleep(0.1)
+        end
+    end
+    
+    if totalPulled < count then
+        logger.warn(string.format("Wanted %d %s, only got %d after %d attempts", 
+            count, item, totalPulled, attempts))
+    end
+    
+    return totalPulled
+end
+
+---Execute a crafting job with batch crafting
+---@param job table The crafting job
+---@return boolean success Whether crafting succeeded
+---@return number|string result Output count or error message
+local function executeCraft(job)
+    local recipe = job.recipe
+    if not recipe then
+        return false, "No recipe in job"
+    end
+    
+    -- Clear inventory first
+    clearInventory()
+    
+    -- Build crafting grid
+    local grid, slotCounts = buildCraftingGrid(recipe)
+    
+    -- Calculate total crafts needed
+    local totalCraftsNeeded = job.crafts or 1
+    local totalCraftsCompleted = 0
+    local outputCount = recipe.outputCount or 1
+    
+    logger.info(string.format("Starting job: %d crafts of %s (output: %dx per craft)", 
+        totalCraftsNeeded, recipe.output, outputCount))
+    
+    -- Process in batches
+    while totalCraftsCompleted < totalCraftsNeeded do
+        local remainingCrafts = totalCraftsNeeded - totalCraftsCompleted
+        local batchSize = calculateBatchSize(remainingCrafts)
+        
+        -- Clear inventory before each batch
+        if totalCraftsCompleted > 0 then
+            clearInventory()
+            sleep(0.1)  -- Small delay to ensure items are deposited
+        end
+        
+        -- Gather materials for this batch
         local materialsOk = true
         local failedItem = nil
+        local shortAmount = 0
+        
         for gridSlot = 1, 9 do
             local item = grid[gridSlot]
             if item then
                 local turtleSlot = CRAFT_SLOTS[gridSlot]
-                local pulled = pullItem(item, 1, turtleSlot)
+                local neededCount = slotCounts[gridSlot] * batchSize
+                
+                local pulled = pullItemWithRetry(item, neededCount, turtleSlot, 3)
                 
                 if pulled == 0 then
                     materialsOk = false
                     failedItem = item
-                    logger.warn("Failed to get " .. item .. " for grid slot " .. gridSlot .. " (turtle slot " .. turtleSlot .. ")")
+                    shortAmount = neededCount
+                    logger.warn(string.format("Failed to get any %s for grid slot %d (needed %d)", 
+                        item, gridSlot, neededCount))
                     break
+                elseif pulled < neededCount then
+                    -- We got some but not all - adjust batch size
+                    local possibleCrafts = math.floor(pulled / slotCounts[gridSlot])
+                    if possibleCrafts > 0 and possibleCrafts < batchSize then
+                        -- Reduce batch size to what we can actually craft
+                        logger.info(string.format("Reducing batch from %d to %d (only got %d/%d %s)", 
+                            batchSize, possibleCrafts, pulled, neededCount, item))
+                        batchSize = possibleCrafts
+                        -- Return excess items for this slot
+                        local excess = pulled - (possibleCrafts * slotCounts[gridSlot])
+                        if excess > 0 then
+                            -- We can't easily return partial items, so we'll use what we have
+                            -- The extra will be returned after crafting
+                        end
+                    elseif possibleCrafts == 0 then
+                        materialsOk = false
+                        failedItem = item
+                        shortAmount = neededCount - pulled
+                        logger.warn(string.format("Not enough %s: got %d, needed at least %d", 
+                            item, pulled, slotCounts[gridSlot]))
+                        break
+                    end
                 end
             end
         end
@@ -306,21 +394,28 @@ local function executeCraft(job)
         if not materialsOk then
             -- Return items to storage
             clearInventory()
-            if craftsCompleted > 0 then
-                return true, craftsCompleted * (recipe.outputCount or 1)
+            if totalCraftsCompleted > 0 then
+                local totalOutput = totalCraftsCompleted * outputCount
+                logger.info(string.format("Partial completion: %d/%d crafts, %d items", 
+                    totalCraftsCompleted, totalCraftsNeeded, totalOutput))
+                return true, totalOutput
             else
-                return false, "Missing materials: " .. (failedItem or "unknown")
+                return false, string.format("Missing materials: %s (short %d)", failedItem or "unknown", shortAmount)
             end
         end
         
         -- Select output slot and craft
         turtle.select(OUTPUT_SLOT)
-        local craftSuccess = turtle.craft()
+        local craftSuccess = turtle.craft(batchSize)
         
         if craftSuccess then
-            craftsCompleted = craftsCompleted + 1
+            totalCraftsCompleted = totalCraftsCompleted + batchSize
+            local batchOutput = batchSize * outputCount
             
-            -- Collect slots that have items to clear
+            logger.info(string.format("Batch complete: crafted %d (total: %d/%d crafts)", 
+                batchOutput, totalCraftsCompleted, totalCraftsNeeded))
+            
+            -- Collect all slots that have items to clear (including output)
             local slotsToClean = {}
             for slot = 1, 16 do
                 if turtle.getItemCount(slot) > 0 then
@@ -332,15 +427,23 @@ local function executeCraft(job)
             if #slotsToClean > 0 then
                 local _, _, turtleName = getModem()
                 if turtleName then
-                    requestClearSlots(turtleName, slotsToClean)
+                    local cleared = requestClearSlots(turtleName, slotsToClean)
+                    if cleared == 0 then
+                        -- Retry once if clearing failed
+                        sleep(0.2)
+                        requestClearSlots(turtleName, slotsToClean)
+                    end
                 end
             end
         else
+            -- Crafting failed - try to salvage what we can
             clearInventory()
-            if craftsCompleted > 0 then
-                return true, craftsCompleted * (recipe.outputCount or 1)
+            if totalCraftsCompleted > 0 then
+                local totalOutput = totalCraftsCompleted * outputCount
+                logger.warn(string.format("Crafting failed mid-batch, completed %d crafts", totalCraftsCompleted))
+                return true, totalOutput
             else
-                return false, "Crafting failed"
+                return false, "Crafting failed - recipe may require exact positioning"
             end
         end
     end
@@ -348,7 +451,10 @@ local function executeCraft(job)
     -- Clear any remaining items
     clearInventory()
     
-    return true, craftsCompleted * (recipe.outputCount or 1)
+    local totalOutput = totalCraftsCompleted * outputCount
+    logger.info(string.format("Job complete: %d crafts, %d items output", totalCraftsCompleted, totalOutput))
+    
+    return true, totalOutput
 end
 
 ---Send status update to server
