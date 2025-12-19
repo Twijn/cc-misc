@@ -147,8 +147,10 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/managers/storage.lua", path = diskPrefix .. "managers/storage.lua"},
     {url = BASE_URL .. "/autocrafter/managers/crafter.lua", path = diskPrefix .. "managers/crafter.lua"},
     {url = BASE_URL .. "/autocrafter/managers/monitor.lua", path = diskPrefix .. "managers/monitor.lua"},
+    {url = BASE_URL .. "/autocrafter/managers/export.lua", path = diskPrefix .. "managers/export.lua"},
     {url = BASE_URL .. "/autocrafter/config/settings.lua", path = diskPrefix .. "config/settings.lua"},
     {url = BASE_URL .. "/autocrafter/config/targets.lua", path = diskPrefix .. "config/targets.lua"},
+    {url = BASE_URL .. "/autocrafter/config/exports.lua", path = diskPrefix .. "config/exports.lua"},
 }
 
 local crafterFiles = {
