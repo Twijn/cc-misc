@@ -15,9 +15,15 @@ local lastScanTime = 0
 local scanInterval = 30
 
 ---Initialize the storage manager
-function manager.init()
+---@param storageType? string Optional storage peripheral type
+function manager.init(storageType)
     storageConfig.setDefault("ignoredInventories", {})
     storageConfig.setDefault("priorityInventories", {})
+    
+    -- Set storage peripheral type if provided
+    if storageType then
+        inventory.setStorageType(storageType)
+    end
     
     -- Initialize inventory library from cache
     inventory.init()
@@ -73,9 +79,10 @@ end
 ---@param item string Item ID
 ---@param count number Amount to withdraw
 ---@param destInv string Destination inventory
+---@param destSlot? number Optional destination slot
 ---@return number withdrawn Amount actually withdrawn
-function manager.withdraw(item, count, destInv)
-    local withdrawn = inventory.withdraw(item, count, destInv)
+function manager.withdraw(item, count, destInv, destSlot)
+    local withdrawn = inventory.withdraw(item, count, destInv, destSlot)
     
     if withdrawn > 0 then
         logger.info(string.format("Withdrew %d %s to %s", withdrawn, item, destInv))

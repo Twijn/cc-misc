@@ -76,7 +76,7 @@ local function initialize()
     -- Initialize managers
     print("Initializing managers...")
     queueManager.init()
-    storageManager.init()
+    storageManager.init(config.storagePeripheralType)
     storageManager.setScanInterval(settings.get("scanInterval"))
     crafterManager.init()
     monitorManager.init(config.monitorRefreshInterval)
@@ -247,7 +247,7 @@ local function messageHandler()
                 
             elseif msgType == config.messageTypes.REQUEST_WITHDRAW then
                 -- Crafter requesting items to be pushed to it
-                local withdrawn = storageManager.withdraw(data.item, data.count, data.destInv)
+                local withdrawn = storageManager.withdraw(data.item, data.count, data.destInv, data.destSlot)
                 comms.send(config.messageTypes.RESPONSE_WITHDRAW, {
                     item = data.item,
                     requested = data.count,

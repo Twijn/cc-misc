@@ -163,12 +163,14 @@ end
 ---@param item string Item ID
 ---@param count number Amount needed
 ---@param destInv string Our inventory name (modem name)
+---@param destSlot? number Optional destination slot
 ---@return number withdrawn Amount actually received
-local function requestWithdraw(item, count, destInv)
+local function requestWithdraw(item, count, destInv, destSlot)
     comms.broadcast(config.messageTypes.REQUEST_WITHDRAW, {
         item = item,
         count = count,
         destInv = destInv,
+        destSlot = destSlot,
     })
     
     -- Wait for response
@@ -210,24 +212,19 @@ local function clearInventory()
     local _, _, turtleName = getModem()
     if not turtleName then return end
     
-    -- First, try to push items through adjacent inventories
-    local inventories = getInventories()
-    
+    -- Check if turtle has any items
+    local hasItems = false
     for slot = 1, 16 do
         if turtle.getItemCount(slot) > 0 then
-            turtle.select(slot)
-            -- Try to push to any adjacent inventory (inv pulls from turtle)
-            for _, invName in ipairs(inventories) do
-                local inv = getInventory(invName)
-                if inv then
-                    local pushed = inv.pullItems(turtleName, slot)
-                    if pushed and pushed > 0 then
-                        break
-                    end
-                end
-            end
+            hasItems = true
+            break
         end
     end
+    
+    if not hasItems then return end
+    
+    -- Request server to deposit all items from the turtle
+    requestDeposit(turtleName, nil)
     
     turtle.select(1)
 end
@@ -246,44 +243,10 @@ local function pullItem(item, count, turtleSlot)
     
     turtle.select(turtleSlot)
     
-    -- Request server to push items to our adjacent inventory
-    -- Then we pull from there
-    local inventories = getInventories()
-    if #inventories == 0 then
-        logger.warn("No adjacent inventories for item transfer")
-        return 0
-    end
+    -- Request items from server directly to turtle slot
+    local withdrawn = requestWithdraw(item, count, turtleName, turtleSlot)
     
-    -- Use first adjacent inventory as staging
-    local stagingInv = inventories[1]
-    
-    -- Request items from server to staging inventory
-    local withdrawn = requestWithdraw(item, count, stagingInv)
-    if withdrawn == 0 then
-        return 0
-    end
-    
-    -- Now pull from staging inventory to turtle
-    -- The chest pushes items to the turtle using the turtle's network name
-    local pulled = 0
-    local inv = getInventory(stagingInv)
-    if inv then
-        local list = inv.list()
-        if list then
-            for slot, slotItem in pairs(list) do
-                if slotItem.name == item then
-                    local toPull = math.min(count - pulled, slotItem.count)
-                    local amount = inv.pushItems(turtleName, slot, toPull, turtleSlot)
-                    pulled = pulled + (amount or 0)
-                    if pulled >= count then
-                        break
-                    end
-                end
-            end
-        end
-    end
-    
-    return pulled
+    return withdrawn
 end
 
 ---Execute a crafting job
@@ -374,19 +337,10 @@ local function executeCraft(job)
         if craftSuccess then
             craftsCompleted = craftsCompleted + 1
             
-            -- Move output to storage via cached peripherals
-            local outputCount = turtle.getItemCount(OUTPUT_SLOT)
+            -- Move output to storage via server request
             local _, _, turtleName = getModem()
             if turtleName then
-                for _, invName in ipairs(getInventories()) do
-                    local inv = getInventory(invName)
-                    if inv then
-                        local pushed = inv.pullItems(turtleName, OUTPUT_SLOT, outputCount)
-                        if pushed and pushed > 0 then
-                            break
-                        end
-                    end
-                end
+                requestDeposit(turtleName, nil)
             end
         else
             clearInventory()

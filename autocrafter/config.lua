@@ -5,6 +5,9 @@ return {
     -- Network channel for crafter communication
     modemChannel = 4200,
     
+    -- Storage peripheral type (items are deposited to/withdrawn from these)
+    storagePeripheralType = "sc-goodies:diamond_barrel",
+    
     -- How often to scan inventories (seconds)
     scanInterval = 30,
     

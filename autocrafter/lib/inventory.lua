@@ -25,6 +25,9 @@ local lastScanTime = 0
 local lastFullScan = 0
 local inventoryNames = {}      -- Cached list of inventory names
 local inventorySizes = {}      -- Cached inventory sizes
+local inventoryTypes = {}      -- Cached peripheral types for each inventory
+local storageInventories = {}  -- Cached list of storage-type inventory names
+local storagePeripheralType = "sc-goodies:diamond_barrel"  -- Default storage type
 local modemPeripheral = nil    -- Cached modem peripheral
 local modemName = nil          -- Cached modem name
 local scanInProgress = false
@@ -91,21 +94,39 @@ function inventory.discoverInventories(forceRefresh)
     end
     
     inventoryNames = {}
+    storageInventories = {}
     wrappedPeripherals = {}  -- Clear wrapped cache on rediscovery
+    inventoryTypes = {}
     
     for _, name in ipairs(peripheral.getNames()) do
         local types = {peripheral.getType(name)}
+        local isInventory = false
+        local isStorage = false
+        
         for _, t in ipairs(types) do
             if t == "inventory" then
-                table.insert(inventoryNames, name)
-                -- Pre-wrap and cache
-                local p = peripheral.wrap(name)
-                if p then
-                    wrappedPeripherals[name] = p
-                    -- Cache size (doesn't change)
-                    inventorySizes[name] = p.size()
-                end
-                break
+                isInventory = true
+            end
+            if t == storagePeripheralType then
+                isStorage = true
+            end
+        end
+        
+        if isInventory then
+            table.insert(inventoryNames, name)
+            inventoryTypes[name] = types
+            
+            -- Pre-wrap and cache
+            local p = peripheral.wrap(name)
+            if p then
+                wrappedPeripherals[name] = p
+                -- Cache size (doesn't change)
+                inventorySizes[name] = p.size()
+            end
+            
+            -- Track storage inventories separately
+            if isStorage then
+                table.insert(storageInventories, name)
             end
         end
     end
@@ -114,6 +135,39 @@ function inventory.discoverInventories(forceRefresh)
     inventory.getModem()
     
     return inventoryNames
+end
+
+---Set the storage peripheral type
+---@param peripheralType string The peripheral type for storage (e.g., "sc-goodies:diamond_barrel")
+function inventory.setStorageType(peripheralType)
+    storagePeripheralType = peripheralType
+end
+
+---Get the list of storage inventories
+---@return table names Array of storage inventory names
+function inventory.getStorageInventories()
+    if #storageInventories > 0 then
+        return storageInventories
+    end
+    
+    -- Rebuild from inventory names if needed
+    inventory.discoverInventories(true)
+    return storageInventories
+end
+
+---Check if an inventory is a storage inventory
+---@param name string The inventory name
+---@return boolean isStorage Whether it's a storage inventory
+function inventory.isStorageInventory(name)
+    local types = inventoryTypes[name]
+    if not types then return false end
+    
+    for _, t in ipairs(types) do
+        if t == storagePeripheralType then
+            return true
+        end
+    end
+    return false
 end
 
 ---Get inventory size (cached)
@@ -405,8 +459,9 @@ end
 ---@param item string The item ID to withdraw
 ---@param count number Amount to withdraw
 ---@param destInv string Destination inventory name
+---@param destSlot? number Optional destination slot
 ---@return number withdrawn Amount actually withdrawn
-function inventory.withdraw(item, count, destInv)
+function inventory.withdraw(item, count, destInv, destSlot)
     local locations = inventory.findItem(item)
     if #locations == 0 then return 0 end
     
@@ -419,7 +474,7 @@ function inventory.withdraw(item, count, destInv)
         local source = inventory.getPeripheral(loc.inventory)
         if source then
             local toWithdraw = math.min(count - withdrawn, loc.count)
-            local transferred = source.pushItems(destInv, loc.slot, toWithdraw) or 0
+            local transferred = source.pushItems(destInv, loc.slot, toWithdraw, destSlot) or 0
             withdrawn = withdrawn + transferred
             
             if transferred > 0 then
@@ -437,6 +492,7 @@ function inventory.withdraw(item, count, destInv)
 end
 
 ---Deposit items from an inventory into storage (batch update)
+---Only deposits to storage-type inventories (configured via setStorageType)
 ---@param sourceInv string Source inventory name
 ---@param item? string Optional item filter
 ---@return number deposited Amount deposited
@@ -450,12 +506,23 @@ function inventory.deposit(sourceInv, item)
     if not sourceList then return 0 end
     
     local affectedInventories = {[sourceInv] = true}
-    local invData = inventoryCache.getAll()
+    
+    -- Get storage inventories only
+    local storageInvs = inventory.getStorageInventories()
+    if #storageInvs == 0 then
+        -- Fall back to all cached inventories if no storage type found
+        local invData = inventoryCache.getAll()
+        for name in pairs(invData) do
+            if name ~= sourceInv then
+                table.insert(storageInvs, name)
+            end
+        end
+    end
     
     for slot, slotItem in pairs(sourceList) do
         if not item or slotItem.name == item then
-            -- Find a destination from cached inventories
-            for name in pairs(invData) do
+            -- Find a destination from storage inventories
+            for _, name in ipairs(storageInvs) do
                 if name ~= sourceInv then
                     local transferred = source.pushItems(name, slot)
                     deposited = deposited + (transferred or 0)
