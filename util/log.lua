@@ -70,7 +70,7 @@ local function writeLog(level, msg)
 end
 
 ---Internal logging function that handles both console and file output
----@param level string The log level (info, warn, error)
+---@param level string The log level (debug, info, warn, error)
 ---@param msg string The message to log
 local function log(level, msg)
     if level == "error" then
@@ -79,11 +79,19 @@ local function log(level, msg)
         term.setTextColor(colors.yellow)
     elseif level == "info" then
         term.setTextColor(colors.blue)
+    elseif level == "debug" then
+        term.setTextColor(colors.gray)
     end
     write("["..level.."] ")
     term.setTextColor(colors.white)
     print(msg)
     writeLog(level, msg)
+end
+
+---Log a debug message in gray (only to file, not console by default)
+---@param msg string The message to log
+function module.debug(msg)
+    log("debug", msg)
 end
 
 ---Log an informational message in blue
