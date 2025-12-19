@@ -246,8 +246,8 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>log <span class="version-badge">v1.0.0</span></h1>
-        <p>A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, and timestamped log entries.</p>
+        <h1>log <span class="version-badge">v1.1.0</span></h1>
+        <p>A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, and buffered writes for performance.</p>
     </div>
     
     <div class="install-section">
@@ -376,7 +376,7 @@ log.error("Failed to connect to database")</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.info(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L61' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L89' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log an informational message in blue</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -387,7 +387,7 @@ log.error("Failed to connect to database")</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.warn(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L67' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L95' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log a warning message in yellow</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -398,7 +398,7 @@ log.error("Failed to connect to database")</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.error(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L73' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L101' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log an error message in red</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -406,6 +406,11 @@ log.error("Failed to connect to database")</code></pre>
                 <li><code>msg</code> (string): The message to log</li>
             </ul>
         </div>
+    </div>
+    <div class='function'>
+        <h3><code>module.flush()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L107' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Flush any pending log entries to disk</p>
     </div>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>

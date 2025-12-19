@@ -1,6 +1,6 @@
 # log
 
-A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, and timestamped log entries.
+A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, and buffered writes for performance.
 
 ## Examples
 
@@ -36,4 +36,8 @@ Log an error message in red
 **Parameters:**
 
 - `msg` (string): The message to log
+
+### `module.flush()`
+
+Flush any pending log entries to disk
 
