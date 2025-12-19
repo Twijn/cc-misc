@@ -195,15 +195,21 @@ end
 
 --- Dispatch jobs to available crafters
 local function dispatchJobs()
-    local job = queueManager.getNextJob()
-    if not job then return end
-    
-    local crafter = crafterManager.getIdleCrafter()
-    if not crafter then return end
-    
-    if queueManager.assignJob(job.id, crafter.id) then
-        crafterManager.sendCraftRequest(crafter.id, job)
-        crafterManager.updateStatus(crafter.id, "crafting", job.id)
+    -- Dispatch all pending jobs to all available idle crafters
+    while true do
+        local job = queueManager.getNextJob()
+        if not job then return end
+        
+        local crafter = crafterManager.getIdleCrafter()
+        if not crafter then return end
+        
+        if queueManager.assignJob(job.id, crafter.id) then
+            crafterManager.sendCraftRequest(crafter.id, job)
+            crafterManager.updateStatus(crafter.id, "crafting", job.id)
+        else
+            -- Failed to assign, stop trying to avoid infinite loop
+            return
+        end
     end
 end
 
@@ -219,8 +225,13 @@ local function messageHandler()
                     queueManager.completeJob(result.jobId, result.actualOutput)
                     -- Rescan storage since crafting produced output
                     storageManager.scan()
+                    -- Immediately check for new jobs and dispatch
+                    processCraftTargets()
+                    dispatchJobs()
                 elseif result.type == "craft_failed" then
                     queueManager.failJob(result.jobId, result.reason)
+                    -- Immediately try to dispatch other jobs
+                    dispatchJobs()
                 end
             end
             
