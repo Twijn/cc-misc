@@ -63,7 +63,45 @@ The server provides a command interface:
 - `deposit <item>` - Deposit all of item type
 - `crafters` - List connected crafters
 - `recipes [search]` - Search available recipes
+- `exports` - Manage export inventories (see below)
 - `help` - Show help
+
+## Export System
+
+The export system allows automatic item transfer to/from external inventories like ender storages. This is useful for:
+
+- **Stocking ender storages**: Keep remote locations supplied with items
+- **Emptying ender storages**: Automatically collect items deposited remotely
+
+### Export Commands
+
+- `exports list` - List all configured export inventories
+- `exports add` - Add a new export inventory (opens interactive form)
+- `exports remove <name>` - Remove an export inventory
+- `exports edit [name]` - Edit an export inventory interactively
+- `exports items <name>` - List items for an export inventory
+- `exports additem <inv> <item> <qty> [slot]` - Add item to export
+- `exports rmitem <inv> <item>` - Remove item from export
+- `exports status` - View export system status
+
+### Export Modes
+
+- **Stock Mode**: Push items FROM storage TO the export inventory (keep it stocked)
+- **Empty Mode**: Pull items FROM the export inventory TO storage (drain it)
+
+### Example Usage
+
+```
+# Add an ender storage as an export target
+> exports add
+
+# Edit the export to add items
+> exports edit ender_storage_0
+
+# Or add items via command
+> exports additem ender_storage_0 torch 64
+> exports additem ender_storage_0 coal 128 1  # Slot 1 only
+```
 
 ## Configuration
 
@@ -101,15 +139,17 @@ autocrafter/
 │   ├── queue.lua        # Crafting queue manager
 │   ├── storage.lua      # Storage manager
 │   ├── crafter.lua      # Crafter coordination
-│   └── monitor.lua      # Status display manager
+│   ├── monitor.lua      # Status display manager
+│   └── export.lua       # Export/ender storage manager
 └── config/
     ├── settings.lua     # Settings management
-    └── targets.lua      # Craft target management
+    ├── targets.lua      # Craft target management
+    └── exports.lua      # Export inventory management
 ```
 
 ## Future Expansions
 
-- **Ender Storage Integration**: Control ender storage frequencies
+- **Ender Storage Integration**: ~~Control ender storage frequencies~~ ✓ Added via export system
 - **Remote API**: HTTP API for external access
 - **Multi-server networking**: Connect multiple storage systems
 - **Advanced filtering**: Item filters and priorities

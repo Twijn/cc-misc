@@ -23,10 +23,12 @@ local queueManager = require("managers.queue")
 local storageManager = require("managers.storage")
 local crafterManager = require("managers.crafter")
 local monitorManager = require("managers.monitor")
+local exportManager = require("managers.export")
 
 -- Load config modules
 local settings = require("config.settings")
 local targets = require("config.targets")
+local exportConfig = require("config.exports")
 local config = require("config")
 
 local running = true
@@ -80,6 +82,7 @@ local function initialize()
     storageManager.setScanInterval(settings.get("scanInterval"))
     crafterManager.init()
     monitorManager.init(config.monitorRefreshInterval)
+    exportManager.init()
     print("")
     
     -- Initial stats
@@ -92,6 +95,9 @@ local function initialize()
     
     local targetCount = targets.count()
     print("Craft targets: " .. targetCount)
+    
+    local exportCount = exportConfig.count()
+    print("Export inventories: " .. exportCount)
     print("")
     
     -- Initialize chatbox for in-game commands
@@ -381,6 +387,17 @@ local function crafterPingLoop()
     while running do
         crafterManager.pingAll()
         sleep(pingInterval)
+    end
+end
+
+--- Export processing loop
+local function exportProcessLoop()
+    local exportInterval = config.exportCheckInterval or 5
+    while running do
+        if exportManager.needsCheck() then
+            exportManager.processExports()
+        end
+        sleep(exportInterval)
     end
 end
 
@@ -1046,6 +1063,394 @@ local commands = {
             term.setTextColor(colors.white)
         end
     },
+    
+    exports = {
+        description = "Manage export inventories",
+        execute = function(args, ctx)
+            local subCmd = args[1]
+            
+            if not subCmd or subCmd == "list" then
+                -- List export inventories
+                local all = exportConfig.getAll()
+                local count = 0
+                for _ in pairs(all) do count = count + 1 end
+                
+                if count == 0 then
+                    ctx.mess("No export inventories configured")
+                    ctx.mess("Use 'exports add' to add one")
+                    return
+                end
+                
+                print("")
+                ctx.mess("=== Export Inventories ===")
+                for name, cfg in pairs(all) do
+                    local itemCount = #(cfg.slots or {})
+                    term.setTextColor(colors.lime)
+                    write(cfg.mode == "stock" and "+" or "-")
+                    term.setTextColor(colors.white)
+                    write(" " .. name .. " ")
+                    term.setTextColor(colors.lightGray)
+                    print(string.format("[%s] %d items", cfg.mode, itemCount))
+                end
+                term.setTextColor(colors.white)
+                
+            elseif subCmd == "add" then
+                -- Add a new export inventory using FormUI
+                local searchType = config.exportDefaultType or "ender_storage"
+                local peripheralNames = exportManager.findExportPeripherals(searchType)
+                
+                if #peripheralNames == 0 then
+                    ctx.err("No " .. searchType .. " peripherals found")
+                    ctx.mess("Try connecting ender storages or configure a different type")
+                    return
+                end
+                
+                local form = FormUI.new("Add Export Inventory")
+                local peripheralField = form:peripheral("Inventory", searchType)
+                local modeField = form:select("Mode", {"stock", "empty"}, 1)
+                form:label("stock = push TO inventory | empty = pull FROM inventory")
+                form:addSubmitCancel()
+                
+                local result = form:run()
+                if not result then
+                    ctx.mess("Cancelled")
+                    return
+                end
+                
+                local invName = peripheralField()
+                local mode = modeField()
+                
+                exportConfig.set(invName, {
+                    name = invName,
+                    searchType = searchType,
+                    mode = mode,
+                    slots = {},
+                })
+                
+                ctx.succ("Added export inventory: " .. invName)
+                ctx.mess("Use 'exports items <name>' to add items")
+                
+            elseif subCmd == "remove" then
+                local invName = args[2]
+                if not invName then
+                    ctx.err("Usage: exports remove <inventory>")
+                    return
+                end
+                
+                if not exportConfig.get(invName) then
+                    ctx.err("Export inventory not found: " .. invName)
+                    return
+                end
+                
+                exportConfig.remove(invName)
+                ctx.succ("Removed export inventory: " .. invName)
+                
+            elseif subCmd == "items" then
+                local invName = args[2]
+                if not invName then
+                    ctx.err("Usage: exports items <inventory>")
+                    return
+                end
+                
+                local cfg = exportConfig.get(invName)
+                if not cfg then
+                    ctx.err("Export inventory not found: " .. invName)
+                    return
+                end
+                
+                -- Show and manage items for this export
+                local items = cfg.slots or {}
+                
+                print("")
+                ctx.mess("=== Items for " .. invName .. " ===")
+                ctx.mess("Mode: " .. cfg.mode)
+                print("")
+                
+                if #items == 0 then
+                    ctx.mess("No items configured")
+                else
+                    for i, item in ipairs(items) do
+                        term.setTextColor(colors.white)
+                        write(string.format("%d. %s ", i, item.item:gsub("minecraft:", "")))
+                        term.setTextColor(colors.lightGray)
+                        if item.slot then
+                            print(string.format("x%d (slot %d)", item.quantity, item.slot))
+                        else
+                            print(string.format("x%d", item.quantity))
+                        end
+                    end
+                end
+                term.setTextColor(colors.white)
+                print("")
+                ctx.mess("Use 'exports additem <inv> <item> <qty> [slot]' to add")
+                ctx.mess("Use 'exports rmitem <inv> <item>' to remove")
+                
+            elseif subCmd == "additem" then
+                local invName = args[2]
+                local item = args[3]
+                local qty = tonumber(args[4]) or 0
+                local slot = args[5] and tonumber(args[5]) or nil
+                
+                if not invName or not item then
+                    ctx.err("Usage: exports additem <inventory> <item> <quantity> [slot]")
+                    return
+                end
+                
+                if not exportConfig.get(invName) then
+                    ctx.err("Export inventory not found: " .. invName)
+                    return
+                end
+                
+                -- Add minecraft: prefix if missing
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                exportConfig.addItem(invName, item, qty, slot)
+                ctx.succ(string.format("Added %s x%d to %s", item:gsub("minecraft:", ""), qty, invName))
+                
+            elseif subCmd == "rmitem" then
+                local invName = args[2]
+                local item = args[3]
+                
+                if not invName or not item then
+                    ctx.err("Usage: exports rmitem <inventory> <item>")
+                    return
+                end
+                
+                if not exportConfig.get(invName) then
+                    ctx.err("Export inventory not found: " .. invName)
+                    return
+                end
+                
+                -- Add minecraft: prefix if missing
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                exportConfig.removeItem(invName, item)
+                ctx.succ(string.format("Removed %s from %s", item:gsub("minecraft:", ""), invName))
+                
+            elseif subCmd == "status" then
+                local stats = exportManager.getStats()
+                print("")
+                ctx.mess("=== Export Status ===")
+                print(string.format("  Inventories: %d", stats.inventoryCount))
+                print(string.format("  Total items: %d", stats.itemCount))
+                print(string.format("  Check interval: %ds", stats.checkInterval))
+                print(string.format("  Last check: %.1fs ago", os.clock() - stats.lastCheck))
+                
+            elseif subCmd == "edit" then
+                local invName = args[2]
+                if not invName then
+                    -- Show list of export inventories to choose from
+                    local all = exportConfig.getAll()
+                    local invNames = {}
+                    for name in pairs(all) do
+                        table.insert(invNames, name)
+                    end
+                    
+                    if #invNames == 0 then
+                        ctx.err("No export inventories configured")
+                        ctx.mess("Use 'exports add' to create one first")
+                        return
+                    end
+                    
+                    local selectForm = FormUI.new("Select Export Inventory")
+                    local invField = selectForm:select("Inventory", invNames, 1)
+                    selectForm:addSubmitCancel()
+                    
+                    local selectResult = selectForm:run()
+                    if not selectResult then
+                        ctx.mess("Cancelled")
+                        return
+                    end
+                    
+                    invName = invField()
+                end
+                
+                local cfg = exportConfig.get(invName)
+                if not cfg then
+                    ctx.err("Export inventory not found: " .. invName)
+                    return
+                end
+                
+                -- Interactive edit loop for managing items
+                local items = cfg.slots or {}
+                local editing = true
+                
+                while editing do
+                    -- Build display of current items
+                    local itemDisplay = {}
+                    for i, item in ipairs(items) do
+                        local display = item.item:gsub("minecraft:", "")
+                        if item.slot then
+                            display = display .. string.format(" x%d (slot %d)", item.quantity, item.slot)
+                        else
+                            display = display .. string.format(" x%d", item.quantity)
+                        end
+                        table.insert(itemDisplay, display)
+                    end
+                    
+                    local form = FormUI.new("Edit Export: " .. invName)
+                    form:label("Mode: " .. cfg.mode)
+                    form:label(cfg.mode == "stock" and "Items will be pushed TO this inventory" or "Items will be pulled FROM this inventory")
+                    form:label("")
+                    form:label("Current items (" .. #items .. "):")
+                    
+                    if #itemDisplay == 0 then
+                        form:label("  (no items configured)")
+                    else
+                        for _, display in ipairs(itemDisplay) do
+                            form:label("  " .. display)
+                        end
+                    end
+                    
+                    form:label("")
+                    form:button("Add Item", "add")
+                    if #items > 0 then
+                        form:button("Remove Item", "remove")
+                    end
+                    form:button("Change Mode", "mode")
+                    form:label("")
+                    form:button("Done", "done")
+                    
+                    local result = form:run()
+                    if not result then
+                        editing = false
+                    else
+                        local action = nil
+                        -- Find which button was pressed
+                        for _, field in ipairs(form.fields) do
+                            if field.type == "button" and result[field.label] then
+                                action = field.action
+                                break
+                            end
+                        end
+                        
+                        if action == "add" then
+                            -- Form to add a new item
+                            local addForm = FormUI.new("Add Item to Export")
+                            local itemField = addForm:text("Item Name", "", nil, false)
+                            local qtyField = addForm:number("Quantity", cfg.mode == "stock" and 64 or 0)
+                            local useSlotField = addForm:checkbox("Use specific slot", false)
+                            local slotField = addForm:number("Slot number", 1)
+                            addForm:label("")
+                            if cfg.mode == "stock" then
+                                addForm:label("Quantity = amount to keep stocked")
+                            else
+                                addForm:label("Quantity = amount to leave (0 = take all)")
+                            end
+                            addForm:addSubmitCancel()
+                            
+                            local addResult = addForm:run()
+                            if addResult then
+                                local itemName = itemField()
+                                local qty = qtyField()
+                                local useSlot = useSlotField()
+                                local slot = useSlot and slotField() or nil
+                                
+                                -- Add minecraft: prefix if missing
+                                if itemName ~= "" and not itemName:find(":") then
+                                    itemName = "minecraft:" .. itemName
+                                end
+                                
+                                if itemName ~= "" then
+                                    exportConfig.addItem(invName, itemName, qty, slot)
+                                    -- Refresh items list
+                                    cfg = exportConfig.get(invName)
+                                    items = cfg.slots or {}
+                                end
+                            end
+                            
+                        elseif action == "remove" and #items > 0 then
+                            -- Form to remove an item
+                            local removeNames = {}
+                            for _, item in ipairs(items) do
+                                local display = item.item:gsub("minecraft:", "")
+                                if item.slot then
+                                    display = display .. " (slot " .. item.slot .. ")"
+                                end
+                                table.insert(removeNames, display)
+                            end
+                            
+                            local removeForm = FormUI.new("Remove Item")
+                            local removeField = removeForm:select("Item to remove", removeNames, 1)
+                            removeForm:addSubmitCancel()
+                            
+                            local removeResult = removeForm:run()
+                            if removeResult then
+                                local idx = 1
+                                for i, name in ipairs(removeNames) do
+                                    if name == removeField() then
+                                        idx = i
+                                        break
+                                    end
+                                end
+                                local toRemove = items[idx]
+                                if toRemove then
+                                    exportConfig.removeItem(invName, toRemove.item, toRemove.slot)
+                                    -- Refresh items list
+                                    cfg = exportConfig.get(invName)
+                                    items = cfg.slots or {}
+                                end
+                            end
+                            
+                        elseif action == "mode" then
+                            -- Toggle mode
+                            local newMode = cfg.mode == "stock" and "empty" or "stock"
+                            cfg.mode = newMode
+                            exportConfig.set(invName, cfg)
+                            
+                        elseif action == "done" then
+                            editing = false
+                        end
+                    end
+                end
+                
+                ctx.succ("Export configuration saved")
+                
+            else
+                ctx.err("Unknown subcommand: " .. subCmd)
+                ctx.mess("Available: list, add, remove, items, additem, rmitem, edit, status")
+            end
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"list", "add", "remove", "items", "additem", "rmitem", "edit", "status"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and (args[1] == "remove" or args[1] == "items" or args[1] == "additem" or args[1] == "rmitem" or args[1] == "edit") then
+                -- Complete export inventory names
+                local query = (args[2] or ""):lower()
+                local all = exportConfig.getAll()
+                local matches = {}
+                for name in pairs(all) do
+                    if name:lower():find(query, 1, true) then
+                        table.insert(matches, name)
+                    end
+                end
+                return matches
+            elseif #args == 3 and (args[1] == "additem" or args[1] == "rmitem") then
+                -- Complete item names from stock
+                local query = args[3] or ""
+                if query == "" then return {} end
+                local results = storageManager.searchItems(query)
+                local completions = {}
+                for _, item in ipairs(results) do
+                    table.insert(completions, (item.item:gsub("minecraft:", "")))
+                end
+                return completions
+            end
+            return {}
+        end
+    },
 }
 
 --- Send a message to a player via chatbox
@@ -1255,6 +1660,7 @@ local function handleTerminate()
     storageManager.beforeShutdown()
     crafterManager.beforeShutdown()
     monitorManager.beforeShutdown()
+    exportManager.beforeShutdown()
     
     comms.close()
     
@@ -1276,6 +1682,7 @@ local function main()
         crafterPingLoop,
         serverAnnounceLoop,
         monitorRefreshLoop,
+        exportProcessLoop,
         chatboxHandler,
         function()
             cmd("AutoCrafter", VERSION, commands)

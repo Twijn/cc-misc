@@ -31,6 +31,12 @@ return {
     -- Monitor refresh interval (seconds)
     monitorRefreshInterval = 5,
     
+    -- Export check interval (seconds)
+    exportCheckInterval = 5,
+    
+    -- Default peripheral type for export inventories
+    exportDefaultType = "ender_storage",
+    
     -- Ping interval for crafters (seconds)
     pingInterval = 30,
     
