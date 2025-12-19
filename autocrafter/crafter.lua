@@ -2,9 +2,9 @@
 --- Turtle component that executes crafting jobs from the server.
 --- All inventory operations are requested from the server to minimize peripheral calls.
 ---
----@version 2.0.0
+---@version 2.1.0
 
-local VERSION = "2.0.0"
+local VERSION = "2.1.0"
 
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""
@@ -184,26 +184,98 @@ local function requestClearSlots(sourceInv, slots)
     return 0
 end
 
----Clear the turtle inventory to storage (via server request)
-local function clearInventory()
-    local _, _, turtleName = getModem()
-    if not turtleName then return end
-    
-    -- Check if turtle has any items
-    local hasItems = false
+---Check if the turtle inventory is empty
+---@return boolean isEmpty Whether all slots are empty
+local function isInventoryEmpty()
     for slot = 1, 16 do
         if turtle.getItemCount(slot) > 0 then
-            hasItems = true
-            break
+            return false
+        end
+    end
+    return true
+end
+
+---Clear the turtle inventory to storage (via server request)
+---Ensures inventory is completely empty before returning (required for turtle.craft())
+---@param maxRetries? number Maximum retry attempts (default 5)
+---@return boolean success Whether inventory was fully cleared
+local function clearInventory(maxRetries)
+    maxRetries = maxRetries or 5
+    local _, _, turtleName = getModem()
+    if not turtleName then 
+        logger.warn("No modem found for clearInventory")
+        return isInventoryEmpty()
+    end
+    
+    -- Check if turtle has any items
+    if isInventoryEmpty() then 
+        turtle.select(1)
+        return true 
+    end
+    
+    -- Try to deposit all items with retries
+    for attempt = 1, maxRetries do
+        -- Request server to deposit all items from the turtle
+        local deposited = requestDeposit(turtleName, nil)
+        
+        -- Small delay to allow items to transfer
+        sleep(0.1)
+        
+        -- Verify inventory is actually empty
+        if isInventoryEmpty() then
+            turtle.select(1)
+            return true
+        end
+        
+        -- Still have items - try clearing specific slots
+        local slotsWithItems = {}
+        for slot = 1, 16 do
+            if turtle.getItemCount(slot) > 0 then
+                table.insert(slotsWithItems, slot)
+            end
+        end
+        
+        if #slotsWithItems > 0 then
+            logger.info(string.format("Inventory not empty after deposit, clearing %d slots (attempt %d/%d)", 
+                #slotsWithItems, attempt, maxRetries))
+            requestClearSlots(turtleName, slotsWithItems)
+            sleep(0.1)
+        end
+        
+        -- Check again
+        if isInventoryEmpty() then
+            turtle.select(1)
+            return true
+        end
+        
+        -- Still have items, wait and retry
+        if attempt < maxRetries then
+            sleep(0.2)
         end
     end
     
-    if not hasItems then return end
-    
-    -- Request server to deposit all items from the turtle
-    requestDeposit(turtleName, nil)
+    -- Last resort: try to drop items that couldn't be deposited
+    if not isInventoryEmpty() then
+        logger.warn("Could not deposit all items to storage, attempting to drop")
+        for slot = 1, 16 do
+            if turtle.getItemCount(slot) > 0 then
+                turtle.select(slot)
+                -- Try dropping in all directions
+                if not turtle.drop() then
+                    if not turtle.dropUp() then
+                        turtle.dropDown()
+                    end
+                end
+            end
+        end
+    end
     
     turtle.select(1)
+    local empty = isInventoryEmpty()
+    if not empty then
+        logger.error("Failed to clear inventory - crafting may fail")
+    end
+    return empty
 end
 
 ---Calculate how many items are needed per slot in the crafting grid
@@ -320,8 +392,10 @@ local function executeCraft(job)
         return false, "No recipe in job"
     end
     
-    -- Clear inventory first
-    clearInventory()
+    -- Clear inventory first - MUST succeed or crafting will fail
+    if not clearInventory() then
+        return false, "Failed to clear inventory before crafting"
+    end
     
     -- Build crafting grid
     local grid, slotCounts = buildCraftingGrid(recipe)
@@ -339,10 +413,14 @@ local function executeCraft(job)
         local remainingCrafts = totalCraftsNeeded - totalCraftsCompleted
         local batchSize = calculateBatchSize(remainingCrafts)
         
-        -- Clear inventory before each batch
+        -- Clear inventory before each batch (first batch already cleared above)
         if totalCraftsCompleted > 0 then
-            clearInventory()
-            sleep(0.1)  -- Small delay to ensure items are deposited
+            if not clearInventory() then
+                -- Partial success - return what we completed
+                local totalOutput = totalCraftsCompleted * outputCount
+                logger.warn(string.format("Failed to clear inventory for next batch, returning partial: %d items", totalOutput))
+                return true, totalOutput
+            end
         end
         
         -- Gather materials for this batch
