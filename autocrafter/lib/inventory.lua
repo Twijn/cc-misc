@@ -285,6 +285,8 @@ function inventory.rebuildFromCache()
         if data.slots then
             for slot, item in pairs(data.slots) do
                 local key = getItemKey(item)
+                -- Convert slot to number (JSON deserializes numeric keys as strings)
+                local slotNum = tonumber(slot) or slot
                 
                 newStockLevels[key] = (newStockLevels[key] or 0) + item.count
                 
@@ -293,7 +295,7 @@ function inventory.rebuildFromCache()
                 end
                 table.insert(itemLocations[key], {
                     inventory = name,
-                    slot = slot,
+                    slot = slotNum,
                     count = item.count,
                 })
             end
@@ -338,9 +340,11 @@ function inventory.findItem(item)
             for slot, slotItem in pairs(data.slots) do
                 local key = getItemKey(slotItem)
                 if key == item then
+                    -- Convert slot to number (JSON deserializes numeric keys as strings)
+                    local slotNum = tonumber(slot) or slot
                     table.insert(locations, {
                         inventory = name,
-                        slot = slot,
+                        slot = slotNum,
                         count = slotItem.count,
                     })
                 end
@@ -361,7 +365,8 @@ function inventory.findEmptySlots()
     for name, data in pairs(invData) do
         if data.size and data.slots then
             for slot = 1, data.size do
-                if not data.slots[slot] then
+                -- Check both numeric and string keys (JSON deserializes numeric keys as strings)
+                if not data.slots[slot] and not data.slots[tostring(slot)] then
                     table.insert(empty, {
                         inventory = name,
                         slot = slot,
@@ -381,11 +386,15 @@ end
 function inventory.getItemDetail(invName, slot)
     -- First check the slot in cache
     local invData = inventoryCache.get(invName)
-    if not invData or not invData.slots or not invData.slots[slot] then
+    if not invData or not invData.slots then
         return nil
     end
     
-    local item = invData.slots[slot]
+    -- Check both numeric and string keys (JSON deserializes numeric keys as strings)
+    local item = invData.slots[slot] or invData.slots[tostring(slot)]
+    if not item then
+        return nil
+    end
     local cacheKey = getDetailCacheKey(item)
     
     -- Check detail cache
