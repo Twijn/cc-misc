@@ -32,6 +32,7 @@ local modemPeripheral = nil    -- Cached modem peripheral
 local modemName = nil          -- Cached modem name
 local scanInProgress = false
 local manipulator = nil        -- Cached manipulator peripheral
+local deferredRebuild = false  -- Flag to defer cache rebuilding for batch operations
 
 ---Get item detail cache key
 ---@param item table The item with name and optional nbt
@@ -206,35 +207,51 @@ function inventory.scan(forceRefresh)
     -- Discover inventories if needed
     local invNames = inventory.discoverInventories(forceRefresh)
     
+    -- Batch scan inventories using parallel operations for better performance
+    -- Each inv.list() is a peripheral call that can run concurrently
+    local scanResults = {}
+    local scanFunctions = {}
+    
     for _, name in ipairs(invNames) do
         local inv = inventory.getPeripheral(name)
         if inv then
-            local list = inv.list()
-            if list then
-                local size = inventory.getSize(name)
-                
-                newInventoryData[name] = {
-                    slots = list,
-                    size = size,
-                }
-                
-                for slot, item in pairs(list) do
-                    local key = getItemKey(item)
-                    
-                    -- Update stock levels
-                    newStockLevels[key] = (newStockLevels[key] or 0) + item.count
-                    
-                    -- Track item locations (runtime only)
-                    if not itemLocations[key] then
-                        itemLocations[key] = {}
-                    end
-                    table.insert(itemLocations[key], {
-                        inventory = name,
-                        slot = slot,
-                        count = item.count,
-                    })
+            table.insert(scanFunctions, function()
+                local list = inv.list()
+                if list then
+                    local size = inventory.getSize(name)
+                    scanResults[name] = {
+                        slots = list,
+                        size = size,
+                    }
                 end
+            end)
+        end
+    end
+    
+    -- Run all scans in parallel (CC:Tweaked supports this)
+    if #scanFunctions > 0 then
+        parallel.waitForAll(table.unpack(scanFunctions))
+    end
+    
+    -- Process scan results (sequential, but just data processing)
+    for name, data in pairs(scanResults) do
+        newInventoryData[name] = data
+        
+        for slot, item in pairs(data.slots) do
+            local key = getItemKey(item)
+            
+            -- Update stock levels
+            newStockLevels[key] = (newStockLevels[key] or 0) + item.count
+            
+            -- Track item locations (runtime only)
+            if not itemLocations[key] then
+                itemLocations[key] = {}
             end
+            table.insert(itemLocations[key], {
+                inventory = name,
+                slot = slot,
+                count = item.count,
+            })
         end
     end
     
@@ -252,8 +269,9 @@ end
 
 ---Scan a single inventory and update caches
 ---@param name string The inventory name to scan
+---@param skipRebuild? boolean Skip rebuilding cache (for batch operations)
 ---@return table slots The slots in that inventory
-function inventory.scanSingle(name)
+function inventory.scanSingle(name, skipRebuild)
     local inv = inventory.getPeripheral(name)
     if not inv then return {} end
     
@@ -268,10 +286,23 @@ function inventory.scanSingle(name)
         size = size,
     })
     
-    -- Rebuild stock levels and locations from cached inventory data
-    inventory.rebuildFromCache()
+    -- Rebuild stock levels and locations from cached inventory data (unless deferred)
+    if not skipRebuild and not deferredRebuild then
+        inventory.rebuildFromCache()
+    end
     
     return list
+end
+
+---Begin a batch operation (defers cache rebuilding)
+function inventory.beginBatch()
+    deferredRebuild = true
+end
+
+---End a batch operation and rebuild cache
+function inventory.endBatch()
+    deferredRebuild = false
+    inventory.rebuildFromCache()
 end
 
 ---Rebuild stock levels and item locations from cached inventory data
@@ -517,8 +548,17 @@ function inventory.withdraw(item, count, destInv, destSlot)
     end
     
     -- Batch update affected source inventories (not destination - it may be a turtle)
+    -- Use skipRebuild=true and rebuild once at the end for efficiency
+    local invCount = 0
     for invName in pairs(affectedInventories) do
-        inventory.scanSingle(invName)
+        invCount = invCount + 1
+    end
+    
+    local scanned = 0
+    for invName in pairs(affectedInventories) do
+        scanned = scanned + 1
+        -- Only rebuild on the last inventory
+        inventory.scanSingle(invName, scanned < invCount)
     end
     
     return withdrawn
@@ -526,6 +566,7 @@ end
 
 ---Deposit items from an inventory into storage (batch update)
 ---Storage inventories pull from the source (works with turtles)
+---Optimized: only tries one storage per slot until successful, then moves to next slot
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param item? string Optional item filter (not used when pulling from turtle)
 ---@return number deposited Amount deposited
@@ -537,7 +578,7 @@ function inventory.deposit(sourceInv, item)
     local storageInvs = inventory.getStorageInventories()
     if #storageInvs == 0 then
         -- Fall back to all cached inventories if no storage type found
-        local invData = inventoryCache.getAll()
+        local invData = inventoryCache.getAll()  
         for name in pairs(invData) do
             if name ~= sourceInv then
                 table.insert(storageInvs, name)
@@ -545,27 +586,79 @@ function inventory.deposit(sourceInv, item)
         end
     end
     
-    -- Have each storage inventory pull from the source
-    -- This works even when source is a turtle (which can't be wrapped from server)
+    -- Pre-wrap all storage peripherals for efficiency
+    local storagePeripherals = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
             local dest = inventory.getPeripheral(name)
             if dest and dest.pullItems then
-                -- Try to pull from all 16 slots (turtle has 16 slots)
-                for slot = 1, 16 do
-                    local pulled = dest.pullItems(sourceInv, slot)
-                    if pulled and pulled > 0 then
-                        deposited = deposited + pulled
-                        affectedInventories[name] = true
-                    end
-                end
+                table.insert(storagePeripherals, {name = name, peripheral = dest})
             end
         end
     end
     
+    if #storagePeripherals == 0 then
+        return 0
+    end
+    
+    -- For each slot in the source, try ONE storage per slot
+    -- If storage is full (pulled=0 but no error), try next storage
+    -- If slot is empty (pulled=0), move to next slot after one attempt
+    -- This minimizes peripheral calls
+    local storageIndex = 1
+    local emptySlotStreak = 0  -- Track consecutive empty slots for early exit
+    
+    for slot = 1, 16 do
+        local slotHandled = false
+        local attempts = 0
+        local maxAttempts = math.min(3, #storagePeripherals)  -- Max 3 storage attempts per slot
+        
+        while not slotHandled and attempts < maxAttempts do
+            local storage = storagePeripherals[storageIndex]
+            local pulled = storage.peripheral.pullItems(sourceInv, slot)
+            
+            if pulled and pulled > 0 then
+                deposited = deposited + pulled
+                affectedInventories[storage.name] = true
+                slotHandled = true
+                emptySlotStreak = 0
+                -- Keep using same storage if it's working
+            elseif pulled == 0 then
+                -- Either slot is empty or storage is full
+                -- After first attempt, assume slot is empty and move on
+                if attempts == 0 then
+                    slotHandled = true  -- Slot likely empty
+                    emptySlotStreak = emptySlotStreak + 1
+                else
+                    -- Storage might be full, try next
+                    storageIndex = (storageIndex % #storagePeripherals) + 1
+                end
+                attempts = attempts + 1
+            else
+                attempts = attempts + 1
+            end
+        end
+        
+        -- Early exit: if 4+ consecutive empty slots at end, likely done
+        if emptySlotStreak >= 4 and slot >= 12 then
+            break
+        end
+        
+        -- Rotate storage occasionally for even distribution
+        if slot % 4 == 0 then
+            storageIndex = (storageIndex % #storagePeripherals) + 1
+        end
+    end
+    
     -- Batch update affected storage inventories
+    -- Use skipRebuild for all but the last one
+    local invCount = 0
+    for _ in pairs(affectedInventories) do invCount = invCount + 1 end
+    
+    local scanned = 0
     for invName in pairs(affectedInventories) do
-        inventory.scanSingle(invName)
+        scanned = scanned + 1
+        inventory.scanSingle(invName, scanned < invCount)
     end
     
     return deposited
@@ -573,6 +666,7 @@ end
 
 ---Clear specific slots from an inventory into storage (batch update)
 ---Storage inventories pull from the specified slots (works with turtles)
+---Optimized: only tries one storage per slot until successful, then moves to next slot
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param slots table Array of slot numbers to clear
 ---@return number cleared Amount of items cleared
@@ -592,26 +686,55 @@ function inventory.clearSlots(sourceInv, slots)
         end
     end
     
-    -- Have each storage inventory pull from the specified slots
-    -- This works even when source is a turtle (which can't be wrapped from server)
+    -- Pre-wrap all storage peripherals for efficiency
+    local storagePeripherals = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
             local dest = inventory.getPeripheral(name)
             if dest and dest.pullItems then
-                for _, slot in ipairs(slots) do
-                    local pulled = dest.pullItems(sourceInv, slot)
-                    if pulled and pulled > 0 then
-                        cleared = cleared + pulled
-                        affectedInventories[name] = true
-                    end
-                end
+                table.insert(storagePeripherals, {name = name, peripheral = dest})
+            end
+        end
+    end
+    
+    if #storagePeripherals == 0 then
+        return 0
+    end
+    
+    -- For each specified slot, try storage inventories until the slot is cleared
+    -- More aggressive since these slots are known to have items
+    local storageIndex = 1
+    
+    for _, slot in ipairs(slots) do
+        local slotCleared = false
+        local attempts = 0
+        local maxAttempts = math.min(5, #storagePeripherals)  -- Try more storages since we know slot has items
+        
+        while not slotCleared and attempts < maxAttempts do
+            local storage = storagePeripherals[storageIndex]
+            local pulled = storage.peripheral.pullItems(sourceInv, slot)
+            
+            if pulled and pulled > 0 then
+                cleared = cleared + pulled
+                affectedInventories[storage.name] = true
+                slotCleared = true
+                -- Keep using same storage if it's working
+            else
+                -- Storage might be full, try next
+                storageIndex = (storageIndex % #storagePeripherals) + 1
+                attempts = attempts + 1
             end
         end
     end
     
     -- Batch update affected storage inventories
+    local invCount = 0
+    for _ in pairs(affectedInventories) do invCount = invCount + 1 end
+    
+    local scanned = 0
     for invName in pairs(affectedInventories) do
-        inventory.scanSingle(invName)
+        scanned = scanned + 1
+        inventory.scanSingle(invName, scanned < invCount)
     end
     
     return cleared
