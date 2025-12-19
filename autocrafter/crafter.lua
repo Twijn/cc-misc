@@ -96,8 +96,19 @@ local function initialize()
     end
     print("")
     
-    -- Cache modem
-    getModem()
+    -- Cache modem and validate network name
+    local modem, modemName, turtleName = getModem()
+    if not turtleName then
+        term.setTextColor(colors.yellow)
+        print("WARNING: Cannot get turtle network name!")
+        print("  This turtle may not be visible on the wired network.")
+        print("  Ensure the modem is connected to a wired network.")
+        print("  Wireless modems do not support item transfers.")
+        term.setTextColor(colors.white)
+        logger.warn("getNameLocal() returned nil - turtle may not be on wired network")
+    else
+        print("Network name: " .. turtleName)
+    end
     
     -- Set label if not set
     if not os.getComputerLabel() then
@@ -145,20 +156,38 @@ end
 ---@param item? string Optional item filter
 ---@return number deposited Amount deposited
 local function requestDeposit(sourceInv, item)
+    logger.debug(string.format("requestDeposit: sourceInv=%s, item=%s", sourceInv, tostring(item)))
+    
     comms.broadcast(config.messageTypes.REQUEST_DEPOSIT, {
         sourceInv = sourceInv,
         item = item,
     })
     
-    -- Wait for response
-    local timeout = os.clock() + 5
-    while os.clock() < timeout do
-        local message = comms.receive(0.5)
-        if message and message.type == config.messageTypes.RESPONSE_DEPOSIT then
-            return message.data.deposited or 0
+    -- Wait for response with longer timeout and retry logic
+    local attempts = 0
+    local maxAttempts = 3
+    local timeout = os.clock() + 8  -- Longer timeout
+    
+    while os.clock() < timeout and attempts < maxAttempts do
+        local message = comms.receive(2)  -- Longer receive timeout
+        if message then
+            if message.type == config.messageTypes.RESPONSE_DEPOSIT then
+                logger.debug(string.format("requestDeposit: received response, deposited=%d", message.data.deposited or 0))
+                return message.data.deposited or 0
+            else
+                -- Got a different message, keep waiting
+                logger.debug(string.format("requestDeposit: received unexpected message type: %s", message.type))
+            end
+        else
+            -- Timeout on this receive, retry
+            attempts = attempts + 1
+            if attempts < maxAttempts then
+                logger.debug(string.format("requestDeposit: no response, retrying (%d/%d)", attempts, maxAttempts))
+            end
         end
     end
     
+    logger.warn("requestDeposit: no response from server after timeout")
     return 0
 end
 
@@ -167,20 +196,36 @@ end
 ---@param slots table Array of slot numbers to clear
 ---@return number cleared Amount of items cleared
 local function requestClearSlots(sourceInv, slots)
+    logger.debug(string.format("requestClearSlots: sourceInv=%s, slots=%s", sourceInv, textutils.serialize(slots)))
+    
     comms.broadcast(config.messageTypes.REQUEST_CLEAR_SLOTS, {
         sourceInv = sourceInv,
         slots = slots,
     })
     
-    -- Wait for response
-    local timeout = os.clock() + 5
-    while os.clock() < timeout do
-        local message = comms.receive(0.5)
-        if message and message.type == config.messageTypes.RESPONSE_CLEAR_SLOTS then
-            return message.data.cleared or 0
+    -- Wait for response with longer timeout and retry logic
+    local attempts = 0
+    local maxAttempts = 3
+    local timeout = os.clock() + 8
+    
+    while os.clock() < timeout and attempts < maxAttempts do
+        local message = comms.receive(2)
+        if message then
+            if message.type == config.messageTypes.RESPONSE_CLEAR_SLOTS then
+                logger.debug(string.format("requestClearSlots: received response, cleared=%d", message.data.cleared or 0))
+                return message.data.cleared or 0
+            else
+                logger.debug(string.format("requestClearSlots: received unexpected message type: %s", message.type))
+            end
+        else
+            attempts = attempts + 1
+            if attempts < maxAttempts then
+                logger.debug(string.format("requestClearSlots: no response, retrying (%d/%d)", attempts, maxAttempts))
+            end
         end
     end
     
+    logger.warn("requestClearSlots: no response from server after timeout")
     return 0
 end
 

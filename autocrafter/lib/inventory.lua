@@ -10,6 +10,7 @@ local VERSION = "2.0.0"
 fs.makeDir("data/cache")
 
 local persist = require("lib.persist")
+local logger = require("lib.log")
 
 local inventory = {}
 
@@ -574,16 +575,22 @@ function inventory.deposit(sourceInv, item)
     local deposited = 0
     local affectedInventories = {}
     
+    logger.debug(string.format("inventory.deposit called: sourceInv=%s, item=%s", sourceInv, tostring(item)))
+    
     -- Get storage inventories only
     local storageInvs = inventory.getStorageInventories()
+    logger.debug(string.format("Found %d storage inventories", #storageInvs))
+    
     if #storageInvs == 0 then
         -- Fall back to all cached inventories if no storage type found
+        logger.warn("No storage inventories found, falling back to all cached inventories")
         local invData = inventoryCache.getAll()  
         for name in pairs(invData) do
             if name ~= sourceInv then
                 table.insert(storageInvs, name)
             end
         end
+        logger.debug(string.format("Fallback found %d inventories", #storageInvs))
     end
     
     -- Pre-wrap all storage peripherals for efficiency
@@ -598,45 +605,52 @@ function inventory.deposit(sourceInv, item)
     end
     
     if #storagePeripherals == 0 then
+        logger.error("No storage peripherals available for deposit!")
         return 0
     end
     
-    -- For each slot in the source, try ONE storage per slot
-    -- If storage is full (pulled=0 but no error), try next storage
-    -- If slot is empty (pulled=0), move to next slot after one attempt
-    -- This minimizes peripheral calls
+    logger.debug(string.format("Using %d storage peripherals for deposit", #storagePeripherals))
+    
+    -- For each slot in the source, try multiple storages to handle both
+    -- empty slots and full storages correctly
     local storageIndex = 1
     local emptySlotStreak = 0  -- Track consecutive empty slots for early exit
     
     for slot = 1, 16 do
-        local slotHandled = false
-        local attempts = 0
-        local maxAttempts = math.min(3, #storagePeripherals)  -- Max 3 storage attempts per slot
+        local slotCleared = false
+        local zeroCount = 0  -- How many storages returned 0 for this slot
+        local maxZeroAttempts = math.min(3, #storagePeripherals)  -- Try up to 3 storages before assuming empty
         
-        while not slotHandled and attempts < maxAttempts do
+        -- Keep trying until slot is cleared or we've tried enough storages
+        while not slotCleared and zeroCount < maxZeroAttempts do
             local storage = storagePeripherals[storageIndex]
-            local pulled = storage.peripheral.pullItems(sourceInv, slot)
+            local success, pulled = pcall(function()
+                return storage.peripheral.pullItems(sourceInv, slot)
+            end)
             
-            if pulled and pulled > 0 then
+            if not success then
+                -- Error during pull (e.g., peripheral disconnected)
+                logger.debug(string.format("Slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
+                zeroCount = zeroCount + 1
+                storageIndex = (storageIndex % #storagePeripherals) + 1
+            elseif pulled and pulled > 0 then
+                logger.debug(string.format("Slot %d: pulled %d items to %s", slot, pulled, storage.name))
                 deposited = deposited + pulled
                 affectedInventories[storage.name] = true
-                slotHandled = true
+                slotCleared = true
                 emptySlotStreak = 0
                 -- Keep using same storage if it's working
-            elseif pulled == 0 then
-                -- Either slot is empty or storage is full
-                -- After first attempt, assume slot is empty and move on
-                if attempts == 0 then
-                    slotHandled = true  -- Slot likely empty
-                    emptySlotStreak = emptySlotStreak + 1
-                else
-                    -- Storage might be full, try next
-                    storageIndex = (storageIndex % #storagePeripherals) + 1
-                end
-                attempts = attempts + 1
             else
-                attempts = attempts + 1
+                -- pulled == 0 or pulled == nil: either slot is empty or storage is full
+                zeroCount = zeroCount + 1
+                -- Rotate to next storage to try
+                storageIndex = (storageIndex % #storagePeripherals) + 1
             end
+        end
+        
+        -- If we tried all storages and got 0 each time, slot is likely empty
+        if not slotCleared then
+            emptySlotStreak = emptySlotStreak + 1
         end
         
         -- Early exit: if 4+ consecutive empty slots at end, likely done
@@ -649,6 +663,8 @@ function inventory.deposit(sourceInv, item)
             storageIndex = (storageIndex % #storagePeripherals) + 1
         end
     end
+    
+    logger.debug(string.format("inventory.deposit complete: deposited %d items", deposited))
     
     -- Batch update affected storage inventories
     -- Use skipRebuild for all but the last one
@@ -674,10 +690,15 @@ function inventory.clearSlots(sourceInv, slots)
     local cleared = 0
     local affectedInventories = {}
     
+    logger.debug(string.format("inventory.clearSlots called: sourceInv=%s, slots=%s", sourceInv, textutils.serialize(slots)))
+    
     -- Get storage inventories only
     local storageInvs = inventory.getStorageInventories()
+    logger.debug(string.format("Found %d storage inventories for clearSlots", #storageInvs))
+    
     if #storageInvs == 0 then
         -- Fall back to all cached inventories if no storage type found
+        logger.warn("No storage inventories found for clearSlots, falling back to all cached inventories")
         local invData = inventoryCache.getAll()
         for name in pairs(invData) do
             if name ~= sourceInv then
@@ -698,8 +719,11 @@ function inventory.clearSlots(sourceInv, slots)
     end
     
     if #storagePeripherals == 0 then
+        logger.error("No storage peripherals available for clearSlots!")
         return 0
     end
+    
+    logger.debug(string.format("Using %d storage peripherals for clearSlots", #storagePeripherals))
     
     -- For each specified slot, try storage inventories until the slot is cleared
     -- More aggressive since these slots are known to have items
@@ -712,20 +736,34 @@ function inventory.clearSlots(sourceInv, slots)
         
         while not slotCleared and attempts < maxAttempts do
             local storage = storagePeripherals[storageIndex]
-            local pulled = storage.peripheral.pullItems(sourceInv, slot)
+            local success, pulled = pcall(function()
+                return storage.peripheral.pullItems(sourceInv, slot)
+            end)
             
-            if pulled and pulled > 0 then
+            if not success then
+                -- Error during pull (e.g., peripheral disconnected)
+                logger.debug(string.format("clearSlots slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
+                storageIndex = (storageIndex % #storagePeripherals) + 1
+                attempts = attempts + 1
+            elseif pulled and pulled > 0 then
+                logger.debug(string.format("clearSlots slot %d: pulled %d items to %s", slot, pulled, storage.name))
                 cleared = cleared + pulled
                 affectedInventories[storage.name] = true
                 slotCleared = true
                 -- Keep using same storage if it's working
             else
-                -- Storage might be full, try next
+                -- Storage might be full or slot is empty, try next
                 storageIndex = (storageIndex % #storagePeripherals) + 1
                 attempts = attempts + 1
             end
         end
+        
+        if not slotCleared then
+            logger.warn(string.format("clearSlots: failed to clear slot %d after %d attempts", slot, attempts))
+        end
     end
+    
+    logger.debug(string.format("inventory.clearSlots complete: cleared %d items", cleared))
     
     -- Batch update affected storage inventories
     local invCount = 0
