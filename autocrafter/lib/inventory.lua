@@ -547,7 +547,51 @@ function inventory.deposit(sourceInv, item)
     return deposited
 end
 
----Get time since last scan
+---Clear specific slots from an inventory into storage (batch update)
+---Storage inventories pull from the specified slots (works with turtles)
+---@param sourceInv string Source inventory name (can be a turtle)
+---@param slots table Array of slot numbers to clear
+---@return number cleared Amount of items cleared
+function inventory.clearSlots(sourceInv, slots)
+    local cleared = 0
+    local affectedInventories = {}
+    
+    -- Get storage inventories only
+    local storageInvs = inventory.getStorageInventories()
+    if #storageInvs == 0 then
+        -- Fall back to all cached inventories if no storage type found
+        local invData = inventoryCache.getAll()
+        for name in pairs(invData) do
+            if name ~= sourceInv then
+                table.insert(storageInvs, name)
+            end
+        end
+    end
+    
+    -- Have each storage inventory pull from the specified slots
+    -- This works even when source is a turtle (which can't be wrapped from server)
+    for _, name in ipairs(storageInvs) do
+        if name ~= sourceInv then
+            local dest = inventory.getPeripheral(name)
+            if dest and dest.pullItems then
+                for _, slot in ipairs(slots) do
+                    local pulled = dest.pullItems(sourceInv, slot)
+                    if pulled and pulled > 0 then
+                        cleared = cleared + pulled
+                        affectedInventories[name] = true
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Batch update affected storage inventories
+    for invName in pairs(affectedInventories) do
+        inventory.scanSingle(invName)
+    end
+    
+    return cleared
+end
 ---@return number seconds Time since last scan in seconds
 function inventory.timeSinceLastScan()
     return os.clock() - lastScanTime

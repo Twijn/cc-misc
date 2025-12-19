@@ -111,6 +111,20 @@ function manager.deposit(sourceInv, item)
     return deposited
 end
 
+---Clear specific slots from an inventory into storage
+---@param sourceInv string Source inventory (e.g., turtle name)
+---@param slots table Array of slot numbers to clear
+---@return number cleared Amount of items cleared
+function manager.clearSlots(sourceInv, slots)
+    local cleared = inventory.clearSlots(sourceInv, slots)
+    
+    if cleared > 0 then
+        logger.info(string.format("Cleared %d items from %d slots in %s", cleared, #slots, sourceInv))
+    end
+    
+    return cleared
+end
+
 ---Withdraw items to a player's inventory via manipulator
 ---@param item string Item ID to withdraw
 ---@param count number Amount to withdraw

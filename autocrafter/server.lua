@@ -261,6 +261,13 @@ local function messageHandler()
                     deposited = deposited,
                 }, sender)
                 
+            elseif msgType == config.messageTypes.REQUEST_CLEAR_SLOTS then
+                -- Crafter wants to clear specific slots
+                local cleared = storageManager.clearSlots(data.sourceInv, data.slots)
+                comms.send(config.messageTypes.RESPONSE_CLEAR_SLOTS, {
+                    cleared = cleared,
+                }, sender)
+                
             elseif msgType == config.messageTypes.SERVER_QUERY then
                 -- Client asking if server exists
                 comms.send(config.messageTypes.SERVER_ANNOUNCE, {

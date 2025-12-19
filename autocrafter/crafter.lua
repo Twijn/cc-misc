@@ -162,6 +162,28 @@ local function requestDeposit(sourceInv, item)
     return 0
 end
 
+---Request server to clear specific slots from turtle inventory
+---@param sourceInv string Our inventory name (modem name)
+---@param slots table Array of slot numbers to clear
+---@return number cleared Amount of items cleared
+local function requestClearSlots(sourceInv, slots)
+    comms.broadcast(config.messageTypes.REQUEST_CLEAR_SLOTS, {
+        sourceInv = sourceInv,
+        slots = slots,
+    })
+    
+    -- Wait for response
+    local timeout = os.clock() + 5
+    while os.clock() < timeout do
+        local message = comms.receive(0.5)
+        if message and message.type == config.messageTypes.RESPONSE_CLEAR_SLOTS then
+            return message.data.cleared or 0
+        end
+    end
+    
+    return 0
+end
+
 ---Clear the turtle inventory to storage (via server request)
 local function clearInventory()
     local _, _, turtleName = getModem()
@@ -298,10 +320,20 @@ local function executeCraft(job)
         if craftSuccess then
             craftsCompleted = craftsCompleted + 1
             
-            -- Move output to storage via server request
-            local _, _, turtleName = getModem()
-            if turtleName then
-                requestDeposit(turtleName, nil)
+            -- Collect slots that have items to clear
+            local slotsToClean = {}
+            for slot = 1, 16 do
+                if turtle.getItemCount(slot) > 0 then
+                    table.insert(slotsToClean, slot)
+                end
+            end
+            
+            -- Request server to pull items from these slots
+            if #slotsToClean > 0 then
+                local _, _, turtleName = getModem()
+                if turtleName then
+                    requestClearSlots(turtleName, slotsToClean)
+                end
             end
         else
             clearInventory()
