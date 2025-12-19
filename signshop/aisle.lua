@@ -49,7 +49,15 @@ end
 
 os.setComputerLabel("aisle-" .. aisleName)
 
-logger.info(string.format("Started SignShop %s v%s", aisleName, VERSION))
+-- Validate modem has a local name (required for wired modem network)
+local localName = modem.getNameLocal()
+if not localName then
+    logger.error("Modem does not have a local name! This aisle requires a wired modem.")
+    logger.error("Make sure the modem is wired and the turtle is connected to the network.")
+    error("Wired modem with local name required")
+end
+
+logger.info(string.format("Started SignShop %s v%s (peripheral: %s)", aisleName, VERSION, localName))
 
 local function empty()
     for slot = 1,16 do
@@ -90,6 +98,7 @@ end
 local function modemLoop()
     modem.open(broadcastChannel)
     modem.open(privateChannel)
+    logger.info(string.format("Listening on channels %d (broadcast) and %d (private)", broadcastChannel, privateChannel))
     while true do
         local e, side, chnl, rChnl, msg, distance = os.pullEvent("modem_message")
 
@@ -101,7 +110,7 @@ local function modemLoop()
                 transmit(rChnl, {
                     type = "pong",
                     aisle = aisleName,
-                    self = modem.getNameLocal(),
+                    self = localName,
                 })
             elseif msg.type == "update" then
                 shell.run("update")

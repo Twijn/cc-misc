@@ -129,6 +129,8 @@ end
 ---@param maxCount number Maximum number of items to dispense
 ---@return table Result object (use errors.isError to check, errors.unwrap to get data)
 function manager.dispense(product, maxCount)
+  logger.info(string.format("Starting dispense: %d x %s to aisle %s", maxCount, product.modid, product.aisleName))
+  
   local aisle, aisleErr = aisleManager.getAisle(product.aisleName)
   if not aisle then
     local errType = errors.types.AISLE_NOT_FOUND
@@ -155,10 +157,29 @@ function manager.dispense(product, maxCount)
     logger.warn(string.format("Aisle %s is degraded, attempting dispense anyway", product.aisleName))
   end
 
+  -- Validate the aisle peripheral exists and is reachable
+  if not aisle.self then
+    local errMsg = string.format("Aisle %s has no peripheral name configured", product.aisleName)
+    logger.error(string.format("[%s] %s", errors.types.AISLE_OFFLINE, errMsg))
+    return errors.create(errors.types.AISLE_OFFLINE, errMsg, { aisleName = product.aisleName })
+  end
+
+  if not peripheral.isPresent(aisle.self) then
+    local errMsg = string.format("Aisle %s peripheral '%s' is not reachable", product.aisleName, aisle.self)
+    logger.error(string.format("[%s] %s", errors.types.AISLE_OFFLINE, errMsg))
+    return errors.create(errors.types.AISLE_OFFLINE, errMsg, { 
+      aisleName = product.aisleName,
+      peripheral = aisle.self 
+    })
+  end
+
   peripheral.call(aisle.self, "turnOn")
 
   local dispensed = 0
-  for _, chest in ipairs(getChests()) do
+  local chests = getChests()
+  logger.info(string.format("Scanning %d chests for %s", #chests, product.modid))
+  
+  for i, chest in ipairs(chests) do
     for slot, item in pairs(chest.list()) do
       if dispensed >= maxCount then break end
       -- Match item: if anyNbt is true, match only by modid; otherwise match both modid and nbt
@@ -169,12 +190,19 @@ function manager.dispense(product, maxCount)
       if matches then
         local remaining = maxCount - dispensed
         local moved = chest.pushItems(aisle.self, slot, remaining)
-        dispensed = dispensed + moved
-        -- Decrement stock for the specific item that was dispensed
-        decrementStock(item.name, item.nbt, moved)
+        if moved and moved > 0 then
+          dispensed = dispensed + moved
+          -- Decrement stock for the specific item that was dispensed
+          decrementStock(item.name, item.nbt, moved)
+        elseif moved == nil then
+          -- Peripheral became unreachable mid-dispense
+          logger.error(string.format("Lost connection to aisle %s during dispense", product.aisleName))
+          break
+        end
         sleep()
       end
     end
+    if dispensed >= maxCount then break end
   end
 
   if dispensed == 0 and maxCount > 0 then
@@ -187,6 +215,7 @@ function manager.dispense(product, maxCount)
     })
   end
 
+  logger.info(string.format("Dispense complete: %d/%d %s", dispensed, maxCount, product.modid))
   return errors.success({ 
     dispensed = dispensed,
     requested = maxCount,
