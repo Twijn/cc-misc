@@ -158,6 +158,41 @@ return function(fileName, useSerialize)
         object = obj
         save()
     end
+    
+    -- Batch mode tracking
+    local batchMode = false
+    local batchDirty = false
+    
+    ---Begin batch mode - multiple set() calls won't save until endBatch()
+    ---This is useful when making multiple changes that should be written atomically
+    persistModule.beginBatch = function()
+        batchMode = true
+        batchDirty = false
+    end
+    
+    ---End batch mode and save if any changes were made
+    ---@return boolean dirty Whether any changes were made during batch
+    persistModule.endBatch = function()
+        batchMode = false
+        if batchDirty then
+            save()
+            batchDirty = false
+            return true
+        end
+        return false
+    end
+    
+    ---Set a key-value pair during batch mode without immediate save
+    ---@param key any The key to set
+    ---@param value any The value to store
+    persistModule.setBatch = function(key, value)
+        object[key] = value
+        if batchMode then
+            batchDirty = true
+        else
+            save()
+        end
+    end
 
     ---Get the value associated with a key
     ---@param key any The key to look up

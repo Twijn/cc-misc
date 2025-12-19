@@ -139,16 +139,26 @@ function manager.completeJob(jobId, actualOutput)
             while #completed > 100 do
                 table.remove(completed)
             end
-            jobHistory.set("completed", completed)
             
             -- Remove from queue
             table.remove(jobs, i)
-            queueData.set("jobs", jobs)
+            
+            -- Use batch mode for multiple file writes
+            queueData.beginBatch()
+            queueData.setBatch("jobs", jobs)
+            queueData.endBatch()
+            
+            jobHistory.beginBatch()
+            jobHistory.setBatch("completed", completed)
+            jobHistory.endBatch()
             
             logger.info(string.format("Job #%d completed: crafted %d items", jobId, job.actualOutput))
             return
         end
     end
+    
+    -- Job not found - log warning
+    logger.warn(string.format("Job #%d not found in queue for completion", jobId))
 end
 
 ---Mark a job as failed
@@ -169,16 +179,26 @@ function manager.failJob(jobId, reason)
             while #failed > 100 do
                 table.remove(failed)
             end
-            jobHistory.set("failed", failed)
             
             -- Remove from queue
             table.remove(jobs, i)
-            queueData.set("jobs", jobs)
+            
+            -- Use batch mode for multiple file writes
+            queueData.beginBatch()
+            queueData.setBatch("jobs", jobs)
+            queueData.endBatch()
+            
+            jobHistory.beginBatch()
+            jobHistory.setBatch("failed", failed)
+            jobHistory.endBatch()
             
             logger.warn(string.format("Job #%d failed: %s", jobId, reason or "Unknown"))
             return
         end
     end
+    
+    -- Job not found - log warning
+    logger.warn(string.format("Job #%d not found in queue for failure marking", jobId))
 end
 
 ---Get all jobs in queue

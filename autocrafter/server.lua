@@ -213,6 +213,10 @@ local function dispatchJobs()
     end
 end
 
+-- Throttle state to prevent excessive processing
+local lastCraftTargetProcess = 0
+local craftTargetProcessInterval = 5  -- Minimum seconds between processCraftTargets calls
+
 --- Handle network messages
 local function messageHandler()
     while running do
@@ -223,14 +227,14 @@ local function messageHandler()
             if result then
                 if result.type == "craft_complete" then
                     queueManager.completeJob(result.jobId, result.actualOutput)
-                    -- Rescan storage since crafting produced output
-                    storageManager.scan()
-                    -- Immediately check for new jobs and dispatch
-                    processCraftTargets()
+                    -- Mark storage as needing a scan (will happen in storageScanLoop)
+                    -- Don't block here with a full scan
+                    storageManager.invalidateCache()
+                    -- Dispatch any pending jobs immediately
                     dispatchJobs()
                 elseif result.type == "craft_failed" then
                     queueManager.failJob(result.jobId, result.reason)
-                    -- Immediately try to dispatch other jobs
+                    -- Try to dispatch other jobs
                     dispatchJobs()
                 elseif result.type == "crafter_idle" then
                     -- Crafter just became idle, try to dispatch pending jobs
@@ -309,7 +313,12 @@ end
 local function craftTargetLoop()
     local craftCheckInterval = settings.get("craftCheckInterval")
     while running do
-        processCraftTargets()
+        -- Only process if enough time has passed (prevents spam from multiple triggers)
+        local now = os.clock()
+        if (now - lastCraftTargetProcess) >= craftTargetProcessInterval then
+            lastCraftTargetProcess = now
+            processCraftTargets()
+        end
         dispatchJobs()
         sleep(craftCheckInterval)
     end
@@ -658,6 +667,82 @@ local commands = {
             end
         end,
         complete = function(args)
+            return {}
+        end
+    },
+    
+    history = {
+        description = "View job history (completed/failed)",
+        execute = function(args, ctx)
+            local historyType = args[1]  -- "completed", "failed", or nil for both
+            local limit = tonumber(args[2]) or 10
+            
+            local history = queueManager.getHistory(historyType)
+            
+            print("")
+            
+            if historyType == "completed" or not historyType then
+                local completed = historyType == "completed" and history or history.completed
+                ctx.mess("=== Completed Jobs ===")
+                if #completed == 0 then
+                    print("  No completed jobs")
+                else
+                    local shown = 0
+                    for _, job in ipairs(completed) do
+                        if shown >= limit then
+                            ctx.mess("... and " .. (#completed - limit) .. " more")
+                            break
+                        end
+                        local output = job.recipe and job.recipe.output or "unknown"
+                        output = output:gsub("minecraft:", "")
+                        term.setTextColor(colors.lime)
+                        write("  #" .. job.id .. " ")
+                        term.setTextColor(colors.white)
+                        print(string.format("%dx %s", job.actualOutput or 0, output))
+                        shown = shown + 1
+                    end
+                end
+                print("")
+            end
+            
+            if historyType == "failed" or not historyType then
+                local failed = historyType == "failed" and history or history.failed
+                ctx.mess("=== Failed Jobs ===")
+                if #failed == 0 then
+                    print("  No failed jobs")
+                else
+                    local shown = 0
+                    for _, job in ipairs(failed) do
+                        if shown >= limit then
+                            ctx.mess("... and " .. (#failed - limit) .. " more")
+                            break
+                        end
+                        local output = job.recipe and job.recipe.output or "unknown"
+                        output = output:gsub("minecraft:", "")
+                        term.setTextColor(colors.red)
+                        write("  #" .. job.id .. " ")
+                        term.setTextColor(colors.white)
+                        write(output .. " - ")
+                        term.setTextColor(colors.orange)
+                        print(job.failReason or "Unknown")
+                        shown = shown + 1
+                    end
+                end
+            end
+            term.setTextColor(colors.white)
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"completed", "failed"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            end
             return {}
         end
     },
@@ -1123,6 +1208,8 @@ local function handleTerminate()
     comms.close()
     
     logger.info("Shutdown complete")
+    -- Flush any remaining log entries
+    logger.flush()
 end
 
 --- Main entry point

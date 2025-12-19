@@ -357,6 +357,12 @@ function manager.clearCaches()
     logger.info("Caches cleared and rescanned")
 end
 
+---Invalidate cache to force next scan to happen immediately
+---This is non-blocking and just marks that a scan is needed
+function manager.invalidateCache()
+    lastScanTime = 0  -- Reset scan time so needsScan() returns true
+end
+
 ---Shutdown handler
 function manager.beforeShutdown()
     logger.info("Storage manager shutting down")
