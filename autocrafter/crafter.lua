@@ -24,8 +24,6 @@ local status = "idle"
 local cachedModem = nil
 local cachedModemName = nil
 local cachedTurtleName = nil  -- The turtle's name on the network (from getNameLocal)
-local cachedInventories = nil
-local cachedInventoryPeripherals = {}
 
 -- Crafting slot mapping: 3x3 grid to turtle inventory
 -- Turtle slots: 1-16
@@ -63,48 +61,6 @@ local function getModem()
     return cachedModem, cachedModemName, cachedTurtleName
 end
 
----Get cached inventory peripheral
----@param name string The inventory name
----@return table|nil inv The inventory peripheral
-local function getInventory(name)
-    if cachedInventoryPeripherals[name] then
-        return cachedInventoryPeripherals[name]
-    end
-    
-    local inv = peripheral.wrap(name)
-    if inv then
-        cachedInventoryPeripherals[name] = inv
-    end
-    
-    return inv
-end
-
----Find connected inventories (cached)
----@param forceRefresh? boolean Force rediscovery
----@return table inventories Array of inventory peripheral names
-local function getInventories(forceRefresh)
-    if cachedInventories and not forceRefresh then
-        return cachedInventories
-    end
-    
-    cachedInventories = {}
-    cachedInventoryPeripherals = {}
-    
-    for _, name in ipairs(peripheral.getNames()) do
-        local types = {peripheral.getType(name)}
-        for _, t in ipairs(types) do
-            if t == "inventory" then
-                table.insert(cachedInventories, name)
-                -- Pre-cache the peripheral
-                cachedInventoryPeripherals[name] = peripheral.wrap(name)
-                break
-            end
-        end
-    end
-    
-    return cachedInventories
-end
-
 ---Initialize the crafter
 local function initialize()
     term.clear()
@@ -140,9 +96,8 @@ local function initialize()
     end
     print("")
     
-    -- Cache modem and inventories
+    -- Cache modem
     getModem()
-    getInventories()
     
     -- Set label if not set
     if not os.getComputerLabel() then
