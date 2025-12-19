@@ -203,11 +203,23 @@ function manager.handleMessage(message)
     
     if message.type == config.messageTypes.PONG then
         -- Crafter responding to ping
-        manager.updateStatus(crafterId, data.status or "idle", data.currentJob)
+        local newStatus = data.status or "idle"
+        local wasIdle = crafters[crafterId] and crafters[crafterId].status == "idle"
+        manager.updateStatus(crafterId, newStatus, data.currentJob)
+        -- Signal if crafter just became idle
+        if newStatus == "idle" and not wasIdle then
+            return { type = "crafter_idle", crafterId = crafterId }
+        end
         
     elseif message.type == config.messageTypes.STATUS then
         -- Status update from crafter
-        manager.updateStatus(crafterId, data.status or "idle", data.currentJob)
+        local newStatus = data.status or "idle"
+        local wasIdle = crafters[crafterId] and crafters[crafterId].status == "idle"
+        manager.updateStatus(crafterId, newStatus, data.currentJob)
+        -- Signal if crafter just became idle
+        if newStatus == "idle" and not wasIdle then
+            return { type = "crafter_idle", crafterId = crafterId }
+        end
         
     elseif message.type == config.messageTypes.CRAFT_COMPLETE then
         -- Crafting completed

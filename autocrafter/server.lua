@@ -232,6 +232,9 @@ local function messageHandler()
                     queueManager.failJob(result.jobId, result.reason)
                     -- Immediately try to dispatch other jobs
                     dispatchJobs()
+                elseif result.type == "crafter_idle" then
+                    -- Crafter just became idle, try to dispatch pending jobs
+                    dispatchJobs()
                 end
             end
             
@@ -292,50 +295,53 @@ local function messageHandler()
     end
 end
 
---- Periodic tasks handler
-local function periodicTasks()
-    local lastCraftCheck = 0
-    local lastPing = 0
-    local lastAnnounce = 0
-    local craftCheckInterval = settings.get("craftCheckInterval")
-    local pingInterval = config.pingInterval or 30
-    local monitorRefreshInterval = config.monitorRefreshInterval or 5
-    
+--- Storage scan loop
+local function storageScanLoop()
     while running do
-        local now = os.clock()
-        
-        -- Scan storage if needed (respects scan interval)
         if storageManager.needsScan() then
             storageManager.scan()
         end
-        
-        -- Check craft targets
-        if now - lastCraftCheck >= craftCheckInterval then
-            processCraftTargets()
-            dispatchJobs()
-            lastCraftCheck = now
+        sleep(1)
+    end
+end
+
+--- Craft target processing loop
+local function craftTargetLoop()
+    local craftCheckInterval = settings.get("craftCheckInterval")
+    while running do
+        processCraftTargets()
+        dispatchJobs()
+        sleep(craftCheckInterval)
+    end
+end
+
+--- Crafter ping loop
+local function crafterPingLoop()
+    local pingInterval = config.pingInterval or 30
+    while running do
+        crafterManager.pingAll()
+        sleep(pingInterval)
+    end
+end
+
+--- Server announce loop
+local function serverAnnounceLoop()
+    while running do
+        if comms.isConnected() then
+            comms.broadcast(config.messageTypes.SERVER_ANNOUNCE, {
+                serverId = os.getComputerID(),
+                serverLabel = settings.get("serverLabel"),
+                version = VERSION,
+                online = true,
+            })
         end
-        
-        -- Ping crafters (less frequently than before)
-        if now - lastPing >= pingInterval then
-            crafterManager.pingAll()
-            lastPing = now
-        end
-        
-        -- Announce server presence periodically
-        if now - lastAnnounce >= 60 then
-            if comms.isConnected() then
-                comms.broadcast(config.messageTypes.SERVER_ANNOUNCE, {
-                    serverId = os.getComputerID(),
-                    serverLabel = settings.get("serverLabel"),
-                    version = VERSION,
-                    online = true,
-                })
-            end
-            lastAnnounce = now
-        end
-        
-        -- Update monitor (less frequently)
+        sleep(60)
+    end
+end
+
+--- Monitor refresh loop
+local function monitorRefreshLoop()
+    while running do
         if monitorManager.needsRefresh() then
             local stock = storageManager.getAllStock()
             monitorManager.drawStatus({
@@ -345,8 +351,7 @@ local function periodicTasks()
                 targets = targets.getWithStock(stock),
             })
         end
-        
-        sleep(0.5)
+        sleep(config.monitorRefreshInterval or 5)
     end
 end
 
@@ -1124,11 +1129,15 @@ end
 local function main()
     initialize()
     
-    -- Start the command interface
+    -- Start all parallel loops
     parallel.waitForAny(
         handleTerminate,
-        periodicTasks,
         messageHandler,
+        storageScanLoop,
+        craftTargetLoop,
+        crafterPingLoop,
+        serverAnnounceLoop,
+        monitorRefreshLoop,
         chatboxHandler,
         function()
             cmd("AutoCrafter", VERSION, commands)
