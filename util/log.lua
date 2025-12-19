@@ -8,14 +8,15 @@
 ---@usage
 ---local log = require("log")
 ---
+---log.debug("This is a debug message")
 ---log.info("Server started")
 ---log.warn("High memory usage detected")
 ---log.error("Failed to connect to database")
 ---
----@version 1.1.0
+---@version 1.2.0
 -- @module log
 
-local VERSION = "1.1.0"
+local VERSION = "1.2.0"
 
 local module = {}
 
