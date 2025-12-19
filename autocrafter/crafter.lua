@@ -195,6 +195,26 @@ local function isInventoryEmpty()
     return true
 end
 
+---Log detailed inventory state for debugging
+---@return table slotDetails Array of {slot, count, name} for non-empty slots
+local function logInventoryState()
+    local slotDetails = {}
+    for slot = 1, 16 do
+        local count = turtle.getItemCount(slot)
+        if count > 0 then
+            local detail = turtle.getItemDetail(slot)
+            local itemName = detail and detail.name or "unknown"
+            table.insert(slotDetails, {
+                slot = slot,
+                count = count,
+                name = itemName,
+            })
+            logger.debug(string.format("  Slot %d: %dx %s", slot, count, itemName))
+        end
+    end
+    return slotDetails
+end
+
 ---Clear the turtle inventory to storage (via server request)
 ---Ensures inventory is completely empty before returning (required for turtle.craft())
 ---@param maxRetries? number Maximum retry attempts (default 5)
@@ -203,9 +223,12 @@ local function clearInventory(maxRetries)
     maxRetries = maxRetries or 5
     local _, _, turtleName = getModem()
     if not turtleName then 
-        logger.warn("No modem found for clearInventory")
+        logger.error("No modem found for clearInventory - cannot communicate with server")
+        logger.error("Check that modem is attached and wired network is connected")
         return isInventoryEmpty()
     end
+    
+    logger.debug("clearInventory called, turtle name: " .. turtleName)
     
     -- Check if turtle has any items
     if isInventoryEmpty() then 
@@ -213,69 +236,80 @@ local function clearInventory(maxRetries)
         return true 
     end
     
+    -- Log what we're trying to clear
+    logger.info("Attempting to clear inventory:")
+    local initialItems = logInventoryState()
+    
     -- Try to deposit all items with retries
     for attempt = 1, maxRetries do
+        logger.debug(string.format("Clear attempt %d/%d", attempt, maxRetries))
+        
         -- Request server to deposit all items from the turtle
         local deposited = requestDeposit(turtleName, nil)
+        logger.debug(string.format("requestDeposit returned: %d items deposited", deposited))
         
         -- Small delay to allow items to transfer
         sleep(0.1)
         
         -- Verify inventory is actually empty
         if isInventoryEmpty() then
+            logger.info("Inventory successfully cleared")
             turtle.select(1)
             return true
         end
         
-        -- Still have items - try clearing specific slots
+        -- Still have items - log what remains
+        logger.warn(string.format("Inventory not empty after deposit (attempt %d/%d)", attempt, maxRetries))
+        local remainingItems = logInventoryState()
+        
+        -- Try clearing specific slots
         local slotsWithItems = {}
-        for slot = 1, 16 do
-            if turtle.getItemCount(slot) > 0 then
-                table.insert(slotsWithItems, slot)
-            end
+        for _, item in ipairs(remainingItems) do
+            table.insert(slotsWithItems, item.slot)
         end
         
         if #slotsWithItems > 0 then
-            logger.info(string.format("Inventory not empty after deposit, clearing %d slots (attempt %d/%d)", 
-                #slotsWithItems, attempt, maxRetries))
-            requestClearSlots(turtleName, slotsWithItems)
+            logger.debug(string.format("Requesting server to clear slots: %s", textutils.serialize(slotsWithItems)))
+            local cleared = requestClearSlots(turtleName, slotsWithItems)
+            logger.debug(string.format("requestClearSlots returned: %d items cleared", cleared))
             sleep(0.1)
         end
         
         -- Check again
         if isInventoryEmpty() then
+            logger.info("Inventory successfully cleared after slot-specific request")
             turtle.select(1)
             return true
         end
         
         -- Still have items, wait and retry
         if attempt < maxRetries then
+            logger.debug("Items still remain, waiting before retry...")
             sleep(0.2)
         end
     end
     
-    -- Last resort: try to drop items that couldn't be deposited
-    if not isInventoryEmpty() then
-        logger.warn("Could not deposit all items to storage, attempting to drop")
-        for slot = 1, 16 do
-            if turtle.getItemCount(slot) > 0 then
-                turtle.select(slot)
-                -- Try dropping in all directions
-                if not turtle.drop() then
-                    if not turtle.dropUp() then
-                        turtle.dropDown()
-                    end
-                end
-            end
-        end
+    -- Failed to clear inventory - log detailed diagnostic info
+    logger.error("=== INVENTORY CLEAR FAILED - DIAGNOSTIC INFO ===")
+    logger.error(string.format("Turtle name on network: %s", turtleName))
+    logger.error(string.format("Attempted %d times to clear inventory", maxRetries))
+    logger.error("Remaining items in inventory:")
+    local finalItems = logInventoryState()
+    
+    for _, item in ipairs(finalItems) do
+        logger.error(string.format("  STUCK: Slot %d has %dx %s", item.slot, item.count, item.name))
     end
     
+    logger.error("Possible causes:")
+    logger.error("  1. Server not responding to deposit/clear requests")
+    logger.error("  2. Storage system is full")
+    logger.error("  3. No valid storage destination for these items")
+    logger.error("  4. Network communication issues")
+    logger.error("  5. Server doesn't have peripheral access to this turtle")
+    logger.error("=================================================")
+    
     turtle.select(1)
-    local empty = isInventoryEmpty()
-    if not empty then
-        logger.error("Failed to clear inventory - crafting may fail")
-    end
-    return empty
+    return false
 end
 
 ---Calculate how many items are needed per slot in the crafting grid
