@@ -30,6 +30,26 @@ function manager.init()
     queueData.setDefault("nextId", 1)
     jobHistory.setDefault("completed", {})
     jobHistory.setDefault("failed", {})
+    
+    -- Clean up any jobs with missing recipe data (can happen after server restart)
+    local jobs = queueData.get("jobs") or {}
+    local validJobs = {}
+    local removedCount = 0
+    
+    for _, job in ipairs(jobs) do
+        if job.recipe and job.recipe.output and job.recipe.ingredients then
+            table.insert(validJobs, job)
+        else
+            logger.warn(string.format("Removing invalid job #%d (missing recipe data)", job.id or 0))
+            removedCount = removedCount + 1
+        end
+    end
+    
+    if removedCount > 0 then
+        queueData.set("jobs", validJobs)
+        logger.info(string.format("Cleaned up %d invalid jobs from queue", removedCount))
+    end
+    
     logger.info("Queue manager initialized")
 end
 
@@ -54,6 +74,12 @@ function manager.addJob(output, quantity, stockLevels)
         return nil, "Missing materials:" .. missingStr
     end
     
+    -- Validate job has recipe data before saving
+    if not job.recipe or not job.recipe.output or not job.recipe.ingredients then
+        logger.error("Job created with invalid recipe data for " .. output)
+        return nil, "Internal error: invalid job recipe"
+    end
+    
     -- Assign sequential ID
     local nextId = queueData.get("nextId") or 1
     job.id = nextId
@@ -76,7 +102,12 @@ function manager.getNextJob()
     
     for _, job in ipairs(jobs) do
         if job.status == STATES.PENDING then
-            return job
+            -- Validate job has required recipe data before returning
+            if job.recipe and job.recipe.output and job.recipe.ingredients then
+                return job
+            else
+                logger.warn(string.format("Skipping job #%d with invalid recipe data", job.id or 0))
+            end
         end
     end
     
