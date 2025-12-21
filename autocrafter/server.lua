@@ -1528,6 +1528,9 @@ local commands = {
     },
 }
 
+-- Register log level commands (loglevel, log-level, ll aliases)
+logger.registerCommands(commands)
+
 --- Send a message to a player via chatbox
 ---@param user string The username to send to
 ---@param message string The message to send
