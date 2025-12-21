@@ -1,9 +1,9 @@
 --- AutoCrafter Server
 --- Main server component for automated crafting and storage management.
 ---
----@version 1.1.0
+---@version 1.1.1
 
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""
@@ -177,23 +177,36 @@ local function processCraftTargets()
     local stock = storageManager.getAllStock()
     local needed = targets.getNeeded(stock)
     
-    -- Get count of idle crafters available
+    -- Get count of idle crafters and pending jobs
     local crafterStats = crafterManager.getStats()
-    local availableCrafters = crafterStats.idle or 0
+    local idleCrafters = crafterStats.idle or 0
     
-    if availableCrafters == 0 then
-        return -- No idle crafters, don't create jobs yet
+    -- Count all pending jobs (not yet assigned to a crafter)
+    local allJobs = queueManager.getJobs()
+    local pendingJobCount = 0
+    for _, job in ipairs(allJobs) do
+        if job.status == "pending" then
+            pendingJobCount = pendingJobCount + 1
+        end
+    end
+    
+    -- Available slots = idle crafters minus pending jobs waiting for assignment
+    local availableSlots = idleCrafters - pendingJobCount
+    
+    if availableSlots <= 0 then
+        return -- No capacity for new jobs
     end
     
     for _, target in ipairs(needed) do
-        -- Count existing active jobs for this item (pending, assigned, or crafting)
-        local jobs = queueManager.getJobs()
-        local activeJobCount = 0
+        if availableSlots <= 0 then
+            break -- No more capacity
+        end
+        
+        -- Count queued output for this item to avoid over-queuing
         local totalQueued = 0
-        for _, job in ipairs(jobs) do
+        for _, job in ipairs(allJobs) do
             if job.recipe and job.recipe.output == target.item then
                 if job.status == "pending" or job.status == "assigned" or job.status == "crafting" then
-                    activeJobCount = activeJobCount + 1
                     totalQueued = totalQueued + (job.expectedOutput or 0)
                 end
             end
@@ -206,12 +219,6 @@ local function processCraftTargets()
             goto continue
         end
         
-        -- Calculate how many more jobs we can create (up to available crafters)
-        local maxNewJobs = availableCrafters - activeJobCount
-        if maxNewJobs <= 0 then
-            goto continue
-        end
-        
         -- Get recipe to determine output count per craft
         local recipe = require("lib.recipes").getRecipeFor(target.item)
         if not recipe then
@@ -221,9 +228,8 @@ local function processCraftTargets()
         local outputPerCraft = recipe.outputCount or 1
         local maxBatch = settings.get("maxBatchSize")
         
-        -- Create multiple jobs to distribute work across crafters
-        local jobsCreated = 0
-        while remainingNeeded > 0 and jobsCreated < maxNewJobs do
+        -- Create jobs to distribute work across available crafters
+        while remainingNeeded > 0 and availableSlots > 0 do
             -- Calculate batch size for this job
             local toCraft = math.min(remainingNeeded, maxBatch)
             
@@ -237,7 +243,7 @@ local function processCraftTargets()
             end
             
             remainingNeeded = remainingNeeded - toCraft
-            jobsCreated = jobsCreated + 1
+            availableSlots = availableSlots - 1
             
             -- Update stock to reflect materials reserved for this job
             -- This prevents creating jobs that can't be fulfilled
