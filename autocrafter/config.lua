@@ -3,8 +3,9 @@
 
 return {
     -- Cache storage path (for inventories.json, item-details.json, stock.json)
-    -- Set to nil to use local cache/ directory, or specify a path like "disk/data/cache"
-    cachePath = "disk/data/cache",
+    -- Must be an absolute path (starting with /) to bypass persist.lua's data/ prefix
+    -- Set to nil to use default "/disk/data/cache"
+    cachePath = "/disk/data/cache",
     
     -- Network channel for crafter communication
     modemChannel = 4200,

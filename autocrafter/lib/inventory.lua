@@ -13,8 +13,9 @@ local config = require("config")
 
 local inventory = {}
 
--- Determine cache path from config (default to disk/data/cache)
-local cachePath = config.cachePath or "disk/data/cache"
+-- Determine cache path from config (default to /disk/data/cache)
+-- Use absolute path (starts with /) so persist.lua doesn't prepend data/
+local cachePath = config.cachePath or "/disk/data/cache"
 
 -- Ensure cache directory exists
 fs.makeDir(cachePath)

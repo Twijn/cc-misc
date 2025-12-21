@@ -13,20 +13,23 @@
 ---config.set("name", "MyServer")
 ---print(config.get("port")) -- 8080
 ---
----@version 1.1.0
+---@version 1.1.1
 -- @module persist
 
-local VERSION = "1.1.0"
+local VERSION = "1.1.1"
 
 local dataDir = "data/"
 fs.makeDir(dataDir)
 
 ---Create a new persistence module for a specific file
----@param fileName string The name of the file to persist data to (stored in data/ directory)
+---@param fileName string The name of the file to persist data to (stored in data/ directory, or absolute path if starts with /)
 ---@param useSerialize? boolean Whether to use Lua serialization (true) or JSON (false/nil)
 ---@return PersistModule # Persistence module instance
 return function(fileName, useSerialize)
-    fileName = dataDir .. fileName
+    -- Support absolute paths (starting with /) - don't prepend data/ for those
+    if not fileName:match("^/") then
+        fileName = dataDir .. fileName
+    end
 
     ---@class PersistModule
     ---@field setDefault fun(key: any, defaultValue: any): nil Set a default value if key doesn't exist
