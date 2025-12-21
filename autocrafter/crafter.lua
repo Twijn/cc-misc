@@ -666,43 +666,57 @@ local function messageHandler()
                 -- Received craft request
                 if status == "idle" and message.data.job then
                     currentJob = message.data.job
-                    status = "crafting"
                     
-                    term.setTextColor(colors.lime)
-                    print("Received job #" .. currentJob.id)
-                    term.setTextColor(colors.white)
-                    print("  Crafting: " .. (currentJob.recipe.output or "unknown"))
-                    print("  Quantity: " .. (currentJob.expectedOutput or 0))
-                    
-                    -- Execute the craft
-                    local success, result = executeCraft(currentJob)
-                    
-                    if success then
-                        term.setTextColor(colors.lime)
-                        print("  Completed! Output: " .. result)
-                        term.setTextColor(colors.white)
-                        
-                        comms.broadcast(config.messageTypes.CRAFT_COMPLETE, {
-                            jobId = currentJob.id,
-                            actualOutput = result,
-                        })
-                    else
+                    -- Validate job has required fields
+                    if not currentJob.recipe then
                         term.setTextColor(colors.red)
-                        print("  Failed: " .. tostring(result))
+                        print("ERROR: Received job #" .. (currentJob.id or "?") .. " with no recipe!")
                         term.setTextColor(colors.white)
                         
                         comms.broadcast(config.messageTypes.CRAFT_FAILED, {
                             jobId = currentJob.id,
-                            reason = tostring(result),
+                            reason = "Job missing recipe data",
                         })
+                        currentJob = nil
+                    else
+                        status = "crafting"
+                        
+                        term.setTextColor(colors.lime)
+                        print("Received job #" .. currentJob.id)
+                        term.setTextColor(colors.white)
+                        print("  Crafting: " .. (currentJob.recipe.output or "unknown"))
+                        print("  Quantity: " .. (currentJob.expectedOutput or 0))
+                        
+                        -- Execute the craft
+                        local success, result = executeCraft(currentJob)
+                        
+                        if success then
+                            term.setTextColor(colors.lime)
+                            print("  Completed! Output: " .. result)
+                            term.setTextColor(colors.white)
+                            
+                            comms.broadcast(config.messageTypes.CRAFT_COMPLETE, {
+                                jobId = currentJob.id,
+                                actualOutput = result,
+                            })
+                        else
+                            term.setTextColor(colors.red)
+                            print("  Failed: " .. tostring(result))
+                            term.setTextColor(colors.white)
+                            
+                            comms.broadcast(config.messageTypes.CRAFT_FAILED, {
+                                jobId = currentJob.id,
+                                reason = tostring(result),
+                            })
+                        end
+                        
+                        currentJob = nil
+                        status = "idle"
+                        -- Immediately notify server we're idle and ready for next job
+                        sendStatus()
+                        lastStatusUpdate = os.clock()
+                        print("")
                     end
-                    
-                    currentJob = nil
-                    status = "idle"
-                    -- Immediately notify server we're idle and ready for next job
-                    sendStatus()
-                    lastStatusUpdate = os.clock()
-                    print("")
                 end
             end
         end
