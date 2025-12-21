@@ -19,6 +19,8 @@ local config = require("config")
 local running = true
 local currentJob = nil
 local status = "idle"
+local lastStatusUpdate = 0
+local STATUS_UPDATE_INTERVAL = 30  -- Send status updates every 30 seconds
 
 -- Cached peripherals (avoid repeated peripheral calls)
 local cachedModem = nil
@@ -699,13 +701,18 @@ local function messageHandler()
                     status = "idle"
                     -- Immediately notify server we're idle and ready for next job
                     sendStatus()
+                    lastStatusUpdate = os.clock()
                     print("")
                 end
             end
         end
         
-        -- Periodic status update
-        sendStatus()
+        -- Periodic status update (throttled to avoid network spam)
+        local now = os.clock()
+        if now - lastStatusUpdate >= STATUS_UPDATE_INTERVAL then
+            sendStatus()
+            lastStatusUpdate = now
+        end
     end
 end
 
