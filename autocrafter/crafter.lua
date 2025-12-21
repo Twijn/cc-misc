@@ -132,22 +132,38 @@ end
 ---@param destSlot? number Optional destination slot
 ---@return number withdrawn Amount actually received
 local function requestWithdraw(item, count, destInv, destSlot)
-    comms.broadcast(config.messageTypes.REQUEST_WITHDRAW, {
-        item = item,
-        count = count,
-        destInv = destInv,
-        destSlot = destSlot,
-    })
+    local attempts = 0
+    local maxAttempts = 5
     
-    -- Wait for response
-    local timeout = os.clock() + 5
-    while os.clock() < timeout do
-        local message = comms.receive(0.5)
-        if message and message.type == config.messageTypes.RESPONSE_WITHDRAW then
-            return message.data.withdrawn or 0
+    while attempts < maxAttempts do
+        -- Send request each attempt
+        comms.broadcast(config.messageTypes.REQUEST_WITHDRAW, {
+            item = item,
+            count = count,
+            destInv = destInv,
+            destSlot = destSlot,
+        })
+        
+        -- Wait for response - use shorter timeout per attempt
+        local attemptTimeout = os.clock() + 2
+        while os.clock() < attemptTimeout do
+            local message = comms.receive(0.5)
+            if message then
+                if message.type == config.messageTypes.RESPONSE_WITHDRAW then
+                    return message.data.withdrawn or 0
+                end
+                -- Got a different message, keep waiting
+            end
+        end
+        
+        -- Timeout on this attempt, retry with new request
+        attempts = attempts + 1
+        if attempts < maxAttempts then
+            logger.debug(string.format("requestWithdraw: no response, retrying (%d/%d)", attempts, maxAttempts))
         end
     end
     
+    logger.warn("requestWithdraw: no response from server after timeout")
     return 0
 end
 
@@ -158,32 +174,35 @@ end
 local function requestDeposit(sourceInv, item)
     logger.debug(string.format("requestDeposit: sourceInv=%s, item=%s", sourceInv, tostring(item)))
     
-    comms.broadcast(config.messageTypes.REQUEST_DEPOSIT, {
-        sourceInv = sourceInv,
-        item = item,
-    })
-    
-    -- Wait for response with longer timeout and retry logic
     local attempts = 0
     local maxAttempts = 5
-    local timeout = os.clock() + 15  -- Longer overall timeout
     
-    while os.clock() < timeout and attempts < maxAttempts do
-        local message = comms.receive(3)  -- 3 second receive timeout
-        if message then
-            if message.type == config.messageTypes.RESPONSE_DEPOSIT then
-                logger.debug(string.format("requestDeposit: received response, deposited=%d", message.data.deposited or 0))
-                return message.data.deposited or 0
-            else
-                -- Got a different message, keep waiting but don't count as attempt
-                logger.debug(string.format("requestDeposit: received unexpected message type: %s", message.type))
+    while attempts < maxAttempts do
+        -- Send request each attempt
+        comms.broadcast(config.messageTypes.REQUEST_DEPOSIT, {
+            sourceInv = sourceInv,
+            item = item,
+        })
+        
+        -- Wait for response - use shorter timeout per attempt
+        local attemptTimeout = os.clock() + 3
+        while os.clock() < attemptTimeout do
+            local message = comms.receive(1)
+            if message then
+                if message.type == config.messageTypes.RESPONSE_DEPOSIT then
+                    logger.debug(string.format("requestDeposit: received response, deposited=%d", message.data.deposited or 0))
+                    return message.data.deposited or 0
+                else
+                    -- Got a different message, keep waiting
+                    logger.debug(string.format("requestDeposit: received unexpected message type: %s", message.type))
+                end
             end
-        else
-            -- Timeout on this receive, retry
-            attempts = attempts + 1
-            if attempts < maxAttempts then
-                logger.debug(string.format("requestDeposit: no response, retrying (%d/%d)", attempts, maxAttempts))
-            end
+        end
+        
+        -- Timeout on this attempt, retry with new request
+        attempts = attempts + 1
+        if attempts < maxAttempts then
+            logger.debug(string.format("requestDeposit: no response, retrying (%d/%d)", attempts, maxAttempts))
         end
     end
     
@@ -198,30 +217,34 @@ end
 local function requestClearSlots(sourceInv, slots)
     logger.debug(string.format("requestClearSlots: sourceInv=%s, slots=%s", sourceInv, textutils.serialize(slots)))
     
-    comms.broadcast(config.messageTypes.REQUEST_CLEAR_SLOTS, {
-        sourceInv = sourceInv,
-        slots = slots,
-    })
-    
-    -- Wait for response with longer timeout and retry logic
     local attempts = 0
     local maxAttempts = 3
-    local timeout = os.clock() + 8
     
-    while os.clock() < timeout and attempts < maxAttempts do
-        local message = comms.receive(2)
-        if message then
-            if message.type == config.messageTypes.RESPONSE_CLEAR_SLOTS then
-                logger.debug(string.format("requestClearSlots: received response, cleared=%d", message.data.cleared or 0))
-                return message.data.cleared or 0
-            else
-                logger.debug(string.format("requestClearSlots: received unexpected message type: %s", message.type))
+    while attempts < maxAttempts do
+        -- Send request each attempt
+        comms.broadcast(config.messageTypes.REQUEST_CLEAR_SLOTS, {
+            sourceInv = sourceInv,
+            slots = slots,
+        })
+        
+        -- Wait for response - use shorter timeout per attempt
+        local attemptTimeout = os.clock() + 2
+        while os.clock() < attemptTimeout do
+            local message = comms.receive(0.5)
+            if message then
+                if message.type == config.messageTypes.RESPONSE_CLEAR_SLOTS then
+                    logger.debug(string.format("requestClearSlots: received response, cleared=%d", message.data.cleared or 0))
+                    return message.data.cleared or 0
+                else
+                    logger.debug(string.format("requestClearSlots: received unexpected message type: %s", message.type))
+                end
             end
-        else
-            attempts = attempts + 1
-            if attempts < maxAttempts then
-                logger.debug(string.format("requestClearSlots: no response, retrying (%d/%d)", attempts, maxAttempts))
-            end
+        end
+        
+        -- Timeout on this attempt, retry with new request
+        attempts = attempts + 1
+        if attempts < maxAttempts then
+            logger.debug(string.format("requestClearSlots: no response, retrying (%d/%d)", attempts, maxAttempts))
         end
     end
     
