@@ -190,6 +190,40 @@ local function updateCacheAfterAddition(invName, slot, itemName, count, nbt)
     end
 end
 
+---Get the maximum stack size for an item
+---Uses cached item details when available, defaults to 64
+---@param itemName string The item name (e.g., "minecraft:stone")
+---@param nbt? string Optional NBT hash
+---@return number maxStackSize The maximum stack size for this item
+local function getMaxStackSize(itemName, nbt)
+    local cacheKey = nbt and (itemName .. ":" .. nbt) or itemName
+    
+    -- Check detail cache for maxCount
+    local cached = itemDetailCache.get(cacheKey)
+    if cached and cached.maxCount then
+        return cached.maxCount
+    end
+    
+    -- Default stack sizes for common items
+    -- Most items stack to 64, but some have lower limits
+    local knownStackSizes = {
+        ["minecraft:ender_pearl"] = 16,
+        ["minecraft:snowball"] = 16,
+        ["minecraft:egg"] = 16,
+        ["minecraft:bucket"] = 16,
+        ["minecraft:sign"] = 16,
+        ["minecraft:honey_bottle"] = 16,
+        ["minecraft:banner"] = 16,
+    }
+    
+    if knownStackSizes[itemName] then
+        return knownStackSizes[itemName]
+    end
+    
+    -- Default to 64 for most items
+    return 64
+end
+
 ---Get an empty slot from a storage inventory (from cache)
 ---@param invName string The inventory name
 ---@return number|nil slot An empty slot number or nil if full
@@ -216,6 +250,70 @@ local function getEmptySlot(invName)
     end
     
     return nil
+end
+
+---Find slots with partial stacks of a specific item that can accept more items
+---@param itemName string The item name (e.g., "minecraft:stone")
+---@param nbt? string Optional NBT hash
+---@param storageInvs? table Optional list of storage inventory names to search
+---@return table partialSlots Array of {inventory, slot, count, space} sorted by space ascending (smallest gaps first)
+local function findPartialStacks(itemName, nbt, storageInvs)
+    local itemKey = nbt and (itemName .. ":" .. nbt) or itemName
+    local maxStackSize = getMaxStackSize(itemName, nbt)
+    local partialSlots = {}
+    
+    -- Get item locations from cache
+    local locations = itemLocations[itemKey] or {}
+    
+    -- If no locations in runtime cache, check persistent cache
+    if #locations == 0 then
+        local invData = inventoryCache.getAll()
+        for name, data in pairs(invData) do
+            if data.slots then
+                for slot, slotItem in pairs(data.slots) do
+                    local key = getItemKey(slotItem)
+                    if key == itemKey then
+                        local slotNum = tonumber(slot) or slot
+                        table.insert(locations, {
+                            inventory = name,
+                            slot = slotNum,
+                            count = slotItem.count,
+                        })
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Filter to storage inventories and find partial stacks
+    local storageSet = {}
+    if storageInvs then
+        for _, name in ipairs(storageInvs) do
+            storageSet[name] = true
+        end
+    end
+    
+    for _, loc in ipairs(locations) do
+        -- Only include if it's a storage inventory (or if no filter provided)
+        if not storageInvs or storageSet[loc.inventory] then
+            local space = maxStackSize - loc.count
+            if space > 0 then
+                table.insert(partialSlots, {
+                    inventory = loc.inventory,
+                    slot = loc.slot,
+                    count = loc.count,
+                    space = space,
+                })
+            end
+        end
+    end
+    
+    -- Sort by space ascending - fill smallest gaps first for better compaction
+    table.sort(partialSlots, function(a, b)
+        return a.space < b.space
+    end)
+    
+    return partialSlots
 end
 
 ---Get the cached modem peripheral (finds once, caches forever)
@@ -792,7 +890,8 @@ end
 
 ---Deposit items from an inventory into storage (batch update)
 ---Storage inventories pull from the source (works with turtles)
----Uses internal cache to find empty slots and updates cache after transfers
+---Prioritizes filling existing partial stacks before using empty slots
+---Uses internal cache to find partial stacks and empty slots, updates cache after transfers
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param item? string Optional item filter (not used when pulling from turtle)
 ---@return number deposited Amount deposited
@@ -819,17 +918,17 @@ function inventory.deposit(sourceInv, item)
     
     -- Pre-wrap all storage peripherals for efficiency
     local storagePeripherals = {}
+    local storageByName = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
             local dest = inventory.getPeripheral(name)
             if dest and dest.pullItems then
-                -- Get or build empty slot cache for this inventory
-                local emptySlot = getEmptySlot(name)
-                table.insert(storagePeripherals, {
+                local entry = {
                     name = name, 
                     peripheral = dest,
-                    hasSpace = emptySlot ~= nil
-                })
+                }
+                table.insert(storagePeripherals, entry)
+                storageByName[name] = entry
             end
         end
     end
@@ -839,52 +938,142 @@ function inventory.deposit(sourceInv, item)
         return 0
     end
     
-    -- Sort so inventories with space come first
-    table.sort(storagePeripherals, function(a, b)
-        if a.hasSpace ~= b.hasSpace then
-            return a.hasSpace
-        end
-        return false
-    end)
-    
     logger.debug(string.format("Using %d storage peripherals for deposit", #storagePeripherals))
     
-    -- For each slot in the source (turtle has 16 slots), try to deposit
+    -- First, get list of source slots from source inventory (turtle or other inventory)
+    -- For turtles, we just iterate 1-16
+    local sourceSlots = {}
+    local sourcePeripheral = inventory.getPeripheral(sourceInv)
+    
+    if sourcePeripheral and sourcePeripheral.list then
+        -- It's an inventory we can query
+        local sourceList = sourcePeripheral.list()
+        if sourceList then
+            for slot, slotItem in pairs(sourceList) do
+                local slotNum = tonumber(slot) or slot
+                sourceSlots[slotNum] = slotItem
+            end
+        end
+    else
+        -- Assume turtle slots 1-16, we'll discover contents by trying to pull
+        for slot = 1, 16 do
+            sourceSlots[slot] = true  -- Mark as needing check
+        end
+    end
+    
+    -- Track which inventories we've modified (for scanning later)
+    local modifiedInventories = {}
+    
+    -- Phase 1: Try to fill partial stacks first for each item type
+    -- This saves storage space by consolidating items
+    for slot, slotInfo in pairs(sourceSlots) do
+        if slotInfo and type(slotInfo) == "table" and slotInfo.name then
+            local itemName = slotInfo.name
+            local itemNbt = slotInfo.nbt
+            local remaining = slotInfo.count
+            
+            -- Find partial stacks of this item in storage
+            local partialStacks = findPartialStacks(itemName, itemNbt, storageInvs)
+            
+            for _, partial in ipairs(partialStacks) do
+                if remaining <= 0 then break end
+                
+                local storage = storageByName[partial.inventory]
+                if storage then
+                    -- Pull up to the available space in this stack
+                    local toPull = math.min(remaining, partial.space)
+                    local success, pulled = pcall(function()
+                        return storage.peripheral.pullItems(sourceInv, slot, toPull, partial.slot)
+                    end)
+                    
+                    if success and pulled and pulled > 0 then
+                        logger.debug(string.format("Stack-fill: pulled %d %s from slot %d to %s slot %d", 
+                            pulled, itemName, slot, partial.inventory, partial.slot))
+                        deposited = deposited + pulled
+                        remaining = remaining - pulled
+                        modifiedInventories[partial.inventory] = true
+                        
+                        -- Update the slotInfo count for phase 2
+                        slotInfo.count = remaining
+                        
+                        -- Update cache for this partial stack
+                        updateCacheAfterAddition(partial.inventory, partial.slot, itemName, pulled, itemNbt)
+                    end
+                end
+            end
+        end
+    end
+    
+    logger.debug(string.format("Phase 1 (stack-fill) complete: deposited %d items so far", deposited))
+    
+    -- Phase 2: Deposit remaining items to empty slots
+    -- Build sorted list of inventories with empty slots
+    local storageWithSpace = {}
+    for _, storage in ipairs(storagePeripherals) do
+        local emptySlot = getEmptySlot(storage.name)
+        if emptySlot then
+            table.insert(storageWithSpace, storage)
+        end
+    end
+    
     local storageIndex = 1
     local emptySlotStreak = 0
     
     for slot = 1, 16 do
-        local slotCleared = false
-        local attempts = 0
-        local maxAttempts = math.min(3, #storagePeripherals)
-        
-        while not slotCleared and attempts < maxAttempts do
-            local storage = storagePeripherals[storageIndex]
-            local success, pulled = pcall(function()
-                return storage.peripheral.pullItems(sourceInv, slot)
-            end)
+        local slotInfo = sourceSlots[slot]
+        -- Skip if slot is empty or already fully deposited in phase 1
+        if slotInfo and (type(slotInfo) ~= "table" or (slotInfo.count and slotInfo.count > 0)) then
+            local slotCleared = false
+            local attempts = 0
+            local maxAttempts = math.min(3, math.max(1, #storageWithSpace))
             
-            if not success then
-                logger.debug(string.format("Slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
-                attempts = attempts + 1
-                storageIndex = (storageIndex % #storagePeripherals) + 1
-            elseif pulled and pulled > 0 then
-                logger.debug(string.format("Slot %d: pulled %d items to %s", slot, pulled, storage.name))
-                deposited = deposited + pulled
-                slotCleared = true
-                emptySlotStreak = 0
+            while not slotCleared and attempts < maxAttempts and #storageWithSpace > 0 do
+                local storage = storageWithSpace[storageIndex]
+                if not storage then
+                    storageIndex = 1
+                    storage = storageWithSpace[1]
+                end
                 
-                -- We received items into storage - update cache
-                -- Since we don't know the exact slot/item, we need to scan this inventory
-                -- But defer the rebuild until the end
-                inventory.scanSingle(storage.name, true)
-            else
-                attempts = attempts + 1
-                storageIndex = (storageIndex % #storagePeripherals) + 1
+                if storage then
+                    local success, pulled = pcall(function()
+                        return storage.peripheral.pullItems(sourceInv, slot)
+                    end)
+                    
+                    if not success then
+                        logger.debug(string.format("Slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
+                        attempts = attempts + 1
+                        storageIndex = (storageIndex % #storageWithSpace) + 1
+                    elseif pulled and pulled > 0 then
+                        logger.debug(string.format("Slot %d: pulled %d items to %s (empty slot)", slot, pulled, storage.name))
+                        deposited = deposited + pulled
+                        slotCleared = true
+                        emptySlotStreak = 0
+                        modifiedInventories[storage.name] = true
+                    else
+                        -- Slot was empty or storage is full - check if storage has space
+                        local emptySlot = getEmptySlot(storage.name)
+                        if not emptySlot then
+                            -- This storage is full, remove from list
+                            table.remove(storageWithSpace, storageIndex)
+                            if storageIndex > #storageWithSpace then
+                                storageIndex = 1
+                            end
+                        else
+                            -- Slot was already empty
+                            slotCleared = true
+                            emptySlotStreak = emptySlotStreak + 1
+                        end
+                        attempts = attempts + 1
+                    end
+                else
+                    break  -- No storage available
+                end
             end
-        end
-        
-        if not slotCleared then
+            
+            if not slotCleared and #storageWithSpace > 0 then
+                emptySlotStreak = emptySlotStreak + 1
+            end
+        else
             emptySlotStreak = emptySlotStreak + 1
         end
         
@@ -893,15 +1082,18 @@ function inventory.deposit(sourceInv, item)
             break
         end
         
-        if slot % 4 == 0 then
-            storageIndex = (storageIndex % #storagePeripherals) + 1
+        if #storageWithSpace > 0 and slot % 4 == 0 then
+            storageIndex = (storageIndex % #storageWithSpace) + 1
         end
     end
     
-    logger.debug(string.format("inventory.deposit complete: deposited %d items", deposited))
+    logger.debug(string.format("inventory.deposit complete: deposited %d items total", deposited))
     
-    -- Rebuild cache once at the end if we deposited anything
+    -- Scan modified inventories and rebuild cache once at the end
     if deposited > 0 then
+        for invName in pairs(modifiedInventories) do
+            inventory.scanSingle(invName, true)
+        end
         inventory.rebuildFromCache()
     end
     
@@ -910,6 +1102,7 @@ end
 
 ---Clear specific slots from an inventory into storage (batch update)
 ---Storage inventories pull from the specified slots (works with turtles)
+---Prioritizes filling existing partial stacks before using empty slots
 ---Uses deferred scanning and batch cache rebuild for efficiency
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param slots table Array of slot numbers to clear
@@ -936,18 +1129,18 @@ function inventory.clearSlots(sourceInv, slots)
     end
     
     -- Pre-wrap all storage peripherals for efficiency
-    -- Prioritize inventories with empty slots
     local storagePeripherals = {}
+    local storageByName = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
             local dest = inventory.getPeripheral(name)
             if dest and dest.pullItems then
-                local emptySlot = getEmptySlot(name)
-                table.insert(storagePeripherals, {
+                local entry = {
                     name = name, 
                     peripheral = dest,
-                    hasSpace = emptySlot ~= nil
-                })
+                }
+                table.insert(storagePeripherals, entry)
+                storageByName[name] = entry
             end
         end
     end
@@ -957,50 +1150,131 @@ function inventory.clearSlots(sourceInv, slots)
         return 0
     end
     
-    -- Sort so inventories with space come first
-    table.sort(storagePeripherals, function(a, b)
-        if a.hasSpace ~= b.hasSpace then
-            return a.hasSpace
-        end
-        return false
-    end)
-    
     logger.debug(string.format("Using %d storage peripherals for clearSlots", #storagePeripherals))
+    
+    -- Get source inventory contents to know what items are in each slot
+    local sourceSlots = {}
+    local sourcePeripheral = inventory.getPeripheral(sourceInv)
+    
+    if sourcePeripheral and sourcePeripheral.list then
+        local sourceList = sourcePeripheral.list()
+        if sourceList then
+            for slot, slotItem in pairs(sourceList) do
+                local slotNum = tonumber(slot) or slot
+                sourceSlots[slotNum] = slotItem
+            end
+        end
+    end
+    
+    -- Phase 1: Try to fill partial stacks first for each slot
+    for _, slot in ipairs(slots) do
+        local slotInfo = sourceSlots[slot]
+        if slotInfo and slotInfo.name then
+            local itemName = slotInfo.name
+            local itemNbt = slotInfo.nbt
+            local remaining = slotInfo.count
+            
+            -- Find partial stacks of this item in storage
+            local partialStacks = findPartialStacks(itemName, itemNbt, storageInvs)
+            
+            for _, partial in ipairs(partialStacks) do
+                if remaining <= 0 then break end
+                
+                local storage = storageByName[partial.inventory]
+                if storage then
+                    local toPull = math.min(remaining, partial.space)
+                    local success, pulled = pcall(function()
+                        return storage.peripheral.pullItems(sourceInv, slot, toPull, partial.slot)
+                    end)
+                    
+                    if success and pulled and pulled > 0 then
+                        logger.debug(string.format("clearSlots stack-fill: pulled %d %s from slot %d to %s slot %d", 
+                            pulled, itemName, slot, partial.inventory, partial.slot))
+                        cleared = cleared + pulled
+                        remaining = remaining - pulled
+                        affectedInventories[partial.inventory] = true
+                        
+                        -- Update slotInfo for phase 2
+                        slotInfo.count = remaining
+                        
+                        -- Update cache
+                        updateCacheAfterAddition(partial.inventory, partial.slot, itemName, pulled, itemNbt)
+                    end
+                end
+            end
+        end
+    end
+    
+    logger.debug(string.format("clearSlots Phase 1 (stack-fill) complete: cleared %d items so far", cleared))
+    
+    -- Phase 2: Clear remaining items to empty slots
+    -- Build list of inventories with empty slots
+    local storageWithSpace = {}
+    for _, storage in ipairs(storagePeripherals) do
+        local emptySlot = getEmptySlot(storage.name)
+        if emptySlot then
+            table.insert(storageWithSpace, storage)
+        end
+    end
     
     local storageIndex = 1
     
     for _, slot in ipairs(slots) do
-        local slotCleared = false
-        local attempts = 0
-        local maxAttempts = math.min(5, #storagePeripherals)
-        
-        while not slotCleared and attempts < maxAttempts do
-            local storage = storagePeripherals[storageIndex]
-            local success, pulled = pcall(function()
-                return storage.peripheral.pullItems(sourceInv, slot)
-            end)
+        local slotInfo = sourceSlots[slot]
+        -- Skip if slot is empty or already fully cleared in phase 1
+        if not slotInfo or (slotInfo.count and slotInfo.count <= 0) then
+            -- Already cleared
+        else
+            local slotCleared = false
+            local attempts = 0
+            local maxAttempts = math.min(5, math.max(1, #storageWithSpace))
             
-            if not success then
-                logger.debug(string.format("clearSlots slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
-                storageIndex = (storageIndex % #storagePeripherals) + 1
-                attempts = attempts + 1
-            elseif pulled and pulled > 0 then
-                logger.debug(string.format("clearSlots slot %d: pulled %d items to %s", slot, pulled, storage.name))
-                cleared = cleared + pulled
-                affectedInventories[storage.name] = true
-                slotCleared = true
-            else
-                storageIndex = (storageIndex % #storagePeripherals) + 1
-                attempts = attempts + 1
+            while not slotCleared and attempts < maxAttempts and #storageWithSpace > 0 do
+                local storage = storageWithSpace[storageIndex]
+                if not storage then
+                    storageIndex = 1
+                    storage = storageWithSpace[1]
+                end
+                
+                if storage then
+                    local success, pulled = pcall(function()
+                        return storage.peripheral.pullItems(sourceInv, slot)
+                    end)
+                    
+                    if not success then
+                        logger.debug(string.format("clearSlots slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
+                        storageIndex = (storageIndex % #storageWithSpace) + 1
+                        attempts = attempts + 1
+                    elseif pulled and pulled > 0 then
+                        logger.debug(string.format("clearSlots slot %d: pulled %d items to %s (empty slot)", slot, pulled, storage.name))
+                        cleared = cleared + pulled
+                        affectedInventories[storage.name] = true
+                        slotCleared = true
+                    else
+                        -- Check if storage still has space
+                        local emptySlot = getEmptySlot(storage.name)
+                        if not emptySlot then
+                            table.remove(storageWithSpace, storageIndex)
+                            if storageIndex > #storageWithSpace then
+                                storageIndex = 1
+                            end
+                        else
+                            slotCleared = true  -- Slot was already empty
+                        end
+                        attempts = attempts + 1
+                    end
+                else
+                    break
+                end
             end
-        end
-        
-        if not slotCleared then
-            logger.warn(string.format("clearSlots: failed to clear slot %d after %d attempts", slot, attempts))
+            
+            if not slotCleared and #storageWithSpace > 0 then
+                logger.warn(string.format("clearSlots: failed to clear slot %d after %d attempts", slot, attempts))
+            end
         end
     end
     
-    logger.debug(string.format("inventory.clearSlots complete: cleared %d items", cleared))
+    logger.debug(string.format("inventory.clearSlots complete: cleared %d items total", cleared))
     
     -- Scan affected inventories with deferred rebuild
     for invName in pairs(affectedInventories) do
