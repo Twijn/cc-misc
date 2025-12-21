@@ -302,4 +302,38 @@ function manager.getHistory(historyType)
     end
 end
 
+---Reset stale assigned or crafting jobs back to pending
+---@param timeoutMs number Timeout in milliseconds
+---@return number count Number of jobs reset
+function manager.resetStaleJobs(timeoutMs)
+    local jobs = queueData.get("jobs") or {}
+    local now = os.epoch("utc")
+    local resetCount = 0
+    local modified = false
+    
+    for i, job in ipairs(jobs) do
+        if job.status == STATES.ASSIGNED or job.status == STATES.CRAFTING then
+            local assignedAt = job.assignedAt or job.startedAt or 0
+            local age = now - assignedAt
+            
+            if age > timeoutMs then
+                logger.warn(string.format("Resetting stale job #%d (status: %s, age: %.1fs)", 
+                    job.id, job.status, age / 1000))
+                jobs[i].status = STATES.PENDING
+                jobs[i].assignedTo = nil
+                jobs[i].assignedAt = nil
+                jobs[i].startedAt = nil
+                resetCount = resetCount + 1
+                modified = true
+            end
+        end
+    end
+    
+    if modified then
+        queueData.set("jobs", jobs)
+    end
+    
+    return resetCount
+end
+
 return manager

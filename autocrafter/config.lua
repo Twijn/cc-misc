@@ -28,6 +28,9 @@ return {
     -- Crafter timeout (seconds) before marking offline
     crafterTimeout = 60,
     
+    -- Job timeout (seconds) - assigned/crafting jobs older than this are reset
+    jobTimeout = 120,
+
     -- Monitor refresh interval (seconds)
     monitorRefreshInterval = 5,
     

@@ -416,6 +416,21 @@ local function serverAnnounceLoop()
     end
 end
 
+--- Stale job cleanup loop
+local function staleJobCleanupLoop()
+    local jobTimeout = (config.jobTimeout or 120) * 1000  -- Convert to milliseconds
+    local checkInterval = 15  -- Check every 15 seconds
+    
+    while running do
+        local resetCount = queueManager.resetStaleJobs(jobTimeout)
+        if resetCount > 0 then
+            logger.info(string.format("Reset %d stale job(s), dispatching...", resetCount))
+            dispatchJobs()
+        end
+        sleep(checkInterval)
+    end
+end
+
 --- Monitor refresh loop
 local function monitorRefreshLoop()
     while running do
@@ -1741,6 +1756,7 @@ local function main()
         craftTargetLoop,
         crafterPingLoop,
         serverAnnounceLoop,
+        staleJobCleanupLoop,
         monitorRefreshLoop,
         exportProcessLoop,
         chatboxHandler,

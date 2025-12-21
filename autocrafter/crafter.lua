@@ -649,7 +649,7 @@ end
 ---Handle incoming messages
 local function messageHandler()
     while running do
-        local message = comms.receive(5)
+        local message = comms.receive(1)  -- Reduced timeout for faster response
         
         if message then
             if message.type == config.messageTypes.PING then
@@ -697,6 +697,8 @@ local function messageHandler()
                     
                     currentJob = nil
                     status = "idle"
+                    -- Immediately notify server we're idle and ready for next job
+                    sendStatus()
                     print("")
                 end
             end
