@@ -5,11 +5,20 @@
 ---
 ---@version 1.0.0
 
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 
 local recipes = {}
 local recipeCache = {}
 local recipesByOutput = {}
+
+-- Lazy load recipe preferences to avoid circular dependencies
+local recipePrefs = nil
+local function getRecipePrefs()
+    if not recipePrefs then
+        recipePrefs = require("config.recipes")
+    end
+    return recipePrefs
+end
 
 ---Parse a shaped recipe JSON into a usable format
 ---@param data table The parsed JSON recipe data
@@ -194,32 +203,74 @@ end
 
 ---Get all recipes that produce a specific item
 ---@param output string The output item ID (e.g., "minecraft:torch")
+---@param includeDisabled? boolean Whether to include disabled recipes (default: false)
 ---@return table recipes Array of recipes that produce this item
-function recipes.getRecipesFor(output)
-    return recipesByOutput[output] or {}
+function recipes.getRecipesFor(output, includeDisabled)
+    local available = recipesByOutput[output] or {}
+    
+    if includeDisabled then
+        return available
+    end
+    
+    -- Filter out disabled recipes
+    local prefs = getRecipePrefs()
+    local filtered = {}
+    for _, recipe in ipairs(available) do
+        if not prefs.isDisabled(output, recipe.source) then
+            table.insert(filtered, recipe)
+        end
+    end
+    
+    return filtered
 end
 
----Get a single recipe for an item (prefers simplest recipe)
+---Get all recipes sorted by preference
+---@param output string The output item ID
+---@param includeDisabled? boolean Whether to include disabled recipes (default: false)
+---@return table recipes Array of recipes sorted by priority
+function recipes.getRecipesSorted(output, includeDisabled)
+    local available = recipes.getRecipesFor(output, includeDisabled)
+    if #available <= 1 then
+        return available
+    end
+    
+    local prefs = getRecipePrefs()
+    local pref = prefs.get(output)
+    local priority = pref.priority or {}
+    
+    -- Build priority lookup table
+    local priorityIndex = {}
+    for i, source in ipairs(priority) do
+        priorityIndex[source] = i
+    end
+    
+    -- Sort by: 1) priority order if set, 2) fewest ingredients as tiebreaker
+    table.sort(available, function(a, b)
+        local aPriority = priorityIndex[a.source] or 999999
+        local bPriority = priorityIndex[b.source] or 999999
+        
+        if aPriority ~= bPriority then
+            return aPriority < bPriority
+        end
+        
+        -- Tiebreaker: fewest ingredients
+        return #a.ingredients < #b.ingredients
+    end)
+    
+    return available
+end
+
+---Get a single recipe for an item (respects preferences and priorities)
 ---@param output string The output item ID
 ---@return table|nil recipe A recipe for the item or nil
 function recipes.getRecipeFor(output)
-    local available = recipesByOutput[output]
+    local available = recipes.getRecipesSorted(output, false)
     if not available or #available == 0 then
         return nil
     end
     
-    -- Return recipe with fewest unique ingredients
-    local best = available[1]
-    local bestCount = #best.ingredients
-    
-    for i = 2, #available do
-        if #available[i].ingredients < bestCount then
-            best = available[i]
-            bestCount = #best.ingredients
-        end
-    end
-    
-    return best
+    -- Return first recipe (already sorted by preference)
+    return available[1]
 end
 
 ---Check if an item can be crafted

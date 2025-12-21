@@ -948,7 +948,9 @@ local commands = {
                 item = "minecraft:" .. item
             end
             
-            local allRecipes = recipes.getRecipesFor(item)
+            local recipePrefs = require("config.recipes")
+            local allRecipes = recipes.getRecipesSorted(item, true)
+            local activeRecipe = recipes.getRecipeFor(item)
             
             if #allRecipes == 0 then
                 ctx.err("No recipe found for: " .. item)
@@ -959,10 +961,33 @@ local commands = {
             local displayName = item:gsub("minecraft:", "")
             ctx.mess("=== Recipe: " .. displayName .. " ===")
             
+            if #allRecipes > 1 then
+                term.setTextColor(colors.lightGray)
+                print("  (" .. #allRecipes .. " variants available - use 'recipeprefs' to configure)")
+            end
+            
             for i, recipe in ipairs(allRecipes) do
+                local isActive = activeRecipe and activeRecipe.source == recipe.source
+                local isDisabled = recipePrefs.isDisabled(item, recipe.source)
+                
                 if i > 1 then
                     print("")
-                    ctx.mess("--- Alternative Recipe " .. i .. " ---")
+                    local variantLabel = "--- Variant " .. i
+                    if isDisabled then
+                        variantLabel = variantLabel .. " (DISABLED)"
+                    elseif isActive then
+                        variantLabel = variantLabel .. " (ACTIVE)"
+                    end
+                    variantLabel = variantLabel .. " ---"
+                    ctx.mess(variantLabel)
+                else
+                    if isActive then
+                        term.setTextColor(colors.lime)
+                        print("  [ACTIVE - will be used for autocrafting]")
+                    elseif isDisabled then
+                        term.setTextColor(colors.red)
+                        print("  [DISABLED]")
+                    end
                 end
                 
                 -- Show output count
@@ -1532,10 +1557,297 @@ local commands = {
             return {}
         end
     },
+    
+    recipeprefs = {
+        description = "Manage recipe variant preferences",
+        execute = function(args, ctx)
+            local recipePrefs = require("config.recipes")
+            local subCmd = args[1]
+            
+            if not subCmd or subCmd == "help" then
+                print("")
+                ctx.mess("=== Recipe Preferences Commands ===")
+                term.setTextColor(colors.lightGray)
+                print("  recipeprefs list [item]   - List items with preferences or recipes for item")
+                print("  recipeprefs show <item>   - Show all recipe variants for an item")
+                print("  recipeprefs prefer <item> <#> - Set preferred recipe variant")
+                print("  recipeprefs enable <item> <#> - Enable a recipe variant")
+                print("  recipeprefs disable <item> <#> - Disable a recipe variant")
+                print("  recipeprefs clear <item>  - Clear preferences for an item")
+                print("  recipeprefs clearall      - Clear all recipe preferences")
+                term.setTextColor(colors.white)
+                return
+            end
+            
+            if subCmd == "list" then
+                local item = args[2]
+                
+                if item then
+                    -- List recipes for a specific item
+                    if not item:find(":") then
+                        item = "minecraft:" .. item
+                    end
+                    
+                    local allRecipes = recipes.getRecipesFor(item, true)
+                    if #allRecipes == 0 then
+                        ctx.err("No recipes found for: " .. item)
+                        return
+                    end
+                    
+                    print("")
+                    ctx.mess("=== Recipes for " .. item:gsub("minecraft:", "") .. " ===")
+                    
+                    for i, recipe in ipairs(allRecipes) do
+                        local disabled = recipePrefs.isDisabled(item, recipe.source)
+                        local pref = recipePrefs.get(item)
+                        local isPrioritized = false
+                        for _, src in ipairs(pref.priority or {}) do
+                            if src == recipe.source then
+                                isPrioritized = true
+                                break
+                            end
+                        end
+                        
+                        local statusIcon = disabled and "X" or (isPrioritized and "*" or " ")
+                        local statusColor = disabled and colors.red or (isPrioritized and colors.lime or colors.white)
+                        
+                        term.setTextColor(colors.lightGray)
+                        write(string.format("  %d. ", i))
+                        term.setTextColor(statusColor)
+                        write("[" .. statusIcon .. "] ")
+                        term.setTextColor(colors.white)
+                        
+                        -- Show ingredients summary
+                        local ingList = {}
+                        for _, ing in ipairs(recipe.ingredients) do
+                            table.insert(ingList, ing.count .. "x " .. ing.item:gsub("minecraft:", ""))
+                        end
+                        print(recipe.outputCount .. "x from: " .. table.concat(ingList, ", "))
+                        
+                        -- Show source file (shortened)
+                        term.setTextColor(colors.gray)
+                        local shortSource = recipe.source:gsub(".*/recipes/", "")
+                        print("     " .. shortSource)
+                    end
+                    
+                    term.setTextColor(colors.white)
+                    print("")
+                    print("Legend: [*] = prioritized, [X] = disabled")
+                else
+                    -- List items with custom preferences
+                    local items = recipePrefs.getCustomizedItems()
+                    
+                    if #items == 0 then
+                        ctx.mess("No recipe preferences configured")
+                        return
+                    end
+                    
+                    print("")
+                    ctx.mess("=== Items with Recipe Preferences ===")
+                    for _, itemId in ipairs(items) do
+                        local summary = recipePrefs.getSummary(itemId)
+                        term.setTextColor(colors.yellow)
+                        write("  " .. itemId:gsub("minecraft:", ""))
+                        term.setTextColor(colors.lightGray)
+                        print(" - " .. summary)
+                    end
+                    term.setTextColor(colors.white)
+                end
+                return
+            end
+            
+            if subCmd == "show" then
+                local item = args[2]
+                if not item then
+                    ctx.err("Usage: recipeprefs show <item>")
+                    return
+                end
+                
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                local allRecipes = recipes.getRecipesFor(item, true)
+                if #allRecipes == 0 then
+                    ctx.err("No recipes found for: " .. item)
+                    return
+                end
+                
+                print("")
+                local displayName = item:gsub("minecraft:", "")
+                ctx.mess("=== Recipe Variants: " .. displayName .. " ===")
+                
+                for i, recipe in ipairs(allRecipes) do
+                    local disabled = recipePrefs.isDisabled(item, recipe.source)
+                    
+                    print("")
+                    term.setTextColor(disabled and colors.red or colors.lime)
+                    write(string.format("  [%d] ", i))
+                    term.setTextColor(colors.white)
+                    print(recipe.outputCount .. "x " .. displayName .. (disabled and " (DISABLED)" or ""))
+                    
+                    -- Show recipe type
+                    term.setTextColor(colors.lightGray)
+                    write("      Type: ")
+                    term.setTextColor(colors.white)
+                    print(recipe.type)
+                    
+                    -- Show ingredients
+                    term.setTextColor(colors.lightGray)
+                    print("      Ingredients:")
+                    for _, ingredient in ipairs(recipe.ingredients) do
+                        local ingName = ingredient.item:gsub("minecraft:", "")
+                        if ingName:sub(1, 1) == "#" then
+                            ingName = ingName:sub(2) .. " (tag)"
+                        end
+                        term.setTextColor(colors.yellow)
+                        write("        " .. ingredient.count .. "x ")
+                        term.setTextColor(colors.white)
+                        print(ingName)
+                    end
+                    
+                    -- Show source
+                    term.setTextColor(colors.gray)
+                    local shortSource = recipe.source:gsub(".*/recipes/", "")
+                    print("      Source: " .. shortSource)
+                end
+                term.setTextColor(colors.white)
+                return
+            end
+            
+            if subCmd == "prefer" then
+                local item = args[2]
+                local idx = tonumber(args[3])
+                
+                if not item or not idx then
+                    ctx.err("Usage: recipeprefs prefer <item> <recipe#>")
+                    return
+                end
+                
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                local allRecipes = recipes.getRecipesFor(item, true)
+                if idx < 1 or idx > #allRecipes then
+                    ctx.err("Invalid recipe number. Use 'recipeprefs show " .. item:gsub("minecraft:", "") .. "' to see variants.")
+                    return
+                end
+                
+                local recipe = allRecipes[idx]
+                recipePrefs.setPreferred(item, recipe.source)
+                ctx.succ("Set recipe #" .. idx .. " as preferred for " .. item:gsub("minecraft:", ""))
+                return
+            end
+            
+            if subCmd == "enable" then
+                local item = args[2]
+                local idx = tonumber(args[3])
+                
+                if not item or not idx then
+                    ctx.err("Usage: recipeprefs enable <item> <recipe#>")
+                    return
+                end
+                
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                local allRecipes = recipes.getRecipesFor(item, true)
+                if idx < 1 or idx > #allRecipes then
+                    ctx.err("Invalid recipe number. Use 'recipeprefs show " .. item:gsub("minecraft:", "") .. "' to see variants.")
+                    return
+                end
+                
+                local recipe = allRecipes[idx]
+                recipePrefs.enable(item, recipe.source)
+                ctx.succ("Enabled recipe #" .. idx .. " for " .. item:gsub("minecraft:", ""))
+                return
+            end
+            
+            if subCmd == "disable" then
+                local item = args[2]
+                local idx = tonumber(args[3])
+                
+                if not item or not idx then
+                    ctx.err("Usage: recipeprefs disable <item> <recipe#>")
+                    return
+                end
+                
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                local allRecipes = recipes.getRecipesFor(item, true)
+                if idx < 1 or idx > #allRecipes then
+                    ctx.err("Invalid recipe number. Use 'recipeprefs show " .. item:gsub("minecraft:", "") .. "' to see variants.")
+                    return
+                end
+                
+                local recipe = allRecipes[idx]
+                recipePrefs.disable(item, recipe.source)
+                ctx.succ("Disabled recipe #" .. idx .. " for " .. item:gsub("minecraft:", ""))
+                return
+            end
+            
+            if subCmd == "clear" then
+                local item = args[2]
+                
+                if not item then
+                    ctx.err("Usage: recipeprefs clear <item>")
+                    return
+                end
+                
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                recipePrefs.clear(item)
+                ctx.succ("Cleared recipe preferences for " .. item:gsub("minecraft:", ""))
+                return
+            end
+            
+            if subCmd == "clearall" then
+                recipePrefs.clearAll()
+                ctx.succ("Cleared all recipe preferences")
+                return
+            end
+            
+            ctx.err("Unknown subcommand: " .. subCmd)
+            ctx.mess("Use 'recipeprefs help' to see available commands")
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"list", "show", "prefer", "enable", "disable", "clear", "clearall", "help"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and (args[1] == "list" or args[1] == "show" or args[1] == "prefer" or args[1] == "enable" or args[1] == "disable" or args[1] == "clear") then
+                -- Complete item names
+                local query = args[2] or ""
+                if query == "" then return {} end
+                local results = recipes.search(query)
+                local completions = {}
+                for _, r in ipairs(results) do
+                    table.insert(completions, (r.output:gsub("minecraft:", "")))
+                end
+                return completions
+            end
+            return {}
+        end
+    },
 }
 
 -- Register log level commands (loglevel, log-level, ll aliases)
 logger.registerCommands(commands)
+
+-- Register alias for recipeprefs command
+commands.rp = commands.recipeprefs
 
 --- Send a message to a player via chatbox
 ---@param user string The username to send to
@@ -1702,15 +2014,19 @@ local function chatboxHandler()
                     item = "minecraft:" .. item
                 end
                 
-                local allRecipes = recipes.getRecipesFor(item)
+                local allRecipes = recipes.getRecipesSorted(item, false)
+                local activeRecipe = recipes.getRecipeFor(item)
                 
                 if #allRecipes == 0 then
                     chatTell(user, "No recipe found for: " .. item, true)
                 else
-                    local recipe = allRecipes[1]
+                    local recipe = activeRecipe or allRecipes[1]
                     local displayName = item:gsub("minecraft:", "")
                     
                     chatTell(user, "=== Recipe: " .. displayName .. " ===")
+                    if #allRecipes > 1 then
+                        chatTell(user, "[Active recipe shown - " .. #allRecipes .. " variants available]")
+                    end
                     chatTell(user, string.format("Output: %dx %s (%s)", recipe.outputCount, displayName, recipe.type))
                     
                     chatTell(user, "Ingredients:")
@@ -1723,7 +2039,7 @@ local function chatboxHandler()
                     end
                     
                     if #allRecipes > 1 then
-                        chatTell(user, string.format("(%d alternative recipes available)", #allRecipes - 1))
+                        chatTell(user, "Use terminal 'recipeprefs' to configure variants")
                     end
                 end
             end
