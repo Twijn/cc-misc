@@ -93,6 +93,7 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/config/settings.lua", path = "config/settings.lua", name = "settings.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/targets.lua", path = "config/targets.lua", name = "targets.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/exports.lua", path = "config/exports.lua", name = "exports.lua", category = "Config"},
+    {url = BASE_URL .. "/autocrafter/config/recipes.lua", path = "config/recipes.lua", name = "recipes.lua", category = "Config"},
 }
 
 local crafterFiles = {

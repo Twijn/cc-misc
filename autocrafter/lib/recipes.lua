@@ -12,10 +12,21 @@ local recipeCache = {}
 local recipesByOutput = {}
 
 -- Lazy load recipe preferences to avoid circular dependencies
+-- Falls back to a no-op module if config.recipes doesn't exist yet
 local recipePrefs = nil
 local function getRecipePrefs()
     if not recipePrefs then
-        recipePrefs = require("config.recipes")
+        local success, prefs = pcall(require, "config.recipes")
+        if success then
+            recipePrefs = prefs
+        else
+            -- Fallback: no preferences configured
+            recipePrefs = {
+                get = function() return { priority = {}, disabled = {} } end,
+                isDisabled = function() return false end,
+                isEnabled = function() return true end,
+            }
+        end
     end
     return recipePrefs
 end
