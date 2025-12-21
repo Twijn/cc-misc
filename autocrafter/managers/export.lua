@@ -122,15 +122,17 @@ end
 ---@param destInv string Destination inventory name
 ---@param destSlot? number Optional destination slot
 ---@return number pushed Amount actually pushed
+---@return table sources Array of {inventory, count} pairs indicating where items came from
 local function pushToExport(item, count, destInv, destSlot)
     -- Find item in storage
     local locations = inventory.findItem(item)
-    if #locations == 0 then return 0 end
+    if #locations == 0 then return 0, {} end
     
     -- Sort by count (largest first) for efficiency
     table.sort(locations, function(a, b) return a.count > b.count end)
     
     local pushed = 0
+    local sources = {}  -- Track which inventories we pulled from
     
     for _, loc in ipairs(locations) do
         if pushed >= count then break end
@@ -142,6 +144,12 @@ local function pushToExport(item, count, destInv, destSlot)
             pushed = pushed + transferred
             
             if transferred > 0 then
+                -- Track this source
+                if sources[loc.inventory] then
+                    sources[loc.inventory] = sources[loc.inventory] + transferred
+                else
+                    sources[loc.inventory] = transferred
+                end
                 -- Update cache for source inventory
                 inventory.scanSingle(loc.inventory, true)
             end
@@ -153,7 +161,13 @@ local function pushToExport(item, count, destInv, destSlot)
         inventory.rebuildFromCache()
     end
     
-    return pushed
+    -- Convert sources to array format for return
+    local sourceList = {}
+    for inv, cnt in pairs(sources) do
+        table.insert(sourceList, {inventory = inv, count = cnt})
+    end
+    
+    return pushed, sourceList
 end
 
 ---Pull items from an export inventory back to storage
@@ -293,11 +307,17 @@ local function processExportInventory(name, config)
             
             if currentCount < targetQty then
                 local needed = targetQty - currentCount
-                local pushed = pushToExport(item, needed, name, specificSlot)
+                local pushed, sources = pushToExport(item, needed, name, specificSlot)
                 result.pushed = result.pushed + pushed
                 
                 if pushed > 0 then
-                    logger.debug(string.format("Stocked %d %s to %s", pushed, item, name))
+                    -- Build source description
+                    local sourceStrs = {}
+                    for _, src in ipairs(sources) do
+                        table.insert(sourceStrs, string.format("%s(%d)", src.inventory, src.count))
+                    end
+                    local sourceDesc = #sourceStrs > 0 and table.concat(sourceStrs, ", ") or "unknown"
+                    logger.debug(string.format("Stocked %d %s to %s from %s", pushed, item, name, sourceDesc))
                 end
             end
             
