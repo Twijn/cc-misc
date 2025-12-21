@@ -3,7 +3,7 @@
 ---
 --- Features: Built-in commands (clear, exit, help), command history navigation,
 --- tab autocompletion for commands and arguments, colored output for different message types,
---- table pretty-printing functionality, and string utility functions (split, startsWith).
+--- table pretty-printing functionality, pager for long output, and string utility functions.
 ---
 ---@usage
 ---local cmd = require("cmd")
@@ -15,15 +15,26 @@
 ---      local name = args[1] or "World"
 ---      context.succ("Hello, " .. name .. "!")
 ---    end
+---  },
+---  longlist = {
+---    description = "Show a long list with pagination",
+---    execute = function(args, context)
+---      local p = context.pager("My Long List")
+---      for i = 1, 100 do
+---        p.print("Item " .. i)
+---      end
+---      p.show()
+---    end
 ---  }
 ---}
 ---
 ---cmd("MyApp", "1.0.0", customCommands)
 ---
----@version 1.0.0
+---@version 1.1.0
 -- @module cmd
 
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
+local pager = require("pager")
 
 local history = {}
 local running = true
@@ -94,6 +105,7 @@ end
 ---@field err fun(txt: string) Function to print error messages
 ---@field mess fun(txt: string) Function to print informational messages
 ---@field succ fun(txt: string) Function to print success messages
+---@field pager fun(title?: string): table Create a pager for displaying long output
 
 -- === Commands ===
 ---@type table<string, CommandDefinition>
@@ -119,18 +131,29 @@ local defaultCommands = {
 defaultCommands.help = {
   description = "Show this menu!",
   execute = function(args, d)
-    for cmdName, cmd in pairs(d.commands) do
-      term.setTextColor(colors.blue)
-      write(cmdName)
-      term.setTextColor(colors.lightGray)
-      write(" - ")
+    -- Collect all command names and sort them
+    local cmdNames = {}
+    for cmdName in pairs(d.commands) do
+      table.insert(cmdNames, cmdName)
+    end
+    table.sort(cmdNames)
+    
+    -- Use pager for displaying commands
+    local p = pager.create("=== Available Commands ===")
+    for _, cmdName in ipairs(cmdNames) do
+      local cmd = d.commands[cmdName]
+      p.setTextColor(colors.blue)
+      p.write(cmdName)
+      p.setTextColor(colors.lightGray)
+      p.write(" - ")
       if cmd.description then
-        term.setTextColor(colors.white)
-        print(cmd.description)
+        p.setTextColor(colors.white)
+        p.print(cmd.description)
       else
-        print("No Description")
+        p.print("No Description")
       end
     end
+    p.show()
   end,
 }
 
@@ -270,6 +293,7 @@ return function(name, version, customCommands)
         err = err,
         mess = mess,
         succ = succ,
+        pager = pager.create,
       })
       table.insert(history, str)
     elseif str ~= "" then

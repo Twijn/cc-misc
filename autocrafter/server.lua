@@ -519,8 +519,7 @@ local commands = {
                 return
             end
             
-            print("")
-            ctx.mess("=== Crafting Queue ===")
+            local p = ctx.pager("=== Crafting Queue (" .. #jobs .. " jobs) ===")
             for _, job in ipairs(jobs) do
                 local output = job.recipe and job.recipe.output or "unknown"
                 output = output:gsub("minecraft:", "")
@@ -533,16 +532,17 @@ local commands = {
                     statusColor = colors.lime
                 end
                 
-                term.setTextColor(colors.lightGray)
-                write(string.format("#%d ", job.id))
-                term.setTextColor(colors.white)
-                write(string.format("%dx %s ", job.expectedOutput, output))
-                term.setTextColor(statusColor)
-                print("[" .. status .. "]")
+                p.setTextColor(colors.lightGray)
+                p.write(string.format("#%d ", job.id))
+                p.setTextColor(colors.white)
+                p.write(string.format("%dx %s ", job.expectedOutput, output))
+                p.setTextColor(statusColor)
+                p.print("[" .. status .. "]")
             end
-            term.setTextColor(colors.white)
-            print("")
-            ctx.mess("Use 'queue clear' to clear all pending jobs")
+            p.print("")
+            p.setTextColor(colors.lightBlue)
+            p.print("Use 'queue clear' to clear all pending jobs")
+            p.show()
         end,
         complete = function(args)
             if #args == 1 then
@@ -655,25 +655,24 @@ local commands = {
                 return
             end
             
-            print("")
-            ctx.mess("=== Craft Targets ===")
+            local p = ctx.pager("=== Craft Targets ===")
             for _, target in ipairs(all) do
                 local item = target.item:gsub("minecraft:", "")
                 
                 if target.current >= target.target then
-                    term.setTextColor(colors.lime)
-                    write("+ ")
+                    p.setTextColor(colors.lime)
+                    p.write("+ ")
                 else
-                    term.setTextColor(colors.orange)
-                    write("* ")
+                    p.setTextColor(colors.orange)
+                    p.write("* ")
                 end
                 
-                term.setTextColor(colors.white)
-                write(item .. " ")
-                term.setTextColor(colors.lightGray)
-                print(string.format("%d/%d", target.current, target.target))
+                p.setTextColor(colors.white)
+                p.write(item .. " ")
+                p.setTextColor(colors.lightGray)
+                p.print(string.format("%d/%d", target.current, target.target))
             end
-            term.setTextColor(colors.white)
+            p.show()
         end
     },
     
@@ -803,61 +802,52 @@ local commands = {
         description = "View job history (completed/failed)",
         execute = function(args, ctx)
             local historyType = args[1]  -- "completed", "failed", or nil for both
-            local limit = tonumber(args[2]) or 10
             
             local history = queueManager.getHistory(historyType)
             
-            print("")
+            local p = ctx.pager("=== Job History ===")
             
             if historyType == "completed" or not historyType then
                 local completed = historyType == "completed" and history or history.completed
-                ctx.mess("=== Completed Jobs ===")
+                p.setTextColor(colors.lightBlue)
+                p.print("Completed Jobs:")
                 if #completed == 0 then
-                    print("  No completed jobs")
+                    p.setTextColor(colors.white)
+                    p.print("  No completed jobs")
                 else
-                    local shown = 0
                     for _, job in ipairs(completed) do
-                        if shown >= limit then
-                            ctx.mess("... and " .. (#completed - limit) .. " more")
-                            break
-                        end
                         local output = job.recipe and job.recipe.output or "unknown"
                         output = output:gsub("minecraft:", "")
-                        term.setTextColor(colors.lime)
-                        write("  #" .. job.id .. " ")
-                        term.setTextColor(colors.white)
-                        print(string.format("%dx %s", job.actualOutput or 0, output))
-                        shown = shown + 1
+                        p.setTextColor(colors.lime)
+                        p.write("  #" .. job.id .. " ")
+                        p.setTextColor(colors.white)
+                        p.print(string.format("%dx %s", job.actualOutput or 0, output))
                     end
                 end
-                print("")
+                p.print("")
             end
             
             if historyType == "failed" or not historyType then
                 local failed = historyType == "failed" and history or history.failed
-                ctx.mess("=== Failed Jobs ===")
+                p.setTextColor(colors.lightBlue)
+                p.print("Failed Jobs:")
                 if #failed == 0 then
-                    print("  No failed jobs")
+                    p.setTextColor(colors.white)
+                    p.print("  No failed jobs")
                 else
-                    local shown = 0
                     for _, job in ipairs(failed) do
-                        if shown >= limit then
-                            ctx.mess("... and " .. (#failed - limit) .. " more")
-                            break
-                        end
                         local output = job.recipe and job.recipe.output or "unknown"
                         output = output:gsub("minecraft:", "")
-                        term.setTextColor(colors.red)
-                        write("  #" .. job.id .. " ")
-                        term.setTextColor(colors.white)
-                        write(output .. " - ")
-                        term.setTextColor(colors.orange)
-                        print(job.failReason or "Unknown")
-                        shown = shown + 1
+                        p.setTextColor(colors.red)
+                        p.write("  #" .. job.id .. " ")
+                        p.setTextColor(colors.white)
+                        p.write(output .. " - ")
+                        p.setTextColor(colors.orange)
+                        p.print(job.failReason or "Unknown")
                     end
                 end
             end
-            term.setTextColor(colors.white)
+            p.show()
         end,
         complete = function(args)
             if #args == 1 then
@@ -885,8 +875,7 @@ local commands = {
                 return
             end
             
-            print("")
-            ctx.mess("=== Crafters ===")
+            local p = ctx.pager("=== Crafters (" .. #allCrafters .. ") ===")
             for _, crafter in ipairs(allCrafters) do
                 local statusColor = colors.red
                 if crafter.isOnline then
@@ -897,14 +886,14 @@ local commands = {
                     end
                 end
                 
-                term.setTextColor(colors.lightGray)
-                write(string.format("#%d ", crafter.id))
-                term.setTextColor(colors.white)
-                write(crafter.label .. " ")
-                term.setTextColor(statusColor)
-                print("[" .. crafter.status .. "]")
+                p.setTextColor(colors.lightGray)
+                p.write(string.format("#%d ", crafter.id))
+                p.setTextColor(colors.white)
+                p.write(crafter.label .. " ")
+                p.setTextColor(statusColor)
+                p.print("[" .. crafter.status .. "]")
             end
-            term.setTextColor(colors.white)
+            p.show()
         end
     },
     
@@ -919,19 +908,12 @@ local commands = {
                 return
             end
             
-            print("")
-            ctx.mess("=== Recipes ===")
-            local shown = 0
+            local p = ctx.pager("=== Recipes (" .. #results .. " found) ===")
             for _, r in ipairs(results) do
-                if shown >= 20 then
-                    ctx.mess("... and " .. (#results - 20) .. " more")
-                    break
-                end
-                
                 local output = r.output:gsub("minecraft:", "")
-                print("  " .. output)
-                shown = shown + 1
+                p.print("  " .. output)
             end
+            p.show()
         end
     },
     
@@ -957,13 +939,12 @@ local commands = {
                 return
             end
             
-            print("")
             local displayName = item:gsub("minecraft:", "")
-            ctx.mess("=== Recipe: " .. displayName .. " ===")
+            local p = ctx.pager("=== Recipe: " .. displayName .. " ===")
             
             if #allRecipes > 1 then
-                term.setTextColor(colors.lightGray)
-                print("  (" .. #allRecipes .. " variants available - use 'recipeprefs' to configure)")
+                p.setTextColor(colors.lightGray)
+                p.print("  (" .. #allRecipes .. " variants available - use 'recipeprefs' to configure)")
             end
             
             for i, recipe in ipairs(allRecipes) do
@@ -971,7 +952,7 @@ local commands = {
                 local isDisabled = recipePrefs.isDisabled(item, recipe.source)
                 
                 if i > 1 then
-                    print("")
+                    p.print("")
                     local variantLabel = "--- Variant " .. i
                     if isDisabled then
                         variantLabel = variantLabel .. " (DISABLED)"
@@ -979,88 +960,82 @@ local commands = {
                         variantLabel = variantLabel .. " (ACTIVE)"
                     end
                     variantLabel = variantLabel .. " ---"
-                    ctx.mess(variantLabel)
+                    p.setTextColor(colors.lightBlue)
+                    p.print(variantLabel)
                 else
                     if isActive then
-                        term.setTextColor(colors.lime)
-                        print("  [ACTIVE - will be used for autocrafting]")
+                        p.setTextColor(colors.lime)
+                        p.print("  [ACTIVE - will be used for autocrafting]")
                     elseif isDisabled then
-                        term.setTextColor(colors.red)
-                        print("  [DISABLED]")
+                        p.setTextColor(colors.red)
+                        p.print("  [DISABLED]")
                     end
                 end
                 
                 -- Show output count
-                term.setTextColor(colors.lightGray)
-                write("  Output: ")
-                term.setTextColor(colors.lime)
-                print(recipe.outputCount .. "x " .. displayName)
+                p.setTextColor(colors.lightGray)
+                p.write("  Output: ")
+                p.setTextColor(colors.lime)
+                p.print(recipe.outputCount .. "x " .. displayName)
                 
                 -- Show recipe type
-                term.setTextColor(colors.lightGray)
-                write("  Type: ")
-                term.setTextColor(colors.white)
-                print(recipe.type)
+                p.setTextColor(colors.lightGray)
+                p.write("  Type: ")
+                p.setTextColor(colors.white)
+                p.print(recipe.type)
                 
                 -- Show ingredients
-                term.setTextColor(colors.lightGray)
-                print("  Ingredients:")
+                p.setTextColor(colors.lightGray)
+                p.print("  Ingredients:")
                 for _, ingredient in ipairs(recipe.ingredients) do
                     local ingName = ingredient.item:gsub("minecraft:", "")
                     -- Handle tags (prefixed with #)
                     if ingName:sub(1, 1) == "#" then
                         ingName = ingName:sub(2) .. " (tag)"
                     end
-                    term.setTextColor(colors.yellow)
-                    write("    " .. ingredient.count .. "x ")
-                    term.setTextColor(colors.white)
-                    print(ingName)
+                    p.setTextColor(colors.yellow)
+                    p.write("    " .. ingredient.count .. "x ")
+                    p.setTextColor(colors.white)
+                    p.print(ingName)
                 end
                 
                 -- Show crafting grid for shaped recipes
                 if recipe.type == "shaped" and recipe.pattern then
-                    term.setTextColor(colors.lightGray)
-                    print("  Pattern:")
+                    p.setTextColor(colors.lightGray)
+                    p.print("  Pattern:")
                     for _, row in ipairs(recipe.pattern) do
-                        term.setTextColor(colors.gray)
-                        write("    [")
+                        p.setTextColor(colors.gray)
+                        p.write("    [")
                         for c = 1, #row do
                             local char = row:sub(c, c)
                             if char == " " then
-                                term.setTextColor(colors.gray)
-                                write(" ")
+                                p.setTextColor(colors.gray)
+                                p.write(" ")
                             else
-                                term.setTextColor(colors.cyan)
-                                write(char)
+                                p.setTextColor(colors.cyan)
+                                p.write(char)
                             end
                         end
-                        term.setTextColor(colors.gray)
-                        print("]")
+                        p.setTextColor(colors.gray)
+                        p.print("]")
                     end
                     
                     -- Show key legend
-                    term.setTextColor(colors.lightGray)
-                    print("  Key:")
+                    p.setTextColor(colors.lightGray)
+                    p.print("  Key:")
                     for char, keyItem in pairs(recipe.key) do
                         local keyName = keyItem:gsub("minecraft:", "")
                         if keyName:sub(1, 1) == "#" then
                             keyName = keyName:sub(2) .. " (tag)"
                         end
-                        term.setTextColor(colors.cyan)
-                        write("    " .. char .. " = ")
-                        term.setTextColor(colors.white)
-                        print(keyName)
+                        p.setTextColor(colors.cyan)
+                        p.write("    " .. char .. " = ")
+                        p.setTextColor(colors.white)
+                        p.print(keyName)
                     end
                 end
-                
-                -- Only show first 3 recipes max
-                if i >= 3 and #allRecipes > 3 then
-                    print("")
-                    ctx.mess("... and " .. (#allRecipes - 3) .. " more alternative recipes")
-                    break
-                end
             end
-            term.setTextColor(colors.white)
+            p.show()
         end,
         complete = function(args)
             if #args == 1 then
@@ -1129,23 +1104,15 @@ local commands = {
                 return
             end
             
-            print("")
-            ctx.mess("=== Stock ===")
-            local shown = 0
+            local p = ctx.pager("=== Stock (" .. #results .. " items) ===")
             for _, item in ipairs(results) do
-                if shown >= 20 then
-                    ctx.mess("... and " .. (#results - 20) .. " more")
-                    break
-                end
-                
                 local name = item.item:gsub("minecraft:", "")
-                term.setTextColor(colors.white)
-                write("  " .. name .. " ")
-                term.setTextColor(colors.lightGray)
-                print("x" .. item.count)
-                shown = shown + 1
+                p.setTextColor(colors.white)
+                p.write("  " .. name .. " ")
+                p.setTextColor(colors.lightGray)
+                p.print("x" .. item.count)
             end
-            term.setTextColor(colors.white)
+            p.show()
         end
     },
     
@@ -1166,26 +1133,25 @@ local commands = {
                     return
                 end
                 
-                print("")
-                ctx.mess("=== Export Inventories ===")
+                local p = ctx.pager("=== Export Inventories (" .. count .. ") ===")
                 for name, cfg in pairs(all) do
                     local itemCount = #(cfg.slots or {})
                     local modeDisplay = cfg.mode
                     if cfg.mode == "empty" and itemCount == 0 then
                         modeDisplay = "drain all"
                     end
-                    term.setTextColor(colors.lime)
-                    write(cfg.mode == "stock" and "+" or "-")
-                    term.setTextColor(colors.white)
-                    write(" " .. name .. " ")
-                    term.setTextColor(colors.lightGray)
+                    p.setTextColor(colors.lime)
+                    p.write(cfg.mode == "stock" and "+" or "-")
+                    p.setTextColor(colors.white)
+                    p.write(" " .. name .. " ")
+                    p.setTextColor(colors.lightGray)
                     if cfg.mode == "empty" and itemCount == 0 then
-                        print(string.format("[%s]", modeDisplay))
+                        p.print(string.format("[%s]", modeDisplay))
                     else
-                        print(string.format("[%s] %d items", modeDisplay, itemCount))
+                        p.print(string.format("[%s] %d items", modeDisplay, itemCount))
                     end
                 end
-                term.setTextColor(colors.white)
+                p.show()
                 
             elseif subCmd == "add" then
                 -- Add a new export inventory using FormUI
@@ -1254,38 +1220,39 @@ local commands = {
                 -- Show and manage items for this export
                 local items = cfg.slots or {}
                 
-                print("")
-                ctx.mess("=== Items for " .. invName .. " ===")
-                ctx.mess("Mode: " .. cfg.mode)
-                print("")
+                local p = ctx.pager("=== Items for " .. invName .. " ===")
+                p.setTextColor(colors.lightBlue)
+                p.print("Mode: " .. cfg.mode)
+                p.print("")
                 
                 if #items == 0 then
                     if cfg.mode == "empty" then
-                        term.setTextColor(colors.lime)
-                        print("  (draining ALL items)")
-                        term.setTextColor(colors.white)
+                        p.setTextColor(colors.lime)
+                        p.print("  (draining ALL items)")
                     else
-                        ctx.mess("No items configured")
+                        p.setTextColor(colors.lightBlue)
+                        p.print("No items configured")
                     end
                 else
                     for i, item in ipairs(items) do
-                        term.setTextColor(colors.white)
-                        write(string.format("%d. %s ", i, item.item:gsub("minecraft:", "")))
-                        term.setTextColor(colors.lightGray)
+                        p.setTextColor(colors.white)
+                        p.write(string.format("%d. %s ", i, item.item:gsub("minecraft:", "")))
+                        p.setTextColor(colors.lightGray)
                         if item.slot then
-                            print(string.format("x%d (slot %d)", item.quantity, item.slot))
+                            p.print(string.format("x%d (slot %d)", item.quantity, item.slot))
                         else
-                            print(string.format("x%d", item.quantity))
+                            p.print(string.format("x%d", item.quantity))
                         end
                     end
                 end
-                term.setTextColor(colors.white)
-                print("")
-                ctx.mess("Use 'exports additem <inv> <item> <qty> [slot]' to add")
-                ctx.mess("Use 'exports rmitem <inv> <item>' to remove")
+                p.print("")
+                p.setTextColor(colors.lightBlue)
+                p.print("Use 'exports additem <inv> <item> <qty> [slot]' to add")
+                p.print("Use 'exports rmitem <inv> <item>' to remove")
                 if cfg.mode == "empty" then
-                    ctx.mess("Tip: Leave empty to drain ALL items from inventory")
+                    p.print("Tip: Leave empty to drain ALL items from inventory")
                 end
+                p.show()
                 
             elseif subCmd == "additem" then
                 local invName = args[2]
@@ -1594,8 +1561,7 @@ local commands = {
                         return
                     end
                     
-                    print("")
-                    ctx.mess("=== Recipes for " .. item:gsub("minecraft:", "") .. " ===")
+                    local p = ctx.pager("=== Recipes for " .. item:gsub("minecraft:", "") .. " ===")
                     
                     for i, recipe in ipairs(allRecipes) do
                         local disabled = recipePrefs.isDisabled(item, recipe.source)
@@ -1611,28 +1577,29 @@ local commands = {
                         local statusIcon = disabled and "X" or (isPrioritized and "*" or " ")
                         local statusColor = disabled and colors.red or (isPrioritized and colors.lime or colors.white)
                         
-                        term.setTextColor(colors.lightGray)
-                        write(string.format("  %d. ", i))
-                        term.setTextColor(statusColor)
-                        write("[" .. statusIcon .. "] ")
-                        term.setTextColor(colors.white)
+                        p.setTextColor(colors.lightGray)
+                        p.write(string.format("  %d. ", i))
+                        p.setTextColor(statusColor)
+                        p.write("[" .. statusIcon .. "] ")
+                        p.setTextColor(colors.white)
                         
                         -- Show ingredients summary
                         local ingList = {}
                         for _, ing in ipairs(recipe.ingredients) do
                             table.insert(ingList, ing.count .. "x " .. ing.item:gsub("minecraft:", ""))
                         end
-                        print(recipe.outputCount .. "x from: " .. table.concat(ingList, ", "))
+                        p.print(recipe.outputCount .. "x from: " .. table.concat(ingList, ", "))
                         
                         -- Show source file (shortened)
-                        term.setTextColor(colors.gray)
+                        p.setTextColor(colors.gray)
                         local shortSource = recipe.source:gsub(".*/recipes/", "")
-                        print("     " .. shortSource)
+                        p.print("     " .. shortSource)
                     end
                     
-                    term.setTextColor(colors.white)
-                    print("")
-                    print("Legend: [*] = prioritized, [X] = disabled")
+                    p.print("")
+                    p.setTextColor(colors.white)
+                    p.print("Legend: [*] = prioritized, [X] = disabled")
+                    p.show()
                 else
                     -- List items with custom preferences
                     local items = recipePrefs.getCustomizedItems()
@@ -1642,16 +1609,15 @@ local commands = {
                         return
                     end
                     
-                    print("")
-                    ctx.mess("=== Items with Recipe Preferences ===")
+                    local p = ctx.pager("=== Items with Recipe Preferences ===")
                     for _, itemId in ipairs(items) do
                         local summary = recipePrefs.getSummary(itemId)
-                        term.setTextColor(colors.yellow)
-                        write("  " .. itemId:gsub("minecraft:", ""))
-                        term.setTextColor(colors.lightGray)
-                        print(" - " .. summary)
+                        p.setTextColor(colors.yellow)
+                        p.write("  " .. itemId:gsub("minecraft:", ""))
+                        p.setTextColor(colors.lightGray)
+                        p.print(" - " .. summary)
                     end
-                    term.setTextColor(colors.white)
+                    p.show()
                 end
                 return
             end
@@ -1673,45 +1639,44 @@ local commands = {
                     return
                 end
                 
-                print("")
                 local displayName = item:gsub("minecraft:", "")
-                ctx.mess("=== Recipe Variants: " .. displayName .. " ===")
+                local p = ctx.pager("=== Recipe Variants: " .. displayName .. " ===")
                 
                 for i, recipe in ipairs(allRecipes) do
                     local disabled = recipePrefs.isDisabled(item, recipe.source)
                     
-                    print("")
-                    term.setTextColor(disabled and colors.red or colors.lime)
-                    write(string.format("  [%d] ", i))
-                    term.setTextColor(colors.white)
-                    print(recipe.outputCount .. "x " .. displayName .. (disabled and " (DISABLED)" or ""))
+                    p.print("")
+                    p.setTextColor(disabled and colors.red or colors.lime)
+                    p.write(string.format("  [%d] ", i))
+                    p.setTextColor(colors.white)
+                    p.print(recipe.outputCount .. "x " .. displayName .. (disabled and " (DISABLED)" or ""))
                     
                     -- Show recipe type
-                    term.setTextColor(colors.lightGray)
-                    write("      Type: ")
-                    term.setTextColor(colors.white)
-                    print(recipe.type)
+                    p.setTextColor(colors.lightGray)
+                    p.write("      Type: ")
+                    p.setTextColor(colors.white)
+                    p.print(recipe.type)
                     
                     -- Show ingredients
-                    term.setTextColor(colors.lightGray)
-                    print("      Ingredients:")
+                    p.setTextColor(colors.lightGray)
+                    p.print("      Ingredients:")
                     for _, ingredient in ipairs(recipe.ingredients) do
                         local ingName = ingredient.item:gsub("minecraft:", "")
                         if ingName:sub(1, 1) == "#" then
                             ingName = ingName:sub(2) .. " (tag)"
                         end
-                        term.setTextColor(colors.yellow)
-                        write("        " .. ingredient.count .. "x ")
-                        term.setTextColor(colors.white)
-                        print(ingName)
+                        p.setTextColor(colors.yellow)
+                        p.write("        " .. ingredient.count .. "x ")
+                        p.setTextColor(colors.white)
+                        p.print(ingName)
                     end
                     
                     -- Show source
-                    term.setTextColor(colors.gray)
+                    p.setTextColor(colors.gray)
                     local shortSource = recipe.source:gsub(".*/recipes/", "")
-                    print("      Source: " .. shortSource)
+                    p.print("      Source: " .. shortSource)
                 end
-                term.setTextColor(colors.white)
+                p.show()
                 return
             end
             

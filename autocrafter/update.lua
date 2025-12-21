@@ -136,7 +136,7 @@ print("")
 local requiredLibs, optionalLibs
 if isServer or isDisk then
     requiredLibs = {"s", "tables", "log", "persist"}
-    optionalLibs = {"formui", "cmd", "updater"}
+    optionalLibs = {"formui", "cmd", "pager", "updater"}
 else
     requiredLibs = {"s", "tables", "log", "persist"}
     optionalLibs = {"updater"}

@@ -118,7 +118,7 @@ end
 -- Run installer with pre-selected libraries
 -- Always install all libraries when on disk (shared between machines)
 if isServer or isDisk then
-    shell.run(installerPath, "s", "tables", "log", "persist", "formui", "cmd", "updater")
+    shell.run(installerPath, "s", "tables", "log", "persist", "formui", "cmd", "pager", "updater")
 else
     shell.run(installerPath, "s", "tables", "log", "persist", "updater")
 end
