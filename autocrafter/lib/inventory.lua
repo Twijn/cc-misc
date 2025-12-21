@@ -1,10 +1,11 @@
 --- AutoCrafter Inventory Library
 --- Manages inventory scanning and item storage with comprehensive caching.
 --- All peripheral calls are cached to minimize network/peripheral overhead.
+--- Uses internal cache updates after transfers instead of rescanning.
 ---
----@version 2.0.0
+---@version 3.0.0
 
-local VERSION = "2.0.0"
+local VERSION = "3.0.0"
 
 -- Ensure cache directory exists
 fs.makeDir("data/cache")
@@ -34,6 +35,8 @@ local modemName = nil          -- Cached modem name
 local scanInProgress = false
 local manipulator = nil        -- Cached manipulator peripheral
 local deferredRebuild = false  -- Flag to defer cache rebuilding for batch operations
+local emptySlotCache = {}      -- Cache of empty slots per inventory: {invName = {slot1, slot2, ...}}
+local stockLevelsDirty = false -- Flag to indicate stock levels need recalculation
 
 ---Get item detail cache key
 ---@param item table The item with name and optional nbt
@@ -53,6 +56,161 @@ local function getItemKey(item)
         return item.name .. ":" .. item.nbt
     end
     return item.name
+end
+
+---Update the internal cache after removing items from a slot
+---Does NOT call any peripheral functions - purely cache manipulation
+---@param invName string The inventory name
+---@param slot number The slot number
+---@param itemKey string The item key (from getItemKey)
+---@param count number Amount removed
+local function updateCacheAfterRemoval(invName, slot, itemKey, count)
+    local invData = inventoryCache.get(invName)
+    if not invData or not invData.slots then return end
+    
+    local slotKey = tostring(slot)  -- JSON uses string keys
+    local slotData = invData.slots[slot] or invData.slots[slotKey]
+    
+    if slotData then
+        local newCount = slotData.count - count
+        if newCount <= 0 then
+            -- Slot is now empty
+            invData.slots[slot] = nil
+            invData.slots[slotKey] = nil
+            -- Add to empty slot cache
+            if not emptySlotCache[invName] then
+                emptySlotCache[invName] = {}
+            end
+            table.insert(emptySlotCache[invName], slot)
+        else
+            -- Update count
+            slotData.count = newCount
+            invData.slots[slot] = slotData
+            invData.slots[slotKey] = nil  -- Normalize to numeric key
+        end
+        inventoryCache.set(invName, invData)
+        
+        -- Update stock levels directly
+        local levels = stockCache.get("levels") or {}
+        levels[itemKey] = math.max(0, (levels[itemKey] or 0) - count)
+        if levels[itemKey] == 0 then
+            levels[itemKey] = nil
+        end
+        stockCache.set("levels", levels)
+        
+        -- Update item locations cache
+        if itemLocations[itemKey] then
+            for i, loc in ipairs(itemLocations[itemKey]) do
+                if loc.inventory == invName and loc.slot == slot then
+                    if newCount <= 0 then
+                        table.remove(itemLocations[itemKey], i)
+                    else
+                        itemLocations[itemKey][i].count = newCount
+                    end
+                    break
+                end
+            end
+        end
+    end
+end
+
+---Update the internal cache after adding items to a slot
+---Does NOT call any peripheral functions - purely cache manipulation
+---@param invName string The inventory name
+---@param slot number The slot number
+---@param itemName string The item name (e.g., "minecraft:stone")
+---@param count number Amount added
+---@param nbt? string Optional NBT hash
+local function updateCacheAfterAddition(invName, slot, itemName, count, nbt)
+    local invData = inventoryCache.get(invName)
+    if not invData then
+        invData = { slots = {}, size = inventorySizes[invName] or 27 }
+    end
+    if not invData.slots then
+        invData.slots = {}
+    end
+    
+    local slotKey = tostring(slot)
+    local existingData = invData.slots[slot] or invData.slots[slotKey]
+    local itemKey = nbt and (itemName .. ":" .. nbt) or itemName
+    
+    if existingData then
+        -- Slot already has items - add to count
+        existingData.count = existingData.count + count
+        invData.slots[slot] = existingData
+        invData.slots[slotKey] = nil  -- Normalize to numeric key
+    else
+        -- Slot was empty - add new item data
+        invData.slots[slot] = {
+            name = itemName,
+            count = count,
+            nbt = nbt,
+        }
+        -- Remove from empty slot cache
+        if emptySlotCache[invName] then
+            for i, emptySlot in ipairs(emptySlotCache[invName]) do
+                if emptySlot == slot then
+                    table.remove(emptySlotCache[invName], i)
+                    break
+                end
+            end
+        end
+    end
+    
+    inventoryCache.set(invName, invData)
+    
+    -- Update stock levels directly
+    local levels = stockCache.get("levels") or {}
+    levels[itemKey] = (levels[itemKey] or 0) + count
+    stockCache.set("levels", levels)
+    
+    -- Update item locations cache
+    if not itemLocations[itemKey] then
+        itemLocations[itemKey] = {}
+    end
+    local found = false
+    for i, loc in ipairs(itemLocations[itemKey]) do
+        if loc.inventory == invName and loc.slot == slot then
+            itemLocations[itemKey][i].count = itemLocations[itemKey][i].count + count
+            found = true
+            break
+        end
+    end
+    if not found then
+        table.insert(itemLocations[itemKey], {
+            inventory = invName,
+            slot = slot,
+            count = count,
+        })
+    end
+end
+
+---Get an empty slot from a storage inventory (from cache)
+---@param invName string The inventory name
+---@return number|nil slot An empty slot number or nil if full
+local function getEmptySlot(invName)
+    -- Check empty slot cache first
+    if emptySlotCache[invName] and #emptySlotCache[invName] > 0 then
+        return emptySlotCache[invName][1]  -- Return first empty slot (don't remove yet)
+    end
+    
+    -- Rebuild empty slot cache for this inventory if needed
+    local invData = inventoryCache.get(invName)
+    if not invData or not invData.size then return nil end
+    
+    emptySlotCache[invName] = {}
+    for slot = 1, invData.size do
+        local slotKey = tostring(slot)
+        if not invData.slots[slot] and not invData.slots[slotKey] then
+            table.insert(emptySlotCache[invName], slot)
+        end
+    end
+    
+    if #emptySlotCache[invName] > 0 then
+        return emptySlotCache[invName][1]
+    end
+    
+    return nil
 end
 
 ---Get the cached modem peripheral (finds once, caches forever)
@@ -235,8 +393,12 @@ function inventory.scan(forceRefresh)
     end
     
     -- Process scan results (sequential, but just data processing)
+    -- Also build empty slot cache
+    emptySlotCache = {}
+    
     for name, data in pairs(scanResults) do
         newInventoryData[name] = data
+        emptySlotCache[name] = {}
         
         for slot, item in pairs(data.slots) do
             local key = getItemKey(item)
@@ -253,6 +415,15 @@ function inventory.scan(forceRefresh)
                 slot = slot,
                 count = item.count,
             })
+        end
+        
+        -- Build empty slot cache for this inventory
+        if data.size then
+            for slot = 1, data.size do
+                if not data.slots[slot] and not data.slots[tostring(slot)] then
+                    table.insert(emptySlotCache[name], slot)
+                end
+            end
         end
     end
     
@@ -287,6 +458,16 @@ function inventory.scanSingle(name, skipRebuild)
         size = size,
     })
     
+    -- Update empty slot cache for this inventory
+    emptySlotCache[name] = {}
+    if size then
+        for slot = 1, size do
+            if not list[slot] and not list[tostring(slot)] then
+                table.insert(emptySlotCache[name], slot)
+            end
+        end
+    end
+    
     -- Rebuild stock levels and locations from cached inventory data (unless deferred)
     if not skipRebuild and not deferredRebuild then
         inventory.rebuildFromCache()
@@ -307,13 +488,17 @@ function inventory.endBatch()
 end
 
 ---Rebuild stock levels and item locations from cached inventory data
+---Also rebuilds empty slot cache
 ---@return table stockLevels The rebuilt stock levels
 function inventory.rebuildFromCache()
     local invData = inventoryCache.getAll()
     local newStockLevels = {}
     itemLocations = {}
+    emptySlotCache = {}
     
     for name, data in pairs(invData) do
+        emptySlotCache[name] = {}
+        
         if data.slots then
             for slot, item in pairs(data.slots) do
                 local key = getItemKey(item)
@@ -330,6 +515,15 @@ function inventory.rebuildFromCache()
                     slot = slotNum,
                     count = item.count,
                 })
+            end
+        end
+        
+        -- Rebuild empty slot cache
+        if data.size then
+            for slot = 1, data.size do
+                if not data.slots[slot] and not data.slots[tostring(slot)] then
+                    table.insert(emptySlotCache[name], slot)
+                end
             end
         end
     end
@@ -451,7 +645,7 @@ function inventory.getItemDetail(invName, slot)
 end
 
 ---Push items from one inventory slot to another
----Updates cache after transfer
+---Updates cache after transfer (for storage inventories only)
 ---@param fromInv string Source inventory name
 ---@param fromSlot number Source slot
 ---@param toInv string Destination inventory name
@@ -462,19 +656,37 @@ function inventory.pushItems(fromInv, fromSlot, toInv, count, toSlot)
     local source = inventory.getPeripheral(fromInv)
     if not source then return 0 end
     
+    -- Get item info from cache before transfer
+    local invData = inventoryCache.get(fromInv)
+    local slotData = nil
+    local itemKey = nil
+    if invData and invData.slots then
+        slotData = invData.slots[fromSlot] or invData.slots[tostring(fromSlot)]
+        if slotData then
+            itemKey = getItemKey(slotData)
+        end
+    end
+    
     local transferred = source.pushItems(toInv, fromSlot, count, toSlot) or 0
     
-    if transferred > 0 then
-        -- Update cache for both inventories
-        inventory.scanSingle(fromInv)
-        inventory.scanSingle(toInv)
+    if transferred > 0 and itemKey then
+        -- Update source cache (removal)
+        updateCacheAfterRemoval(fromInv, fromSlot, itemKey, transferred)
+        
+        -- Update destination cache if it's a storage inventory we track
+        local isStorageDest = inventory.isStorageInventory(toInv)
+        if isStorageDest and slotData then
+            -- For now, scan destination since we don't know exact slot it went to
+            inventory.scanSingle(toInv, true)
+            inventory.rebuildFromCache()
+        end
     end
     
     return transferred
 end
 
 ---Pull items from one inventory slot to another
----Updates cache after transfer
+---Updates cache after transfer (for storage inventories only)
 ---@param toInv string Destination inventory name
 ---@param fromInv string Source inventory name
 ---@param fromSlot number Source slot
@@ -485,18 +697,39 @@ function inventory.pullItems(toInv, fromInv, fromSlot, count, toSlot)
     local dest = inventory.getPeripheral(toInv)
     if not dest then return 0 end
     
+    -- Get item info from source cache before transfer
+    local invData = inventoryCache.get(fromInv)
+    local slotData = nil
+    local itemKey = nil
+    if invData and invData.slots then
+        slotData = invData.slots[fromSlot] or invData.slots[tostring(fromSlot)]
+        if slotData then
+            itemKey = getItemKey(slotData)
+        end
+    end
+    
     local transferred = dest.pullItems(fromInv, fromSlot, count, toSlot) or 0
     
-    if transferred > 0 then
-        -- Update cache for both inventories
-        inventory.scanSingle(fromInv)
-        inventory.scanSingle(toInv)
+    if transferred > 0 and itemKey then
+        -- Update source cache if it's a storage inventory
+        local isStorageSource = inventory.isStorageInventory(fromInv)
+        if isStorageSource then
+            updateCacheAfterRemoval(fromInv, fromSlot, itemKey, transferred)
+        end
+        
+        -- Update destination cache if it's a storage inventory we track
+        local isStorageDest = inventory.isStorageInventory(toInv)
+        if isStorageDest and slotData then
+            inventory.scanSingle(toInv, true)
+            inventory.rebuildFromCache()
+        end
     end
     
     return transferred
 end
 
 ---Withdraw items to a specific inventory (batch update)
+---Uses internal cache updates instead of rescanning
 ---@param item string The item ID to withdraw
 ---@param count number Amount to withdraw
 ---@param destInv string Destination inventory name
@@ -510,7 +743,6 @@ function inventory.withdraw(item, count, destInv, destSlot)
     table.sort(locations, function(a, b) return a.count > b.count end)
     
     local withdrawn = 0
-    local affectedInventories = {}
     local maxRetries = 2
     
     for _, loc in ipairs(locations) do
@@ -535,10 +767,12 @@ function inventory.withdraw(item, count, destInv, destSlot)
                 end
             end
             
-            withdrawn = withdrawn + transferred
-            
             if transferred > 0 then
-                affectedInventories[loc.inventory] = true
+                withdrawn = withdrawn + transferred
+                
+                -- Update cache directly instead of rescanning
+                updateCacheAfterRemoval(loc.inventory, loc.slot, item, transferred)
+                
                 -- If we're pushing to a specific slot and it's now full, 
                 -- clear destSlot so next push can go anywhere
                 if destSlot and transferred < toWithdraw then
@@ -548,32 +782,17 @@ function inventory.withdraw(item, count, destInv, destSlot)
         end
     end
     
-    -- Batch update affected source inventories (not destination - it may be a turtle)
-    -- Use skipRebuild=true and rebuild once at the end for efficiency
-    local invCount = 0
-    for invName in pairs(affectedInventories) do
-        invCount = invCount + 1
-    end
-    
-    local scanned = 0
-    for invName in pairs(affectedInventories) do
-        scanned = scanned + 1
-        -- Only rebuild on the last inventory
-        inventory.scanSingle(invName, scanned < invCount)
-    end
-    
     return withdrawn
 end
 
 ---Deposit items from an inventory into storage (batch update)
 ---Storage inventories pull from the source (works with turtles)
----Optimized: only tries one storage per slot until successful, then moves to next slot
+---Uses internal cache to find empty slots and updates cache after transfers
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param item? string Optional item filter (not used when pulling from turtle)
 ---@return number deposited Amount deposited
 function inventory.deposit(sourceInv, item)
     local deposited = 0
-    local affectedInventories = {}
     
     logger.debug(string.format("inventory.deposit called: sourceInv=%s, item=%s", sourceInv, tostring(item)))
     
@@ -599,7 +818,13 @@ function inventory.deposit(sourceInv, item)
         if name ~= sourceInv then
             local dest = inventory.getPeripheral(name)
             if dest and dest.pullItems then
-                table.insert(storagePeripherals, {name = name, peripheral = dest})
+                -- Get or build empty slot cache for this inventory
+                local emptySlot = getEmptySlot(name)
+                table.insert(storagePeripherals, {
+                    name = name, 
+                    peripheral = dest,
+                    hasSpace = emptySlot ~= nil
+                })
             end
         end
     end
@@ -609,46 +834,51 @@ function inventory.deposit(sourceInv, item)
         return 0
     end
     
+    -- Sort so inventories with space come first
+    table.sort(storagePeripherals, function(a, b)
+        if a.hasSpace ~= b.hasSpace then
+            return a.hasSpace
+        end
+        return false
+    end)
+    
     logger.debug(string.format("Using %d storage peripherals for deposit", #storagePeripherals))
     
-    -- For each slot in the source, try multiple storages to handle both
-    -- empty slots and full storages correctly
+    -- For each slot in the source (turtle has 16 slots), try to deposit
     local storageIndex = 1
-    local emptySlotStreak = 0  -- Track consecutive empty slots for early exit
+    local emptySlotStreak = 0
     
     for slot = 1, 16 do
         local slotCleared = false
-        local zeroCount = 0  -- How many storages returned 0 for this slot
-        local maxZeroAttempts = math.min(3, #storagePeripherals)  -- Try up to 3 storages before assuming empty
+        local attempts = 0
+        local maxAttempts = math.min(3, #storagePeripherals)
         
-        -- Keep trying until slot is cleared or we've tried enough storages
-        while not slotCleared and zeroCount < maxZeroAttempts do
+        while not slotCleared and attempts < maxAttempts do
             local storage = storagePeripherals[storageIndex]
             local success, pulled = pcall(function()
                 return storage.peripheral.pullItems(sourceInv, slot)
             end)
             
             if not success then
-                -- Error during pull (e.g., peripheral disconnected)
                 logger.debug(string.format("Slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
-                zeroCount = zeroCount + 1
+                attempts = attempts + 1
                 storageIndex = (storageIndex % #storagePeripherals) + 1
             elseif pulled and pulled > 0 then
                 logger.debug(string.format("Slot %d: pulled %d items to %s", slot, pulled, storage.name))
                 deposited = deposited + pulled
-                affectedInventories[storage.name] = true
                 slotCleared = true
                 emptySlotStreak = 0
-                -- Keep using same storage if it's working
+                
+                -- We received items into storage - update cache
+                -- Since we don't know the exact slot/item, we need to scan this inventory
+                -- But defer the rebuild until the end
+                inventory.scanSingle(storage.name, true)
             else
-                -- pulled == 0 or pulled == nil: either slot is empty or storage is full
-                zeroCount = zeroCount + 1
-                -- Rotate to next storage to try
+                attempts = attempts + 1
                 storageIndex = (storageIndex % #storagePeripherals) + 1
             end
         end
         
-        -- If we tried all storages and got 0 each time, slot is likely empty
         if not slotCleared then
             emptySlotStreak = emptySlotStreak + 1
         end
@@ -658,7 +888,6 @@ function inventory.deposit(sourceInv, item)
             break
         end
         
-        -- Rotate storage occasionally for even distribution
         if slot % 4 == 0 then
             storageIndex = (storageIndex % #storagePeripherals) + 1
         end
@@ -666,15 +895,9 @@ function inventory.deposit(sourceInv, item)
     
     logger.debug(string.format("inventory.deposit complete: deposited %d items", deposited))
     
-    -- Batch update affected storage inventories
-    -- Use skipRebuild for all but the last one
-    local invCount = 0
-    for _ in pairs(affectedInventories) do invCount = invCount + 1 end
-    
-    local scanned = 0
-    for invName in pairs(affectedInventories) do
-        scanned = scanned + 1
-        inventory.scanSingle(invName, scanned < invCount)
+    -- Rebuild cache once at the end if we deposited anything
+    if deposited > 0 then
+        inventory.rebuildFromCache()
     end
     
     return deposited
@@ -682,7 +905,7 @@ end
 
 ---Clear specific slots from an inventory into storage (batch update)
 ---Storage inventories pull from the specified slots (works with turtles)
----Optimized: only tries one storage per slot until successful, then moves to next slot
+---Uses deferred scanning and batch cache rebuild for efficiency
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param slots table Array of slot numbers to clear
 ---@return number cleared Amount of items cleared
@@ -708,12 +931,18 @@ function inventory.clearSlots(sourceInv, slots)
     end
     
     -- Pre-wrap all storage peripherals for efficiency
+    -- Prioritize inventories with empty slots
     local storagePeripherals = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
             local dest = inventory.getPeripheral(name)
             if dest and dest.pullItems then
-                table.insert(storagePeripherals, {name = name, peripheral = dest})
+                local emptySlot = getEmptySlot(name)
+                table.insert(storagePeripherals, {
+                    name = name, 
+                    peripheral = dest,
+                    hasSpace = emptySlot ~= nil
+                })
             end
         end
     end
@@ -723,16 +952,22 @@ function inventory.clearSlots(sourceInv, slots)
         return 0
     end
     
+    -- Sort so inventories with space come first
+    table.sort(storagePeripherals, function(a, b)
+        if a.hasSpace ~= b.hasSpace then
+            return a.hasSpace
+        end
+        return false
+    end)
+    
     logger.debug(string.format("Using %d storage peripherals for clearSlots", #storagePeripherals))
     
-    -- For each specified slot, try storage inventories until the slot is cleared
-    -- More aggressive since these slots are known to have items
     local storageIndex = 1
     
     for _, slot in ipairs(slots) do
         local slotCleared = false
         local attempts = 0
-        local maxAttempts = math.min(5, #storagePeripherals)  -- Try more storages since we know slot has items
+        local maxAttempts = math.min(5, #storagePeripherals)
         
         while not slotCleared and attempts < maxAttempts do
             local storage = storagePeripherals[storageIndex]
@@ -741,7 +976,6 @@ function inventory.clearSlots(sourceInv, slots)
             end)
             
             if not success then
-                -- Error during pull (e.g., peripheral disconnected)
                 logger.debug(string.format("clearSlots slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
                 storageIndex = (storageIndex % #storagePeripherals) + 1
                 attempts = attempts + 1
@@ -750,9 +984,7 @@ function inventory.clearSlots(sourceInv, slots)
                 cleared = cleared + pulled
                 affectedInventories[storage.name] = true
                 slotCleared = true
-                -- Keep using same storage if it's working
             else
-                -- Storage might be full or slot is empty, try next
                 storageIndex = (storageIndex % #storagePeripherals) + 1
                 attempts = attempts + 1
             end
@@ -765,14 +997,14 @@ function inventory.clearSlots(sourceInv, slots)
     
     logger.debug(string.format("inventory.clearSlots complete: cleared %d items", cleared))
     
-    -- Batch update affected storage inventories
-    local invCount = 0
-    for _ in pairs(affectedInventories) do invCount = invCount + 1 end
-    
-    local scanned = 0
+    -- Scan affected inventories with deferred rebuild
     for invName in pairs(affectedInventories) do
-        scanned = scanned + 1
-        inventory.scanSingle(invName, scanned < invCount)
+        inventory.scanSingle(invName, true)  -- Skip rebuild
+    end
+    
+    -- Rebuild cache once at the end
+    if cleared > 0 then
+        inventory.rebuildFromCache()
     end
     
     return cleared
@@ -846,8 +1078,10 @@ function inventory.clearCaches()
     itemLocations = {}
     inventoryNames = {}
     inventorySizes = {}
+    emptySlotCache = {}
     lastScanTime = 0
     lastFullScan = 0
+    stockLevelsDirty = true
 end
 
 ---Get cache statistics
@@ -869,10 +1103,26 @@ function inventory.getCacheStats()
         wrappedCount = wrappedCount + 1
     end
     
+    local emptySlotCount = 0
+    local inventoriesWithEmpty = 0
+    for invName, slots in pairs(emptySlotCache) do
+        local slotCount = 0
+        for _ in pairs(slots) do
+            slotCount = slotCount + 1
+        end
+        emptySlotCount = emptySlotCount + slotCount
+        if slotCount > 0 then
+            inventoriesWithEmpty = inventoriesWithEmpty + 1
+        end
+    end
+    
     return {
         inventories = invCount,
         itemDetails = detailCount,
         wrappedPeripherals = wrappedCount,
+        emptySlots = emptySlotCount,
+        inventoriesWithEmptySlots = inventoriesWithEmpty,
+        stockLevelsDirty = stockLevelsDirty,
         lastScan = lastFullScan,
         timeSinceScan = os.clock() - lastScanTime,
     }
@@ -966,7 +1216,7 @@ function inventory.withdrawToPlayer(item, count, playerName)
     end
     
     local withdrawn = 0
-    local affectedInventories = {}
+    local invData = inventoryCache.getAll()
     
     for _, loc in ipairs(locations) do
         if withdrawn >= count then break end
@@ -987,15 +1237,11 @@ function inventory.withdrawToPlayer(item, count, playerName)
             
             withdrawn = withdrawn + transferred
             
+            -- Update cache directly instead of rescanning
             if transferred > 0 then
-                affectedInventories[loc.inventory] = true
+                updateCacheAfterRemoval(loc.inventory, loc.slot, loc.name, transferred)
             end
         end
-    end
-    
-    -- Batch update affected inventories
-    for invName in pairs(affectedInventories) do
-        inventory.scanSingle(invName)
     end
     
     if withdrawn == 0 then
