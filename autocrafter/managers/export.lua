@@ -2,7 +2,7 @@
 --- Manages automated item export to external inventories (e.g., ender storage).
 --- Supports "stock" mode (keep items stocked) and "empty" mode (drain from storage).
 ---
----@version 1.0.0
+---@version 1.0.1
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
@@ -137,6 +137,11 @@ local function pushToExport(item, count, destInv, destSlot)
     for _, loc in ipairs(locations) do
         if pushed >= count then break end
         
+        -- Skip if the source is the same as the destination
+        if loc.inventory == destInv then
+            goto continue
+        end
+        
         local source = inventory.getPeripheral(loc.inventory)
         if source then
             local toPush = math.min(count - pushed, loc.count)
@@ -154,6 +159,8 @@ local function pushToExport(item, count, destInv, destSlot)
                 inventory.scanSingle(loc.inventory, true)
             end
         end
+        
+        ::continue::
     end
     
     -- Rebuild cache if we pushed anything
