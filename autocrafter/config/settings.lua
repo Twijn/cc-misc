@@ -15,6 +15,7 @@ settings.setDefault("craftCheckInterval", config.craftCheckInterval)
 settings.setDefault("maxBatchSize", config.maxBatchSize)
 settings.setDefault("serverLabel", config.serverLabel)
 settings.setDefault("crafterTimeout", config.crafterTimeout)
+settings.setDefault("cachePath", config.cachePath)
 
 local module = {}
 
@@ -47,6 +48,7 @@ function module.reset()
     settings.setDefault("maxBatchSize", config.maxBatchSize)
     settings.setDefault("serverLabel", config.serverLabel)
     settings.setDefault("crafterTimeout", config.crafterTimeout)
+    settings.setDefault("cachePath", config.cachePath)
 end
 
 return module

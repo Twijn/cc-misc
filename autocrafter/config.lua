@@ -2,6 +2,10 @@
 ---@version 2.0.0
 
 return {
+    -- Cache storage path (for inventories.json, item-details.json, stock.json)
+    -- Set to nil to use local cache/ directory, or specify a path like "disk/data/cache"
+    cachePath = "disk/data/cache",
+    
     -- Network channel for crafter communication
     modemChannel = 4200,
     

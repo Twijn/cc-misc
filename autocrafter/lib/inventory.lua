@@ -7,18 +7,22 @@
 
 local VERSION = "3.0.0"
 
--- Ensure cache directory exists
-fs.makeDir("data/cache")
-
 local persist = require("lib.persist")
 local logger = require("lib.log")
+local config = require("config")
 
 local inventory = {}
 
+-- Determine cache path from config (default to disk/data/cache)
+local cachePath = config.cachePath or "disk/data/cache"
+
+-- Ensure cache directory exists
+fs.makeDir(cachePath)
+
 -- Persistent caches
-local inventoryCache = persist("cache/inventories.json")
-local itemDetailCache = persist("cache/item-details.json")
-local stockCache = persist("cache/stock.json")
+local inventoryCache = persist(cachePath .. "/inventories.json")
+local itemDetailCache = persist(cachePath .. "/item-details.json")
+local stockCache = persist(cachePath .. "/stock.json")
 
 -- Runtime state (not persisted)
 local wrappedPeripherals = {}  -- Cached peripheral.wrap() results
