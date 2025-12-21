@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>cmd - CC-Misc Utilities</title>
+    <title>pager - CC-Misc Utilities</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
@@ -246,28 +246,24 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>cmd <span class="version-badge">v1.1.0</span></h1>
-        <p>Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, and string utility functions.</p>
+        <h1>pager <span class="version-badge">v1.0.0</span></h1>
+        <p>Pager utility for ComputerCraft that displays long output with pagination Similar to 'less' or 'more' on Unix systems. Allows scrolling through content that exceeds the terminal height. Features: Page-by-page navigation, line-by-line scrolling, search/skip to end, dynamic terminal size detection, works with both strings and tables of lines.</p>
     </div>
     
     <div class="install-section">
         <h2>Installation</h2>
-        <div style="background: #3b362f; border: 1px solid #d89a3a; padding: 1rem; border-radius: 4px; margin-bottom: 1rem;">
-            <strong>⚠️ Dependencies:</strong> This library requires: <code style="background: #3b362f; border: 1px solid #c6ac83;">pager</code>
-            <br><em>Using installer will automatically install all dependencies.</em>
-        </div>
         <p><strong>Recommended:</strong> Install via installer (handles dependencies automatically):</p>
-        <div class="install-cmd" id="installer-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua cmd</div>
+        <div class="install-cmd" id="installer-cmd">wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua pager</div>
             <div class="install-controls">
                 <button class="copy-btn" onclick="copyCommand(this, 'installer-cmd')">Copy Command</button>
-                <a href="https://github.com/Twijn/cc-misc/blob/main/util/cmd.lua" class="github-link" target="_blank">View on GitHub →</a>
+                <a href="https://github.com/Twijn/cc-misc/blob/main/util/pager.lua" class="github-link" target="_blank">View on GitHub →</a>
             </div>
             
             <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
             <div class="collapsible-content">
                 <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
                 <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
-local libs = {"cmd"} -- Add more libraries as needed
+local libs = {"pager"} -- Add more libraries as needed
 local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
 local allExist = true
 
@@ -282,7 +278,7 @@ if not allExist then
     shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
-local cmd = require(libDir .. "cmd")
+local pager = require(libDir .. "pager")
 
 -- Use the library
 -- (your code here)
@@ -290,6 +286,11 @@ local cmd = require(libDir .. "cmd")
                 <div class="install-controls">
                     <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
                 </div>
+            </div>
+        <p style="margin-top: 1.5rem;"><strong>Alternative:</strong> Direct download via wget:</p>
+            <div class="install-cmd" id="wget-cmd">wget https://raw.githubusercontent.com/Twijn/cc-misc/main/util/pager.lua</div>
+            <div class="install-controls">
+                <button class="copy-btn" onclick="copyCommand(this, 'wget-cmd')">Copy Command</button>
             </div>
     </div>
     
@@ -347,7 +348,7 @@ local cmd = require(libDir .. "cmd")
     <h3>Using with Runtime Installation</h3>
     <p>This example shows how to download and use libraries with automatic installation:</p>
     <pre><code class="language-lua">-- Auto-install and require libraries
-local libs = {"cmd"} -- Add more libraries as needed
+local libs = {"pager"} -- Add more libraries as needed
 local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
 local allExist = true
 
@@ -362,61 +363,115 @@ if not allExist then
     shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
-local cmd = require(libDir .. "cmd")
+local pager = require(libDir .. "pager")
 
 -- Use the library
 </code></pre>
     
     <h3>Usage Examples</h3>
-    <pre><code class="language-lua">local cmd = require("cmd")
-local customCommands = {
- hello = {
-   description = "Say hello to someone",
-   execute = function(args, context)
-     local name = args[1] or "World"
-     context.succ("Hello, " .. name .. "!")
-   end
- },
- longlist = {
-   description = "Show a long list with pagination",
-   execute = function(args, context)
-     local p = context.pager("My Long List")
-     for i = 1, 100 do
-       p.print("Item " .. i)
-     end
-     p.show()
-   end
- }
-}
-cmd("MyApp", "1.0.0", customCommands)</code></pre>
+    <pre><code class="language-lua">local pager = require("pager")
+-- Display a table of lines
+local lines = {"Line 1", "Line 2", ...}
+pager.display(lines, "My Title")
+-- Use the pager collector to build output
+local p = pager.new("Results")
+p:print("Some text")
+p:write("partial ")
+p:print("line")
+p:setColor(colors.lime)
+p:print("Green text")
+p:show()</code></pre>
     <h2>Functions</h2>
     <div class='function'>
-        <h3><code>string.split(self, sep?, plain?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/cmd.lua#L161' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
-        <p>Split a string into an array of substrings based on a separator</p>
+        <h3><code>pager.new(title?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L38' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Create a new pager collector for building pageable output</p>
         <div class='params'>
             <strong>Parameters:</strong>
             <ul>
-                <li><code>self</code> (string): The string to split</li>
-                <li><code>sep?</code> (string): The separator to split on (defaults to each character)</li>
-                <li><code>plain?</code> (boolean): Whether to treat separator as plain text (no pattern matching)</li>
+                <li><code>title?</code> (string): Optional title to show at the top</li>
             </ul>
         </div>
-        <div class='returns'><strong>Returns:</strong> string[] # Array of split substrings</div>
+        <div class='returns'><strong>Returns:</strong> PagerCollector</div>
     </div>
     <div class='function'>
-        <h3><code>string.startsWith(self, target, caseSensitive?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/cmd.lua#L185' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
-        <p>Check if a string starts with a target substring</p>
+        <h3><code>PagerCollector:setColor(color)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L50' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Set the current text color for subsequent writes</p>
         <div class='params'>
             <strong>Parameters:</strong>
             <ul>
-                <li><code>self</code> (string): The string to check</li>
-                <li><code>target</code> (string): The substring to look for at the beginning</li>
-                <li><code>caseSensitive?</code> (boolean): Whether the comparison should be case-sensitive (defaults to false)</li>
+                <li><code>color</code> (number): The color constant (e.g., colors.red)</li>
             </ul>
         </div>
-        <div class='returns'><strong>Returns:</strong> boolean # True if the string starts with the target</div>
+    </div>
+    <div class='function'>
+        <h3><code>PagerCollector:write(text)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L56' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Write text without a newline (can be called multiple times per line)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>text</code> (string): The text to write</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>PagerCollector:print(text?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L66' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Print text with a newline (completes the current line)</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>text?</code> (string): Optional text to print before the newline</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>PagerCollector:newline()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L76' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Add a blank line</p>
+    </div>
+    <div class='function'>
+        <h3><code>PagerCollector:lineCount()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L82' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Get the number of lines collected</p>
+        <div class='returns'><strong>Returns:</strong> number</div>
+    </div>
+    <div class='function'>
+        <h3><code>PagerCollector:needsPaging()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L92' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Check if paging is needed based on terminal height</p>
+        <div class='returns'><strong>Returns:</strong> boolean</div>
+    </div>
+    <div class='function'>
+        <h3><code>PagerCollector:show()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L110' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Display the collected content with pagination if needed If content fits on screen, just prints it directly</p>
+    </div>
+    <div class='function'>
+        <h3><code>pager.display(lines, title?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L230' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Display a table of strings or pre-formatted lines with pagination This is a simpler interface for when you just have plain strings</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>lines</code> (string[]): Array of strings to display</li>
+                <li><code>title?</code> (string): Optional title</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>pager.create(title?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/pager.lua#L242' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Create a pager that acts like term for easy integration Returns an object with print, write, setTextColor that collects output</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>title?</code> (string): Optional title for the pager</li>
+            </ul>
+        </div>
+        <div class='returns'><strong>Returns:</strong> table Pager object with terminal-like interface</div>
     </div>
 </body>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>

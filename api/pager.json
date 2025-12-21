@@ -1,0 +1,21 @@
+{
+  "name": "pager",
+  "version": "1.0.0",
+  "description": "Pager utility for ComputerCraft that displays long output with pagination Similar to 'less' or 'more' on Unix systems. Allows scrolling through content that exceeds the terminal height. Features: Page-by-page navigation, line-by-line scrolling, search/skip to end, dynamic terminal size detection, works with both strings and tables of lines.",
+  "dependencies": [],
+  "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/pager.lua",
+  "documentation_url": "https://ccmisc.twijn.dev/pager.html",
+  "functions": [
+    "pager.new",
+    "PagerCollector:setColor",
+    "PagerCollector:write",
+    "PagerCollector:print",
+    "PagerCollector:newline",
+    "PagerCollector:lineCount",
+    "PagerCollector:needsPaging",
+    "PagerCollector:show",
+    "pager.display",
+    "pager.create"
+  ],
+  "classes": []
+}

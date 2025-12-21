@@ -2,9 +2,11 @@
   "libraries": [
     {
       "name": "cmd",
-      "version": "1.0.0",
-      "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, and string utility functions (split, startsWith).",
-      "dependencies": [],
+      "version": "1.1.0",
+      "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, and string utility functions.",
+      "dependencies": [
+        "pager"
+      ],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/cmd.lua",
       "documentation_url": "https://ccmisc.twijn.dev/cmd.html",
       "functions": [
@@ -203,6 +205,27 @@
       "classes": []
     },
     {
+      "name": "pager",
+      "version": "1.0.0",
+      "description": "Pager utility for ComputerCraft that displays long output with pagination Similar to 'less' or 'more' on Unix systems. Allows scrolling through content that exceeds the terminal height. Features: Page-by-page navigation, line-by-line scrolling, search/skip to end, dynamic terminal size detection, works with both strings and tables of lines.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/pager.lua",
+      "documentation_url": "https://ccmisc.twijn.dev/pager.html",
+      "functions": [
+        "pager.new",
+        "PagerCollector:setColor",
+        "PagerCollector:write",
+        "PagerCollector:print",
+        "PagerCollector:newline",
+        "PagerCollector:lineCount",
+        "PagerCollector:needsPaging",
+        "PagerCollector:show",
+        "pager.display",
+        "pager.create"
+      ],
+      "classes": []
+    },
+    {
       "name": "timeutil",
       "version": "1.0.0",
       "description": "A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time intervals (based on system time), accumulated time intervals (based on actual runtime), persistent state across computer restarts, pretty-printed time formatting, manual execution control, and automatic interval management with run loop.",
@@ -251,5 +274,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-12-21T05:09:11Z"
+  "updated": "2025-12-21T06:18:01Z"
 }

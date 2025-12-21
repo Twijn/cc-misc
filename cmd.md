@@ -1,6 +1,6 @@
 # cmd
 
-Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, and string utility functions (split, startsWith).
+Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, and string utility functions.
 
 ## Examples
 
@@ -12,6 +12,16 @@ local customCommands = {
    execute = function(args, context)
      local name = args[1] or "World"
      context.succ("Hello, " .. name .. "!")
+   end
+ },
+ longlist = {
+   description = "Show a long list with pagination",
+   execute = function(args, context)
+     local p = context.pager("My Long List")
+     for i = 1, 100 do
+       p.print("Item " .. i)
+     end
+     p.show()
    end
  }
 }

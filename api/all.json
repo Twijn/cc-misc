@@ -2,9 +2,11 @@
   "libraries": {
     "cmd": {
       "name": "cmd",
-      "version": "1.0.0",
-      "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, and string utility functions (split, startsWith).",
-      "dependencies": [],
+      "version": "1.1.0",
+      "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, and string utility functions.",
+      "dependencies": [
+        "pager"
+      ],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/cmd.lua",
       "documentation_url": "https://ccmisc.twijn.dev/cmd.html",
       "functions": [
@@ -29,7 +31,7 @@
           ],
           "returns": "string[] # Array of split substrings",
           "description": "Split a string into an array of substrings based on a separator",
-          "line": 138
+          "line": 161
         },
         {
           "name": "string.startsWith",
@@ -52,7 +54,7 @@
           ],
           "returns": "boolean # True if the string starts with the target",
           "description": "Check if a string starts with a target substring",
-          "line": 162
+          "line": 185
         }
       ],
       "classes": []
@@ -1356,6 +1358,128 @@
       ],
       "classes": []
     },
+    "pager": {
+      "name": "pager",
+      "version": "1.0.0",
+      "description": "Pager utility for ComputerCraft that displays long output with pagination Similar to 'less' or 'more' on Unix systems. Allows scrolling through content that exceeds the terminal height. Features: Page-by-page navigation, line-by-line scrolling, search/skip to end, dynamic terminal size detection, works with both strings and tables of lines.",
+      "dependencies": [],
+      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/pager.lua",
+      "documentation_url": "https://ccmisc.twijn.dev/pager.html",
+      "functions": [
+        {
+          "name": "pager.new",
+          "params": [
+            {
+              "name": "title?",
+              "type": "string",
+              "description": "Optional title to show at the top"
+            }
+          ],
+          "returns": "PagerCollector",
+          "description": "Create a new pager collector for building pageable output",
+          "line": 38
+        },
+        {
+          "name": "PagerCollector:setColor",
+          "params": [
+            {
+              "name": "color",
+              "type": "number",
+              "description": "The color constant (e.g., colors.red)"
+            }
+          ],
+          "returns": "",
+          "description": "Set the current text color for subsequent writes",
+          "line": 50
+        },
+        {
+          "name": "PagerCollector:write",
+          "params": [
+            {
+              "name": "text",
+              "type": "string",
+              "description": "The text to write"
+            }
+          ],
+          "returns": "",
+          "description": "Write text without a newline (can be called multiple times per line)",
+          "line": 56
+        },
+        {
+          "name": "PagerCollector:print",
+          "params": [
+            {
+              "name": "text?",
+              "type": "string",
+              "description": "Optional text to print before the newline"
+            }
+          ],
+          "returns": "",
+          "description": "Print text with a newline (completes the current line)",
+          "line": 66
+        },
+        {
+          "name": "PagerCollector:newline",
+          "params": [],
+          "returns": "",
+          "description": "Add a blank line",
+          "line": 76
+        },
+        {
+          "name": "PagerCollector:lineCount",
+          "params": [],
+          "returns": "number",
+          "description": "Get the number of lines collected",
+          "line": 82
+        },
+        {
+          "name": "PagerCollector:needsPaging",
+          "params": [],
+          "returns": "boolean",
+          "description": "Check if paging is needed based on terminal height",
+          "line": 92
+        },
+        {
+          "name": "PagerCollector:show",
+          "params": [],
+          "returns": "",
+          "description": "Display the collected content with pagination if needed If content fits on screen, just prints it directly",
+          "line": 110
+        },
+        {
+          "name": "pager.display",
+          "params": [
+            {
+              "name": "lines",
+              "type": "string[]",
+              "description": "Array of strings to display"
+            },
+            {
+              "name": "title?",
+              "type": "string",
+              "description": "Optional title"
+            }
+          ],
+          "returns": "",
+          "description": "Display a table of strings or pre-formatted lines with pagination This is a simpler interface for when you just have plain strings",
+          "line": 230
+        },
+        {
+          "name": "pager.create",
+          "params": [
+            {
+              "name": "title?",
+              "type": "string",
+              "description": "Optional title for the pager"
+            }
+          ],
+          "returns": "table Pager object with terminal-like interface",
+          "description": "Create a pager that acts like term for easy integration Returns an object with print, write, setTextColor that collects output",
+          "line": 242
+        }
+      ],
+      "classes": []
+    },
     "timeutil": {
       "name": "timeutil",
       "version": "1.0.0",
@@ -1802,5 +1926,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-21T05:09:11Z"
+  "updated": "2025-12-21T06:18:01Z"
 }
