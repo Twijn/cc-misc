@@ -213,6 +213,45 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
     return pulled
 end
 
+---Pull all items from an export inventory back to storage
+---@param sourceInv string Source export inventory name
+---@return number pulled Total amount of items pulled
+local function pullAllFromExport(sourceInv)
+    local source = getExportPeripheral(sourceInv)
+    if not source then return 0 end
+    
+    local pulled = 0
+    local storageInvs = inventory.getStorageInventories()
+    
+    if #storageInvs == 0 then return 0 end
+    
+    -- Get all items in the export inventory
+    local list = source.list()
+    if not list then return 0 end
+    
+    -- Pull each slot
+    for slot, slotItem in pairs(list) do
+        for _, destName in ipairs(storageInvs) do
+            local dest = inventory.getPeripheral(destName)
+            if dest and dest.pullItems then
+                local transferred = dest.pullItems(sourceInv, slot) or 0
+                if transferred > 0 then
+                    pulled = pulled + transferred
+                    inventory.scanSingle(destName, true)
+                    break
+                end
+            end
+        end
+    end
+    
+    -- Rebuild cache if we pulled anything
+    if pulled > 0 then
+        inventory.rebuildFromCache()
+    end
+    
+    return pulled
+end
+
 ---Process a single export inventory
 ---@param name string The peripheral name
 ---@param config table The export configuration
@@ -227,6 +266,16 @@ local function processExportInventory(name, config)
     end
     
     local slots = config.slots or {}
+    
+    -- Special case: empty mode with no items configured = pull ALL items
+    if config.mode == "empty" and #slots == 0 then
+        local pulled = pullAllFromExport(name)
+        result.pulled = result.pulled + pulled
+        if pulled > 0 then
+            logger.debug(string.format("Emptied all: %d items from %s", pulled, name))
+        end
+        return result
+    end
     
     for _, slotConfig in ipairs(slots) do
         local item = slotConfig.item

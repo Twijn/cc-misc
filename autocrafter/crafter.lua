@@ -165,17 +165,17 @@ local function requestDeposit(sourceInv, item)
     
     -- Wait for response with longer timeout and retry logic
     local attempts = 0
-    local maxAttempts = 3
-    local timeout = os.clock() + 8  -- Longer timeout
+    local maxAttempts = 5
+    local timeout = os.clock() + 15  -- Longer overall timeout
     
     while os.clock() < timeout and attempts < maxAttempts do
-        local message = comms.receive(2)  -- Longer receive timeout
+        local message = comms.receive(3)  -- 3 second receive timeout
         if message then
             if message.type == config.messageTypes.RESPONSE_DEPOSIT then
                 logger.debug(string.format("requestDeposit: received response, deposited=%d", message.data.deposited or 0))
                 return message.data.deposited or 0
             else
-                -- Got a different message, keep waiting
+                -- Got a different message, keep waiting but don't count as attempt
                 logger.debug(string.format("requestDeposit: received unexpected message type: %s", message.type))
             end
         else

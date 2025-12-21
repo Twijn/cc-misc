@@ -466,8 +466,31 @@ local commands = {
     },
     
     queue = {
-        description = "View crafting queue",
+        description = "View or manage crafting queue",
         execute = function(args, ctx)
+            local subCmd = args[1]
+            
+            if subCmd == "clear" then
+                -- Clear all pending jobs from the queue
+                local jobs = queueManager.getJobs()
+                local pendingCount = 0
+                for _, job in ipairs(jobs) do
+                    if job.status == "pending" then
+                        pendingCount = pendingCount + 1
+                    end
+                end
+                
+                if pendingCount == 0 then
+                    ctx.mess("No pending jobs to clear")
+                    return
+                end
+                
+                queueManager.clearQueue()
+                ctx.succ(string.format("Cleared %d pending job(s) from queue", pendingCount))
+                return
+            end
+            
+            -- Default: show queue
             local jobs = queueManager.getJobs()
             
             if #jobs == 0 then
@@ -497,6 +520,22 @@ local commands = {
                 print("[" .. status .. "]")
             end
             term.setTextColor(colors.white)
+            print("")
+            ctx.mess("Use 'queue clear' to clear all pending jobs")
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"clear"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            end
+            return {}
         end
     },
     
@@ -1085,12 +1124,20 @@ local commands = {
                 ctx.mess("=== Export Inventories ===")
                 for name, cfg in pairs(all) do
                     local itemCount = #(cfg.slots or {})
+                    local modeDisplay = cfg.mode
+                    if cfg.mode == "empty" and itemCount == 0 then
+                        modeDisplay = "drain all"
+                    end
                     term.setTextColor(colors.lime)
                     write(cfg.mode == "stock" and "+" or "-")
                     term.setTextColor(colors.white)
                     write(" " .. name .. " ")
                     term.setTextColor(colors.lightGray)
-                    print(string.format("[%s] %d items", cfg.mode, itemCount))
+                    if cfg.mode == "empty" and itemCount == 0 then
+                        print(string.format("[%s]", modeDisplay))
+                    else
+                        print(string.format("[%s] %d items", modeDisplay, itemCount))
+                    end
                 end
                 term.setTextColor(colors.white)
                 
@@ -1167,7 +1214,13 @@ local commands = {
                 print("")
                 
                 if #items == 0 then
-                    ctx.mess("No items configured")
+                    if cfg.mode == "empty" then
+                        term.setTextColor(colors.lime)
+                        print("  (draining ALL items)")
+                        term.setTextColor(colors.white)
+                    else
+                        ctx.mess("No items configured")
+                    end
                 else
                     for i, item in ipairs(items) do
                         term.setTextColor(colors.white)
@@ -1184,6 +1237,9 @@ local commands = {
                 print("")
                 ctx.mess("Use 'exports additem <inv> <item> <qty> [slot]' to add")
                 ctx.mess("Use 'exports rmitem <inv> <item>' to remove")
+                if cfg.mode == "empty" then
+                    ctx.mess("Tip: Leave empty to drain ALL items from inventory")
+                end
                 
             elseif subCmd == "additem" then
                 local invName = args[2]
@@ -1299,7 +1355,11 @@ local commands = {
                     form:label("Current items (" .. #items .. "):")
                     
                     if #itemDisplay == 0 then
-                        form:label("  (no items configured)")
+                        if cfg.mode == "empty" then
+                            form:label("  (draining ALL items)")
+                        else
+                            form:label("  (no items configured)")
+                        end
                     else
                         for _, display in ipairs(itemDisplay) do
                             form:label("  " .. display)
