@@ -130,6 +130,25 @@ function manager.clearSlots(sourceInv, slots)
     return cleared
 end
 
+---Pull a single slot from an inventory into storage
+---This is a simplified, reliable method for turtle clearing.
+---The caller provides the slot contents so we don't need to query the source.
+---@param sourceInv string Source inventory name (e.g., turtle network name)
+---@param slot number The slot number to pull from
+---@param itemName string The item ID in the slot
+---@param itemCount number The count of items in the slot
+---@param itemNbt? string Optional NBT hash
+---@return number pulled Amount of items actually pulled
+---@return string|nil error Error message if failed
+function manager.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
+    logger.debug(string.format("storageManager.pullSlot: %s slot %d (%dx %s)", 
+        sourceInv, slot, itemCount, itemName))
+    
+    local pulled, err = inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
+    
+    return pulled, err
+end
+
 ---Withdraw items to a player's inventory via manipulator
 ---@param item string Item ID to withdraw
 ---@param count number Amount to withdraw

@@ -258,13 +258,32 @@ local function messageHandler()
                 }, sender)
                 
             elseif msgType == config.messageTypes.REQUEST_CLEAR_SLOTS then
-                -- Crafter wants to clear specific slots
+                -- Crafter wants to clear specific slots (legacy method)
                 logger.debug(string.format("REQUEST_CLEAR_SLOTS from %s: sourceInv=%s, slots=%s", 
                     tostring(sender), tostring(data.sourceInv), textutils.serialize(data.slots or {})))
                 local cleared = storageManager.clearSlots(data.sourceInv, data.slots)
                 logger.debug(string.format("REQUEST_CLEAR_SLOTS result: cleared=%d", cleared))
                 comms.send(config.messageTypes.RESPONSE_CLEAR_SLOTS, {
                     cleared = cleared,
+                }, sender)
+                
+            elseif msgType == config.messageTypes.REQUEST_PULL_SLOT then
+                -- Crafter wants to pull a specific slot with known contents
+                -- This is the preferred method for turtle clearing
+                local slot = data.slot
+                local itemName = data.itemName
+                local itemCount = data.itemCount
+                local itemNbt = data.itemNbt
+                
+                logger.debug(string.format("REQUEST_PULL_SLOT from %s: %s slot %d (%dx %s)", 
+                    tostring(sender), tostring(data.sourceInv), slot, itemCount, itemName))
+                
+                local pulled, err = storageManager.pullSlot(data.sourceInv, slot, itemName, itemCount, itemNbt)
+                
+                comms.send(config.messageTypes.RESPONSE_PULL_SLOT, {
+                    slot = slot,
+                    pulled = pulled,
+                    error = err,
                 }, sender)
                 
             elseif msgType == config.messageTypes.SERVER_QUERY then

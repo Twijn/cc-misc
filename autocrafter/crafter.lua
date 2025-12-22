@@ -194,39 +194,53 @@ local function requestDeposit(sourceInv, item)
     return 0
 end
 
----Request server to clear specific slots from turtle inventory
+---Request server to pull a specific slot with known contents
+---This is more reliable than generic deposit/clear because we tell the server
+---exactly what's in the slot, so it doesn't need to query us.
 ---@param sourceInv string Our inventory name (modem name)
----@param slots table Array of slot numbers to clear
----@return number cleared Amount of items cleared
-local function requestClearSlots(sourceInv, slots)
-    logger.debug(string.format("requestClearSlots: sourceInv=%s, slots=%s", sourceInv, textutils.serialize(slots)))
+---@param slot number The slot number
+---@param itemName string The item ID
+---@param itemCount number The item count
+---@param itemNbt? string Optional NBT hash
+---@return number pulled Amount of items pulled
+---@return string|nil error Error message if failed
+local function requestPullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
+    logger.debug(string.format("requestPullSlot: slot=%d, item=%s, count=%d", slot, itemName, itemCount))
     
     local attempts = 0
     local maxAttempts = 3
     
     while attempts < maxAttempts do
-        -- Send request each attempt
-        comms.broadcast(config.messageTypes.REQUEST_CLEAR_SLOTS, {
+        -- Send request with full slot details
+        comms.broadcast(config.messageTypes.REQUEST_PULL_SLOT, {
             sourceInv = sourceInv,
-            slots = slots,
+            slot = slot,
+            itemName = itemName,
+            itemCount = itemCount,
+            itemNbt = itemNbt,
         })
         
-        -- Wait for response - use filter to only get the response we want
-        local message = comms.receive(5, config.messageTypes.RESPONSE_CLEAR_SLOTS)
-        if message then
-            logger.debug(string.format("requestClearSlots: received response, cleared=%d", message.data.cleared or 0))
-            return message.data.cleared or 0
+        -- Wait for response
+        local message = comms.receive(3, config.messageTypes.RESPONSE_PULL_SLOT)
+        if message and message.data.slot == slot then
+            local pulled = message.data.pulled or 0
+            local err = message.data.error
+            logger.debug(string.format("requestPullSlot: slot %d response, pulled=%d, error=%s", 
+                slot, pulled, tostring(err)))
+            return pulled, err
         end
         
-        -- Timeout on this attempt, retry with new request
+        -- Timeout on this attempt, retry
         attempts = attempts + 1
         if attempts < maxAttempts then
-            logger.debug(string.format("requestClearSlots: no response, retrying (%d/%d)", attempts, maxAttempts))
+            logger.debug(string.format("requestPullSlot: no response for slot %d, retrying (%d/%d)", 
+                slot, attempts, maxAttempts))
+            sleep(0.1)
         end
     end
     
-    logger.warn("requestClearSlots: no response from server after timeout")
-    return 0
+    logger.warn(string.format("requestPullSlot: no response from server for slot %d", slot))
+    return 0, "timeout"
 end
 
 ---Check if the turtle inventory is empty
@@ -238,6 +252,26 @@ local function isInventoryEmpty()
         end
     end
     return true
+end
+
+---Get slot details using local turtle API (always works)
+---@param slot number The slot to check
+---@return table|nil details {name, count, nbt} or nil if empty
+local function getSlotContents(slot)
+    local count = turtle.getItemCount(slot)
+    if count <= 0 then
+        return nil
+    end
+    local detail = turtle.getItemDetail(slot)
+    if not detail then
+        -- Fallback - we know there are items but can't get details
+        return { name = "unknown", count = count, nbt = nil }
+    end
+    return {
+        name = detail.name,
+        count = count,
+        nbt = detail.nbt,
+    }
 end
 
 ---Log detailed inventory state for debugging
@@ -253,6 +287,7 @@ local function logInventoryState()
                 slot = slot,
                 count = count,
                 name = itemName,
+                nbt = detail and detail.nbt,
             })
             logger.debug(string.format("  Slot %d: %dx %s", slot, count, itemName))
         end
@@ -261,11 +296,13 @@ local function logInventoryState()
 end
 
 ---Clear the turtle inventory to storage (via server request)
----Ensures inventory is completely empty before returning (required for turtle.craft())
----@param maxRetries? number Maximum retry attempts (default 5)
+---Uses a robust slot-by-slot approach where the turtle enumerates its own
+---inventory (using local turtle API) and tells the server exactly what to pull.
+---This avoids race conditions and unreliable remote inventory queries.
+---@param maxRetries? number Maximum retry attempts per slot (default 3)
 ---@return boolean success Whether inventory was fully cleared
 local function clearInventory(maxRetries)
-    maxRetries = maxRetries or 5
+    maxRetries = maxRetries or 3
     local _, _, turtleName = getModem()
     if not turtleName then 
         logger.error("No modem found for clearInventory - cannot communicate with server")
@@ -275,83 +312,87 @@ local function clearInventory(maxRetries)
     
     logger.debug("clearInventory called, turtle name: " .. turtleName)
     
-    -- Check if turtle has any items
+    -- Quick check if already empty
     if isInventoryEmpty() then 
         turtle.select(1)
         return true 
     end
     
-    -- Log what we're trying to clear
-    logger.info("Attempting to clear inventory:")
-    local initialItems = logInventoryState()
+    -- Enumerate inventory using LOCAL turtle API (always reliable)
+    local totalItems = 0
+    local totalCleared = 0
+    local failedSlots = {}
     
-    -- Try to deposit all items with retries
-    for attempt = 1, maxRetries do
-        logger.debug(string.format("Clear attempt %d/%d", attempt, maxRetries))
-        
-        -- Request server to deposit all items from the turtle
-        local deposited = requestDeposit(turtleName, nil)
-        logger.debug(string.format("requestDeposit returned: %d items deposited", deposited))
-        
-        -- Small delay to allow items to transfer
-        sleep(0.1)
-        
-        -- Verify inventory is actually empty
-        if isInventoryEmpty() then
-            logger.info("Inventory successfully cleared")
-            turtle.select(1)
-            return true
-        end
-        
-        -- Still have items - log what remains
-        logger.warn(string.format("Inventory not empty after deposit (attempt %d/%d)", attempt, maxRetries))
-        local remainingItems = logInventoryState()
-        
-        -- Try clearing specific slots
-        local slotsWithItems = {}
-        for _, item in ipairs(remainingItems) do
-            table.insert(slotsWithItems, item.slot)
-        end
-        
-        if #slotsWithItems > 0 then
-            logger.debug(string.format("Requesting server to clear slots: %s", textutils.serialize(slotsWithItems)))
-            local cleared = requestClearSlots(turtleName, slotsWithItems)
-            logger.debug(string.format("requestClearSlots returned: %d items cleared", cleared))
-            sleep(0.1)
-        end
-        
-        -- Check again
-        if isInventoryEmpty() then
-            logger.info("Inventory successfully cleared after slot-specific request")
-            turtle.select(1)
-            return true
-        end
-        
-        -- Still have items, wait and retry
-        if attempt < maxRetries then
-            logger.debug("Items still remain, waiting before retry...")
-            sleep(0.2)
+    for slot = 1, 16 do
+        local contents = getSlotContents(slot)
+        if contents then
+            totalItems = totalItems + contents.count
+            logger.debug(string.format("Slot %d: %dx %s", slot, contents.count, contents.name))
+            
+            -- Try to clear this slot with retries
+            local slotCleared = false
+            for attempt = 1, maxRetries do
+                -- Ask server to pull this specific slot
+                local pulled, err = requestPullSlot(
+                    turtleName, 
+                    slot, 
+                    contents.name, 
+                    contents.count,
+                    contents.nbt
+                )
+                
+                -- Verify locally that the slot is now empty (or has fewer items)
+                local remaining = turtle.getItemCount(slot)
+                
+                if remaining == 0 then
+                    -- Slot is clear
+                    totalCleared = totalCleared + contents.count
+                    slotCleared = true
+                    break
+                elseif remaining < contents.count then
+                    -- Partial clear - update and continue
+                    logger.debug(string.format("Slot %d: partial clear, %d remaining", slot, remaining))
+                    contents.count = remaining
+                    totalCleared = totalCleared + (contents.count - remaining)
+                    -- Don't break, try again for remaining items
+                else
+                    -- Nothing cleared
+                    if err == "no_storage" then
+                        logger.warn("Storage is full or unavailable")
+                        table.insert(failedSlots, {slot = slot, reason = "no_storage"})
+                        break  -- Don't retry if storage is full
+                    elseif err == "timeout" then
+                        logger.debug(string.format("Slot %d: timeout on attempt %d/%d", slot, attempt, maxRetries))
+                        sleep(0.2)  -- Wait a bit before retry
+                    end
+                end
+            end
+            
+            if not slotCleared and turtle.getItemCount(slot) > 0 then
+                table.insert(failedSlots, {slot = slot, reason = "failed"})
+            end
         end
     end
     
-    -- Failed to clear inventory - log detailed diagnostic info
-    logger.error("=== INVENTORY CLEAR FAILED - DIAGNOSTIC INFO ===")
-    logger.error(string.format("Turtle name on network: %s", turtleName))
-    logger.error(string.format("Attempted %d times to clear inventory", maxRetries))
-    logger.error("Remaining items in inventory:")
-    local finalItems = logInventoryState()
-    
-    for _, item in ipairs(finalItems) do
-        logger.error(string.format("  STUCK: Slot %d has %dx %s", item.slot, item.count, item.name))
+    -- Final verification
+    if isInventoryEmpty() then
+        logger.info(string.format("Inventory cleared: %d items moved to storage", totalCleared))
+        turtle.select(1)
+        return true
     end
     
-    logger.error("Possible causes:")
-    logger.error("  1. Server not responding to deposit/clear requests")
-    logger.error("  2. Storage system is full")
-    logger.error("  3. No valid storage destination for these items")
-    logger.error("  4. Network communication issues")
-    logger.error("  5. Server doesn't have peripheral access to this turtle")
-    logger.error("=================================================")
+    -- Some items remain
+    logger.error("=== INVENTORY CLEAR INCOMPLETE ===")
+    logger.error(string.format("Cleared %d/%d items", totalCleared, totalItems))
+    logger.error("Remaining items:")
+    logInventoryState()
+    
+    if #failedSlots > 0 then
+        logger.error("Failed slots:")
+        for _, failure in ipairs(failedSlots) do
+            logger.error(string.format("  Slot %d: %s", failure.slot, failure.reason))
+        end
+    end
     
     turtle.select(1)
     return false
@@ -572,25 +613,9 @@ local function executeCraft(job)
             logger.info(string.format("Batch complete: crafted %d (total: %d/%d crafts)", 
                 batchOutput, totalCraftsCompleted, totalCraftsNeeded))
             
-            -- Collect all slots that have items to clear (including output)
-            local slotsToClean = {}
-            for slot = 1, 16 do
-                if turtle.getItemCount(slot) > 0 then
-                    table.insert(slotsToClean, slot)
-                end
-            end
-            
-            -- Request server to pull items from these slots
-            if #slotsToClean > 0 then
-                local _, _, turtleName = getModem()
-                if turtleName then
-                    local cleared = requestClearSlots(turtleName, slotsToClean)
-                    if cleared == 0 then
-                        -- Retry once if clearing failed
-                        sleep(0.2)
-                        requestClearSlots(turtleName, slotsToClean)
-                    end
-                end
+            -- Clear inventory after successful craft using the robust slot-by-slot method
+            if not clearInventory() then
+                logger.warn("Failed to clear inventory after batch, will retry on next iteration")
             end
         else
             -- Crafting failed - try to salvage what we can

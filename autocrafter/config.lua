@@ -77,7 +77,8 @@ return {
         REQUEST_FIND_ITEM = "request_find_item",   -- Request item locations
         REQUEST_WITHDRAW = "request_withdraw",     -- Request items to be pushed to crafter
         REQUEST_DEPOSIT = "request_deposit",       -- Request to accept items from crafter
-        REQUEST_CLEAR_SLOTS = "request_clear_slots", -- Request to pull items from specific slots
+        REQUEST_CLEAR_SLOTS = "request_clear_slots", -- Request to pull items from specific slots (legacy)
+        REQUEST_PULL_SLOT = "request_pull_slot",   -- Request to pull a specific slot with known contents
         
         -- Server -> Crafter responses
         RESPONSE_STOCK = "response_stock",
@@ -85,6 +86,7 @@ return {
         RESPONSE_WITHDRAW = "response_withdraw",
         RESPONSE_DEPOSIT = "response_deposit",
         RESPONSE_CLEAR_SLOTS = "response_clear_slots",
+        RESPONSE_PULL_SLOT = "response_pull_slot",
         
         -- Server discovery
         SERVER_ANNOUNCE = "server_announce",       -- Server broadcasts presence

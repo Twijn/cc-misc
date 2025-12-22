@@ -1573,6 +1573,99 @@ function inventory.clearSlots(sourceInv, slots)
     
     return cleared
 end
+
+---Pull a single slot from an inventory into storage
+---This is a simplified, more reliable version for turtle clearing.
+---The caller provides the slot contents, so we don't need to query the source.
+---@param sourceInv string Source inventory name (e.g., turtle network name)
+---@param slot number The slot number to pull from
+---@param itemName string The item ID in the slot (for stack-filling optimization)
+---@param itemCount number The count of items in the slot
+---@param itemNbt? string Optional NBT hash for items with NBT
+---@return number pulled Amount of items actually pulled
+---@return string|nil error Error message if failed
+function inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
+    logger.debug(string.format("inventory.pullSlot: sourceInv=%s, slot=%d, item=%s, count=%d", 
+        sourceInv, slot, itemName, itemCount))
+    
+    if itemCount <= 0 then
+        return 0, nil  -- Nothing to pull
+    end
+    
+    -- Get storage inventories
+    local storageInvs = inventory.getStorageInventories()
+    if #storageInvs == 0 then
+        logger.error("pullSlot: No storage inventories available")
+        return 0, "no_storage"
+    end
+    
+    local totalPulled = 0
+    local remaining = itemCount
+    
+    -- Phase 1: Try to fill partial stacks of the same item first
+    local partialStacks = findPartialStacks(itemName, itemNbt, storageInvs)
+    
+    for _, partial in ipairs(partialStacks) do
+        if remaining <= 0 then break end
+        
+        local storage = inventory.getPeripheral(partial.inventory)
+        if storage and storage.pullItems then
+            local toPull = math.min(remaining, partial.space)
+            local success, pulled = pcall(function()
+                return storage.pullItems(sourceInv, slot, toPull, partial.slot)
+            end)
+            
+            if success and pulled and pulled > 0 then
+                logger.debug(string.format("pullSlot: stack-fill %d to %s slot %d", 
+                    pulled, partial.inventory, partial.slot))
+                totalPulled = totalPulled + pulled
+                remaining = remaining - pulled
+                
+                -- Update cache
+                updateCacheAfterAddition(partial.inventory, partial.slot, itemName, pulled, itemNbt)
+            end
+        end
+    end
+    
+    -- Phase 2: Pull remaining to any storage with space
+    if remaining > 0 then
+        for _, storageName in ipairs(storageInvs) do
+            if storageName ~= sourceInv then
+                local storage = inventory.getPeripheral(storageName)
+                if storage and storage.pullItems then
+                    -- Try to pull remaining items
+                    local success, pulled = pcall(function()
+                        return storage.pullItems(sourceInv, slot, remaining)
+                    end)
+                    
+                    if success and pulled and pulled > 0 then
+                        logger.debug(string.format("pullSlot: pulled %d to %s (new slot)", 
+                            pulled, storageName))
+                        totalPulled = totalPulled + pulled
+                        remaining = remaining - pulled
+                        
+                        if remaining <= 0 then
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    if totalPulled > 0 then
+        logger.info(string.format("pullSlot: pulled %d/%d %s from %s slot %d", 
+            totalPulled, itemCount, itemName, sourceInv, slot))
+    end
+    
+    if remaining > 0 then
+        logger.warn(string.format("pullSlot: could not pull all items (%d/%d remaining)", remaining, itemCount))
+        return totalPulled, "partial"
+    end
+    
+    return totalPulled, nil
+end
+
 ---@return number seconds Time since last scan in seconds
 function inventory.timeSinceLastScan()
     return os.clock() - lastScanTime
