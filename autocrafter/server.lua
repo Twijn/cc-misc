@@ -214,7 +214,7 @@ end
 
 -- Throttle state to prevent excessive processing
 local lastCraftTargetProcess = 0
-local craftTargetProcessInterval = 5  -- Minimum seconds between processCraftTargets calls
+local craftTargetProcessInterval = 0.5  -- Minimum seconds between processCraftTargets calls
 
 --- Handle network messages
 local function messageHandler()

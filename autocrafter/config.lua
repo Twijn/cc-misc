@@ -17,7 +17,7 @@ return {
     scanInterval = 30,
     
     -- How often to check craft targets (seconds)
-    craftCheckInterval = 10,
+    craftCheckInterval = 1,
     
     -- Maximum crafting batch size
     maxBatchSize = 64,
@@ -40,10 +40,10 @@ return {
     monitorRefreshInterval = 5,
     
     -- Export check interval (seconds)
-    exportCheckInterval = 5,
+    exportCheckInterval = 2,
     
     -- Furnace check interval (seconds)
-    furnaceCheckInterval = 5,
+    furnaceCheckInterval = 1,
 
     -- Default peripheral type for export inventories
     exportDefaultType = "ender_storage",

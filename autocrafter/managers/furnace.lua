@@ -12,7 +12,7 @@ local manager = {}
 -- Cache of wrapped furnace peripherals
 local furnacePeripherals = {}
 local lastSmeltCheck = 0
-local smeltCheckInterval = 5  -- Seconds between smelt checks
+local smeltCheckInterval = 1  -- Seconds between smelt checks
 
 -- Fuel burn times (in ticks, 1 item smelted = 200 ticks)
 -- Values represent number of items that can be smelted per fuel item
