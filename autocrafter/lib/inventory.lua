@@ -982,8 +982,9 @@ function inventory.pushItems(fromInv, fromSlot, toInv, count, toSlot)
         updateCacheAfterRemoval(fromInv, fromSlot, itemKey, transferred)
         
         -- Update destination cache if it's a storage inventory we track
+        -- Skip scanning/rebuilding during batch operations
         local isStorageDest = inventory.isStorageInventory(toInv)
-        if isStorageDest and slotData then
+        if isStorageDest and slotData and not deferredRebuild then
             -- For now, scan destination since we don't know exact slot it went to
             inventory.scanSingle(toInv, true)
             inventory.rebuildFromCache()
@@ -1026,8 +1027,9 @@ function inventory.pullItems(toInv, fromInv, fromSlot, count, toSlot)
         end
         
         -- Update destination cache if it's a storage inventory we track
+        -- Skip scanning/rebuilding during batch operations
         local isStorageDest = inventory.isStorageInventory(toInv)
-        if isStorageDest and slotData then
+        if isStorageDest and slotData and not deferredRebuild then
             inventory.scanSingle(toInv, true)
             inventory.rebuildFromCache()
         end

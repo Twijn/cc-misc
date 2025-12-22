@@ -534,24 +534,26 @@ end
 ---Uses direct peripheral calls to avoid cache overhead for non-storage inventories.
 ---@param furnaceName string The furnace peripheral name
 ---@return number pulled Amount pulled from output slot
+---@return string|nil destName Name of storage inventory that received items (for cache update)
 local function pullFromFurnace(furnaceName)
     local furnace = getFurnacePeripheral(furnaceName)
-    if not furnace then return 0 end
+    if not furnace then return 0, nil end
     
     local contents = getFurnaceContents(furnace)
     if not contents.output or contents.output.count == 0 then
-        return 0
+        return 0, nil
     end
     
     local outputItem = contents.output
     local remaining = outputItem.count
     local pulled = 0
+    local lastDestName = nil
     
     -- Get storage inventories
     local storageInvs = inventory.getStorageInventories()
     if #storageInvs == 0 then
         logger.warn("pullFromFurnace: No storage inventories available")
-        return 0
+        return 0, nil
     end
     
     -- Try to pull from furnace output slot (slot 3) to storage
@@ -569,6 +571,7 @@ local function pullFromFurnace(furnaceName)
             if success and transferred and transferred > 0 then
                 pulled = pulled + transferred
                 remaining = remaining - transferred
+                lastDestName = destName
                 logger.debug(string.format("pullFromFurnace: pulled %d from %s to %s", 
                     transferred, furnaceName, destName))
             end
@@ -580,7 +583,7 @@ local function pullFromFurnace(furnaceName)
             pulled, outputItem.name, furnaceName))
     end
     
-    return pulled
+    return pulled, lastDestName
 end
 
 ---Process smelting for all configured furnaces
@@ -600,16 +603,27 @@ function manager.processSmelt(stockLevels)
     -- Use batch mode to defer cache rebuilds until the end
     inventory.beginBatch()
     
+    -- Track storage inventories that received items (need cache update)
+    local affectedStorage = {}
+    
     -- First, pull completed items and empty buckets from all furnaces
     for _, furnaceData in pairs(furnaceConfig.getAll()) do
         if furnaceData.enabled then
-            local pulled = pullFromFurnace(furnaceData.name)
+            local pulled, destName = pullFromFurnace(furnaceData.name)
             stats.itemsPulled = stats.itemsPulled + pulled
+            if destName then
+                affectedStorage[destName] = true
+            end
             
             -- Pull empty buckets if lava bucket fuel is enabled
             local buckets = pullEmptyBucketsFromFurnace(furnaceData.name)
             stats.emptyBucketsPulled = stats.emptyBucketsPulled + buckets
         end
+    end
+    
+    -- Scan affected storage inventories to update cache
+    for destName in pairs(affectedStorage) do
+        inventory.scanSingle(destName, true)  -- true = skip immediate rebuild
     end
     
     -- Refuel furnaces that need fuel
