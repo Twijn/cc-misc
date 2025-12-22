@@ -338,12 +338,46 @@ local function pushFuelToFurnace(furnaceName, stockLevels)
     local furnace = getFurnacePeripheral(furnaceName)
     if not furnace then return 0, nil end
     
-    local needsFuel, currentFuel = furnaceNeedsFuel(furnace)
+    local needsFuel, currentFuelCount = furnaceNeedsFuel(furnace)
     if not needsFuel then return 0, nil end
     
-    -- Find best available fuel
-    local fuelItem, available = findBestFuel(stockLevels)
-    if not fuelItem then return 0, nil end
+    -- Check what fuel is already in the furnace
+    local contents = getFurnaceContents(furnace)
+    local existingFuelType = contents.fuel and contents.fuel.name or nil
+    
+    -- Determine which fuel to use
+    local fuelItem, available
+    local preferredFuels = furnaceConfig.getPreferredFuels()
+    
+    if existingFuelType then
+        -- Furnace already has fuel - check if it's in our preferred list
+        local existingIsPreferred = false
+        for _, pf in ipairs(preferredFuels) do
+            if pf == existingFuelType then
+                existingIsPreferred = true
+                break
+            end
+        end
+        
+        if existingIsPreferred then
+            -- Only push more of the same type
+            available = stockLevels[existingFuelType] or 0
+            if available > 0 then
+                fuelItem = existingFuelType
+            else
+                -- No more of this fuel available, don't mix fuels
+                return 0, nil
+            end
+        else
+            -- Existing fuel is not in preferred list - don't add anything
+            -- (wait for it to burn out)
+            return 0, nil
+        end
+    else
+        -- Furnace is empty - find best available fuel from preferred list
+        fuelItem, available = findBestFuel(stockLevels)
+        if not fuelItem then return 0, nil end
+    end
     
     -- Handle lava bucket specially - check input chest first
     if fuelItem == "minecraft:lava_bucket" then
@@ -368,7 +402,7 @@ local function pushFuelToFurnace(furnaceName, stockLevels)
     end
     
     -- Normal fuel - push from storage
-    local toPush = math.min(available, 64 - (currentFuel or 0))
+    local toPush = math.min(available, 64 - (currentFuelCount or 0))
     if toPush <= 0 then return 0, nil end
     
     -- Find fuel in storage only (not in export inventories)
