@@ -1,11 +1,33 @@
 --- AutoCrafter Crafting Library
 --- Handles crafting logic and job preparation.
 ---
----@version 1.0.0
+---@version 1.1.0
 
-local VERSION = "1.0.0"
+local VERSION = "1.1.0"
 
 local crafting = {}
+
+-- Maximum stack sizes for common items (default 64)
+local MAX_STACK_SIZES = {
+    ["minecraft:ender_pearl"] = 16,
+    ["minecraft:snowball"] = 16,
+    ["minecraft:egg"] = 16,
+    ["minecraft:bucket"] = 16,
+    ["minecraft:water_bucket"] = 1,
+    ["minecraft:lava_bucket"] = 1,
+    ["minecraft:milk_bucket"] = 1,
+    ["minecraft:honey_bottle"] = 16,
+    ["minecraft:potion"] = 1,
+    ["minecraft:splash_potion"] = 1,
+    ["minecraft:lingering_potion"] = 1,
+}
+
+---Get the maximum stack size for an item
+---@param item string The item ID
+---@return number maxStack The maximum stack size
+function crafting.getMaxStackSize(item)
+    return MAX_STACK_SIZES[item] or 64
+end
 
 ---Calculate how many of an item can be crafted with available materials
 ---@param recipe table The recipe to evaluate
@@ -56,18 +78,58 @@ function crafting.hasMaterials(recipe, stockLevels, quantity)
     return hasAll, missing
 end
 
+---Calculate maximum crafts possible based on material availability and stack limits
+---@param recipe table The recipe to craft
+---@param stockLevels table Current stock levels
+---@return number maxCrafts Maximum number of crafts possible
+function crafting.calculateMaxCrafts(recipe, stockLevels)
+    local maxCrafts = math.huge
+    
+    for _, ingredient in ipairs(recipe.ingredients) do
+        local available = stockLevels[ingredient.item] or 0
+        local possible = math.floor(available / ingredient.count)
+        maxCrafts = math.min(maxCrafts, possible)
+        
+        -- Also limit by stack size per slot (each slot can hold max 64 typically)
+        local stackLimit = crafting.getMaxStackSize(ingredient.item)
+        local maxPerSlot = math.floor(stackLimit / ingredient.count)
+        maxCrafts = math.min(maxCrafts, maxPerSlot)
+    end
+    
+    if maxCrafts == math.huge then
+        return 0
+    end
+    
+    return maxCrafts
+end
+
 ---Create a crafting job
 ---@param recipe table The recipe to craft
 ---@param quantity number Desired output quantity
 ---@param stockLevels table Current stock levels
+---@param allowPartial? boolean Whether to allow partial crafts (default: true)
 ---@return table|nil job The crafting job or nil if not possible
-function crafting.createJob(recipe, quantity, stockLevels)
-    local outputCount = recipe.outputCount
-    local crafts = math.ceil(quantity / outputCount)
+function crafting.createJob(recipe, quantity, stockLevels, allowPartial)
+    if allowPartial == nil then allowPartial = true end
     
-    -- Check if we have materials
-    local hasAll, missing = crafting.hasMaterials(recipe, stockLevels, quantity)
-    if not hasAll then
+    local outputCount = recipe.outputCount or 1
+    local desiredCrafts = math.ceil(quantity / outputCount)
+    
+    -- Calculate how many we can actually craft based on materials and stack limits
+    local maxCrafts = crafting.calculateMaxCrafts(recipe, stockLevels)
+    
+    if maxCrafts == 0 then
+        -- No materials available - return missing info
+        local _, missing = crafting.hasMaterials(recipe, stockLevels, quantity)
+        return nil, missing
+    end
+    
+    -- Determine actual crafts to perform
+    local crafts = math.min(desiredCrafts, maxCrafts)
+    
+    -- If not allowing partial and we can't craft the full amount, fail
+    if not allowPartial and crafts < desiredCrafts then
+        local _, missing = crafting.hasMaterials(recipe, stockLevels, quantity)
         return nil, missing
     end
     
