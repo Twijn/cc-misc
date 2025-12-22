@@ -5,7 +5,7 @@
 ---wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/autocrafter/install.lua
 ---
 
-local VERSION = "1.1.0"
+local VERSION = "1.2.0"
 local BASE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main"
 local INSTALLER_URL = BASE_URL .. "/util/installer.lua"
 
@@ -148,10 +148,12 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/managers/crafter.lua", path = diskPrefix .. "managers/crafter.lua"},
     {url = BASE_URL .. "/autocrafter/managers/monitor.lua", path = diskPrefix .. "managers/monitor.lua"},
     {url = BASE_URL .. "/autocrafter/managers/export.lua", path = diskPrefix .. "managers/export.lua"},
+    {url = BASE_URL .. "/autocrafter/managers/furnace.lua", path = diskPrefix .. "managers/furnace.lua"},
     {url = BASE_URL .. "/autocrafter/config/settings.lua", path = diskPrefix .. "config/settings.lua"},
     {url = BASE_URL .. "/autocrafter/config/targets.lua", path = diskPrefix .. "config/targets.lua"},
     {url = BASE_URL .. "/autocrafter/config/exports.lua", path = diskPrefix .. "config/exports.lua"},
     {url = BASE_URL .. "/autocrafter/config/recipes.lua", path = diskPrefix .. "config/recipes.lua"},
+    {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = diskPrefix .. "config/furnaces.lua"},
 }
 
 local crafterFiles = {

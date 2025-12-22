@@ -2,9 +2,9 @@
 --- Uses the enhanced updater to manage both libraries and project files.
 --- Config values are preserved during update.
 ---
----@version 2.0.0
+---@version 2.1.0
 
-local VERSION = "2.0.0"
+local VERSION = "2.1.0"
 local BASE_URL = "https://raw.githubusercontent.com/Twijn/cc-misc/main"
 local UPDATER_URL = BASE_URL .. "/util/updater.lua"
 
@@ -90,10 +90,12 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/managers/crafter.lua", path = "managers/crafter.lua", name = "crafter.lua", category = "Managers"},
     {url = BASE_URL .. "/autocrafter/managers/monitor.lua", path = "managers/monitor.lua", name = "monitor.lua", category = "Managers"},
     {url = BASE_URL .. "/autocrafter/managers/export.lua", path = "managers/export.lua", name = "export.lua", category = "Managers"},
+    {url = BASE_URL .. "/autocrafter/managers/furnace.lua", path = "managers/furnace.lua", name = "furnace.lua", category = "Managers"},
     {url = BASE_URL .. "/autocrafter/config/settings.lua", path = "config/settings.lua", name = "settings.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/targets.lua", path = "config/targets.lua", name = "targets.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/exports.lua", path = "config/exports.lua", name = "exports.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/recipes.lua", path = "config/recipes.lua", name = "recipes.lua", category = "Config"},
+    {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = "config/furnaces.lua", name = "furnaces.lua", category = "Config"},
 }
 
 local crafterFiles = {
