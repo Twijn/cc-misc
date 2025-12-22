@@ -698,8 +698,10 @@ function inventory.rebuildFromCache()
     emptySlotCache = {}
     
     -- Build storage set for filtering stock levels
+    -- Use getStorageInventories() to ensure storageInventories is populated
     local storageSet = {}
-    for _, name in ipairs(storageInventories) do
+    local storageInvs = inventory.getStorageInventories()
+    for _, name in ipairs(storageInvs) do
         storageSet[name] = true
     end
     

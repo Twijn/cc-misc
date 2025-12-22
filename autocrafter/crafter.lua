@@ -68,48 +68,33 @@ local function initialize()
     term.clear()
     term.setCursorPos(1, 1)
     
-    print("================================")
-    print("  AutoCrafter Crafter v" .. VERSION)
-    print("================================")
+    print("AutoCrafter Crafter v" .. VERSION)
     print("")
     
     -- Check for crafty turtle
     if not turtle.craft then
         term.setTextColor(colors.red)
-        print("ERROR: This turtle needs a crafting table!")
-        print("Use a Crafty Turtle or equip a crafting table.")
+        print("ERROR: Crafting table required!")
         term.setTextColor(colors.white)
         return false
     end
-    print("Crafting table: OK")
     
     -- Initialize communications
-    print("Initializing modem...")
-    if comms.init(false) then -- Prefer wired for turtles
-        comms.setChannel(config.modemChannel)
-        local modemInfo = comms.getModemInfo()
-        print("  Modem: " .. (modemInfo.isWireless and "Wireless" or "Wired"))
-        print("  Channel: " .. modemInfo.channel)
-    else
+    if not comms.init(false) then
         term.setTextColor(colors.red)
         print("ERROR: No modem found!")
         term.setTextColor(colors.white)
         return false
     end
-    print("")
+    comms.setChannel(config.modemChannel)
     
     -- Cache modem and validate network name
     local modem, modemName, turtleName = getModem()
     if not turtleName then
         term.setTextColor(colors.yellow)
-        print("WARNING: Cannot get turtle network name!")
-        print("  This turtle may not be visible on the wired network.")
-        print("  Ensure the modem is connected to a wired network.")
-        print("  Wireless modems do not support item transfers.")
+        print("WARN: No network name (wired modem required for transfers)")
         term.setTextColor(colors.white)
         logger.warn("getNameLocal() returned nil - turtle may not be on wired network")
-    else
-        print("Network name: " .. turtleName)
     end
     
     -- Set label if not set
@@ -117,11 +102,8 @@ local function initialize()
         os.setComputerLabel("Crafter-" .. os.getComputerID())
     end
     
-    print("ID: " .. os.getComputerID())
-    print("Label: " .. os.getComputerLabel())
-    print("")
-    print("Waiting for crafting jobs...")
-    print("")
+    print(string.format("ID: %d | %s", os.getComputerID(), turtleName or "no network"))
+    print("Ready for jobs...")
     
     logger.info("AutoCrafter Crafter started")
     return true

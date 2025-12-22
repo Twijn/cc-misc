@@ -52,33 +52,20 @@ local function initialize()
     term.clear()
     term.setCursorPos(1, 1)
     
-    print("================================")
-    print("  AutoCrafter Server v" .. VERSION)
-    print("================================")
+    print("AutoCrafter Server v" .. VERSION)
     print("")
     
     -- Initialize communications
-    print("Initializing modem...")
     if comms.init(true) then
         comms.setChannel(settings.get("modemChannel"))
-        local modemInfo = comms.getModemInfo()
-        print("  Modem: " .. (modemInfo.isWireless and "Wireless" or "Wired"))
-        print("  Channel: " .. modemInfo.channel)
     else
         term.setTextColor(colors.yellow)
-        print("  Warning: No modem found!")
+        print("Warning: No modem found!")
         term.setTextColor(colors.white)
     end
-    print("")
     
-    -- Load recipes
-    print("Loading recipes...")
+    -- Load recipes and initialize managers
     local recipeCount = recipes.init()
-    print("  Loaded " .. recipeCount .. " recipes")
-    print("")
-    
-    -- Initialize managers
-    print("Initializing managers...")
     queueManager.init()
     storageManager.init(config.storagePeripheralType)
     storageManager.setScanInterval(settings.get("scanInterval"))
@@ -86,99 +73,37 @@ local function initialize()
     monitorManager.init(config.monitorRefreshInterval)
     exportManager.init()
     furnaceManager.init()
-    print("")
     
-    -- Initial stats
+    -- Show summary stats
     local storageStats = storageManager.getStats()
-    print(string.format("Storage: %d items in %d inventories",
-        storageStats.totalItems, storageStats.inventoryCount))
-    print(string.format("Slots: %d/%d (%d%% full)",
-        storageStats.usedSlots, storageStats.totalSlots, storageStats.percentFull))
-    print("")
-    
-    local targetCount = targets.count()
-    print("Craft targets: " .. targetCount)
-    
-    local exportCount = exportConfig.count()
-    print("Export inventories: " .. exportCount)
-    
-    local furnaceCount = furnaceConfig.count()
-    print("Furnaces: " .. furnaceCount)
-    if furnaceCount == 0 then
-        term.setTextColor(colors.gray)
-        print("  (use 'furnaces discover' to find furnaces)")
-        term.setTextColor(colors.white)
-    end
-    print("")
+    print(string.format("Storage: %d items, %d/%d slots (%d%%)",
+        storageStats.totalItems, storageStats.usedSlots, storageStats.totalSlots, storageStats.percentFull))
+    print(string.format("Recipes: %d | Targets: %d | Exports: %d | Furnaces: %d",
+        recipeCount, targets.count(), exportConfig.count(), furnaceConfig.count()))
     
     -- Initialize chatbox for in-game commands
-    if config.chatboxEnabled then
-        print("Initializing chatbox...")
-        if chatbox then
-            -- Give chatbox time to fully initialize
-            sleep(0.5)
-            
-            if chatbox.hasCapability then
-                local hasCommand = chatbox.hasCapability("command")
-                local hasTell = chatbox.hasCapability("tell")
-                
-                if hasCommand then
-                    chatboxAvailable = true
-                    term.setTextColor(colors.lime)
-                    print("  Chatbox available!")
-                    print("  - Command capability: YES")
-                    print("  - Tell capability: " .. (hasTell and "YES" or "NO"))
-                    print("  Use \\help in-game for commands")
-                    term.setTextColor(colors.white)
-                    
-                    -- Show owner restriction status
-                    if config.chatboxOwner then
-                        term.setTextColor(colors.lime)
-                        print("  Owner: " .. config.chatboxOwner)
-                        term.setTextColor(colors.white)
-                    else
-                        term.setTextColor(colors.yellow)
-                        print("  Warning: No owner set - all players can use commands!")
-                        print("  Set chatboxOwner in config.lua to restrict access")
-                        term.setTextColor(colors.white)
-                    end
-                else
-                    term.setTextColor(colors.yellow)
-                    print("  Chatbox found but missing 'command' capability")
-                    print("  Register a license with /chatbox license register")
-                    term.setTextColor(colors.white)
-                end
-            else
-                term.setTextColor(colors.yellow)
-                print("  Warning: Chatbox API not available")
-                print("  In-game commands disabled")
-                term.setTextColor(colors.white)
-            end
+    if config.chatboxEnabled and chatbox then
+        sleep(0.5)
+        if chatbox.hasCapability and chatbox.hasCapability("command") then
+            chatboxAvailable = true
+            term.setTextColor(colors.lime)
+            print("Chatbox: OK" .. (config.chatboxOwner and (" (owner: " .. config.chatboxOwner .. ")") or " (no owner set)"))
+            term.setTextColor(colors.white)
         else
             term.setTextColor(colors.yellow)
-            print("  Warning: Chatbox API not available")
-            print("  In-game commands disabled")
+            print("Chatbox: missing 'command' capability")
             term.setTextColor(colors.white)
         end
-        print("")
     end
     
-    -- Check manipulator for player inventory access
-    print("Checking manipulator...")
+    -- Check manipulator
     if storageManager.hasManipulator() then
         term.setTextColor(colors.lime)
-        print("  Manipulator connected!")
-        print("  Player item transfers enabled")
-        term.setTextColor(colors.white)
-    else
-        term.setTextColor(colors.yellow)
-        print("  Warning: No manipulator found")
-        print("  Player item transfers disabled")
+        print("Manipulator: OK")
         term.setTextColor(colors.white)
     end
-    print("")
     
-    sleep(1)
+    print("")
     logger.info("AutoCrafter Server started")
 end
 
@@ -187,6 +112,12 @@ end
 local function processCraftTargets()
     local stock = storageManager.getAllStock()
     local needed = targets.getNeeded(stock)
+    
+    if #needed == 0 then
+        return  -- No targets need crafting
+    end
+    
+    logger.debug(string.format("processCraftTargets: %d targets need crafting", #needed))
     
     -- Get all current jobs to check what's already queued
     local allJobs = queueManager.getJobs()
@@ -206,12 +137,15 @@ local function processCraftTargets()
         local remainingNeeded = target.needed - totalQueued
         if remainingNeeded <= 0 then
             -- Already have enough queued
+            logger.debug(string.format("processCraftTargets: %s already queued (%d >= %d needed)", 
+                target.item, totalQueued, target.needed))
             goto continue
         end
         
         -- Get recipe to determine output count per craft
         local recipe = require("lib.recipes").getRecipeFor(target.item)
         if not recipe then
+            logger.debug(string.format("processCraftTargets: no recipe for %s", target.item))
             goto continue
         end
         
@@ -223,6 +157,9 @@ local function processCraftTargets()
             end
             goto continue
         end
+        
+        logger.debug(string.format("processCraftTargets: queued job #%d for %dx %s", 
+            job.id, job.expectedOutput, target.item))
         
         -- Update stock to reflect materials reserved for this job
         -- This prevents creating jobs that can't be fulfilled
