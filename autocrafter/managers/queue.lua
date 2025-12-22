@@ -1,7 +1,7 @@
 --- AutoCrafter Queue Manager
 --- Manages the crafting job queue.
 ---
----@version 1.0.0
+---@version 1.1.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")

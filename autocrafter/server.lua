@@ -1,9 +1,9 @@
 --- AutoCrafter Server
 --- Main server component for automated crafting and storage management.
 ---
----@version 1.1.1
+---@version 1.2.0
 
-local VERSION = "1.1.1"
+local VERSION = "1.2.0"
 
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""
@@ -24,11 +24,13 @@ local storageManager = require("managers.storage")
 local crafterManager = require("managers.crafter")
 local monitorManager = require("managers.monitor")
 local exportManager = require("managers.export")
+local furnaceManager = require("managers.furnace")
 
 -- Load config modules
 local settings = require("config.settings")
 local targets = require("config.targets")
 local exportConfig = require("config.exports")
+local furnaceConfig = require("config.furnaces")
 local config = require("config")
 
 local running = true
@@ -83,6 +85,7 @@ local function initialize()
     crafterManager.init()
     monitorManager.init(config.monitorRefreshInterval)
     exportManager.init()
+    furnaceManager.init()
     print("")
     
     -- Initial stats
@@ -98,6 +101,14 @@ local function initialize()
     
     local exportCount = exportConfig.count()
     print("Export inventories: " .. exportCount)
+    
+    local furnaceCount = furnaceConfig.count()
+    print("Furnaces: " .. furnaceCount)
+    if furnaceCount == 0 then
+        term.setTextColor(colors.gray)
+        print("  (use 'furnaces discover' to find furnaces)")
+        term.setTextColor(colors.white)
+    end
     print("")
     
     -- Initialize chatbox for in-game commands
@@ -410,6 +421,18 @@ local function exportProcessLoop()
     end
 end
 
+--- Furnace/smelting processing loop
+local function furnaceProcessLoop()
+    local furnaceInterval = config.furnaceCheckInterval or 5
+    while running do
+        if furnaceManager.needsCheck() then
+            local stock = storageManager.getAllStock()
+            furnaceManager.processSmelt(stock)
+        end
+        sleep(furnaceInterval)
+    end
+end
+
 --- Server announce loop
 local function serverAnnounceLoop()
     while running do
@@ -564,15 +587,27 @@ local commands = {
     },
     
     add = {
-        description = "Add item to auto-craft list",
+        description = "Add item to auto-craft or auto-smelt list",
         execute = function(args, ctx)
             if #args < 2 then
-                ctx.err("Usage: add <item> <quantity>")
+                ctx.err("Usage: add <item> <quantity> [--smelt]")
+                print("  Add --smelt flag to add to smelt targets instead of craft")
                 return
             end
             
-            local item = args[1]
-            local quantity = tonumber(args[2])
+            -- Check for --smelt flag
+            local isSmelt = false
+            local filteredArgs = {}
+            for _, arg in ipairs(args) do
+                if arg == "--smelt" or arg == "-s" then
+                    isSmelt = true
+                else
+                    table.insert(filteredArgs, arg)
+                end
+            end
+            
+            local item = filteredArgs[1]
+            local quantity = tonumber(filteredArgs[2])
             
             if not quantity or quantity <= 0 then
                 ctx.err("Quantity must be a positive number")
@@ -584,51 +619,120 @@ local commands = {
                 item = "minecraft:" .. item
             end
             
-            -- Check if recipe exists
-            if not recipes.canCraft(item) then
-                ctx.err("No recipe found for " .. item)
-                return
+            if isSmelt then
+                -- Check if there's a smelting recipe that produces this item
+                local input = furnaceManager.getSmeltInput(item)
+                if not input then
+                    ctx.err("No smelting recipe produces " .. item)
+                    print("Use 'furnaces recipes' to see available smelting recipes")
+                    return
+                end
+                
+                furnaceConfig.setSmeltTarget(item, quantity)
+                ctx.succ(string.format("Added smelt target: %s (target: %d)", item, quantity))
+                print("  Input: " .. input:gsub("minecraft:", ""))
+            else
+                -- Check if recipe exists
+                if not recipes.canCraft(item) then
+                    -- Also check if it's a smelting output
+                    local input = furnaceManager.getSmeltInput(item)
+                    if input then
+                        ctx.err("No crafting recipe found for " .. item)
+                        print("  This can be smelted! Use: add " .. item:gsub("minecraft:", "") .. " " .. quantity .. " --smelt")
+                        return
+                    end
+                    ctx.err("No recipe found for " .. item)
+                    return
+                end
+                
+                targets.set(item, quantity)
+                ctx.succ(string.format("Added %s (target: %d)", item, quantity))
             end
-            
-            targets.set(item, quantity)
-            ctx.succ(string.format("Added %s (target: %d)", item, quantity))
         end,
         complete = function(args)
             if #args == 1 then
                 -- Complete item names (handle empty string)
                 local query = args[1] or ""
                 if query == "" then return {} end
+                -- Include both crafting recipes and smelting outputs
                 local results = recipes.search(query)
                 local completions = {}
                 for _, r in ipairs(results) do
                     table.insert(completions, (r.output:gsub("minecraft:", "")))
                 end
+                -- Also add smelting outputs
+                local smeltResults = furnaceManager.searchRecipes(query)
+                for _, r in ipairs(smeltResults) do
+                    local output = r.output:gsub("minecraft:", "")
+                    -- Avoid duplicates
+                    local found = false
+                    for _, c in ipairs(completions) do
+                        if c == output then found = true break end
+                    end
+                    if not found then
+                        table.insert(completions, output)
+                    end
+                end
                 return completions
+            elseif #args == 3 then
+                -- Complete flags
+                local query = (args[3] or ""):lower()
+                local smeltFlag = "--smelt"
+                if query == "" or smeltFlag:find(query, 1, true) then
+                    return {"--smelt"}
+                end
             end
             return {}
         end
     },
     
     remove = {
-        description = "Remove item from auto-craft list",
+        description = "Remove item from auto-craft or auto-smelt list",
         execute = function(args, ctx)
             if #args < 1 then
-                ctx.err("Usage: remove <item>")
+                ctx.err("Usage: remove <item> [--smelt]")
                 return
             end
             
-            local item = args[1]
+            -- Check for --smelt flag
+            local isSmelt = false
+            local filteredArgs = {}
+            for _, arg in ipairs(args) do
+                if arg == "--smelt" or arg == "-s" then
+                    isSmelt = true
+                else
+                    table.insert(filteredArgs, arg)
+                end
+            end
+            
+            local item = filteredArgs[1]
             if not item:find(":") then
                 item = "minecraft:" .. item
             end
             
-            if not targets.get(item) then
-                ctx.err("Item not in craft list: " .. item)
-                return
+            if isSmelt then
+                if not furnaceConfig.getSmeltTarget(item) then
+                    ctx.err("Item not in smelt list: " .. item)
+                    return
+                end
+                
+                furnaceConfig.removeSmeltTarget(item)
+                ctx.succ("Removed smelt target: " .. item)
+            else
+                if not targets.get(item) then
+                    -- Check if it's in smelt targets
+                    if furnaceConfig.getSmeltTarget(item) then
+                        ctx.err("Item not in craft list: " .. item)
+                        print("  This item is in the smelt list. Use: remove " .. item:gsub("minecraft:", "") .. " --smelt")
+                        return
+                    end
+                    ctx.err("Item not in craft list: " .. item)
+                    return
+                end
+                
+                targets.remove(item)
+                ctx.succ("Removed " .. item)
             end
-            
-            targets.remove(item)
-            ctx.succ("Removed " .. item)
         end,
         complete = function(args)
             if #args == 1 then
@@ -641,39 +745,93 @@ local commands = {
                         table.insert(completions, (item:gsub("minecraft:", "")))
                     end
                 end
+                -- Also include smelt targets
+                local smeltTargets = furnaceConfig.getAllSmeltTargets()
+                for item in pairs(smeltTargets) do
+                    if item:lower():find(query:lower(), 1, true) then
+                        local display = item:gsub("minecraft:", "")
+                        -- Avoid duplicates
+                        local found = false
+                        for _, c in ipairs(completions) do
+                            if c == display then found = true break end
+                        end
+                        if not found then
+                            table.insert(completions, display)
+                        end
+                    end
+                end
                 return completions
+            elseif #args == 2 then
+                -- Complete flags
+                local query = (args[2] or ""):lower()
+                local smeltFlag = "--smelt"
+                if query == "" or smeltFlag:find(query, 1, true) then
+                    return {"--smelt"}
+                end
             end
             return {}
         end
     },
     
     list = {
-        description = "List auto-craft items",
+        description = "List auto-craft and auto-smelt items",
         execute = function(args, ctx)
             local stock = storageManager.getAllStock()
-            local all = targets.getWithStock(stock)
+            local craftTargets = targets.getWithStock(stock)
+            local smeltTargets = furnaceConfig.getSmeltTargetsWithStock(stock)
             
-            if #all == 0 then
-                ctx.mess("No craft targets configured")
+            if #craftTargets == 0 and #smeltTargets == 0 then
+                ctx.mess("No craft or smelt targets configured")
                 return
             end
             
-            local p = ctx.pager("=== Craft Targets ===")
-            for _, target in ipairs(all) do
-                local item = target.item:gsub("minecraft:", "")
-                
-                if target.current >= target.target then
-                    p.setTextColor(colors.lime)
-                    p.write("+ ")
-                else
-                    p.setTextColor(colors.orange)
-                    p.write("* ")
+            local p = ctx.pager("=== Targets ===")
+            
+            if #craftTargets > 0 then
+                p.setTextColor(colors.cyan)
+                p.print("-- Craft Targets --")
+                for _, target in ipairs(craftTargets) do
+                    local item = target.item:gsub("minecraft:", "")
+                    
+                    if target.current >= target.target then
+                        p.setTextColor(colors.lime)
+                        p.write("+ ")
+                    else
+                        p.setTextColor(colors.orange)
+                        p.write("* ")
+                    end
+                    
+                    p.setTextColor(colors.white)
+                    p.write(item .. " ")
+                    p.setTextColor(colors.lightGray)
+                    p.print(string.format("%d/%d", target.current, target.target))
                 end
-                
-                p.setTextColor(colors.white)
-                p.write(item .. " ")
-                p.setTextColor(colors.lightGray)
-                p.print(string.format("%d/%d", target.current, target.target))
+            end
+            
+            if #smeltTargets > 0 then
+                if #craftTargets > 0 then
+                    p.print("")
+                end
+                p.setTextColor(colors.cyan)
+                p.print("-- Smelt Targets --")
+                for _, target in ipairs(smeltTargets) do
+                    local item = target.item:gsub("minecraft:", "")
+                    local input = furnaceManager.getSmeltInput(target.item)
+                    local inputDisplay = input and input:gsub("minecraft:", "") or "?"
+                    
+                    if target.current >= target.target then
+                        p.setTextColor(colors.lime)
+                        p.write("+ ")
+                    else
+                        p.setTextColor(colors.orange)
+                        p.write("* ")
+                    end
+                    
+                    p.setTextColor(colors.white)
+                    p.write(item .. " ")
+                    p.setTextColor(colors.lightGray)
+                    p.print(string.format("%d/%d (from %s)", target.current, target.target, inputDisplay))
+                end
             end
             p.show()
         end
@@ -1528,6 +1686,271 @@ local commands = {
         end
     },
     
+    furnaces = {
+        description = "Manage furnaces for smelting",
+        execute = function(args, ctx)
+            local subCmd = args[1]
+            
+            if not subCmd or subCmd == "help" then
+                ctx.mess("=== Furnace Commands ===")
+                print("  furnaces list - List configured furnaces")
+                print("  furnaces discover - Auto-discover furnaces on network")
+                print("  furnaces add <name> - Add a furnace by peripheral name")
+                print("  furnaces remove <name> - Remove a furnace")
+                print("  furnaces enable <name> - Enable a furnace")
+                print("  furnaces disable <name> - Disable a furnace")
+                print("  furnaces status - Show furnace status")
+                print("  furnaces targets - List smelt targets")
+                print("  furnaces recipes [search] - Search smelting recipes")
+                return
+            end
+            
+            if subCmd == "list" then
+                local all = furnaceConfig.getAll()
+                local count = 0
+                for _ in pairs(all) do count = count + 1 end
+                
+                if count == 0 then
+                    ctx.mess("No furnaces configured")
+                    print("Use 'furnaces discover' to auto-discover furnaces")
+                    return
+                end
+                
+                local p = ctx.pager("=== Furnaces (" .. count .. ") ===")
+                for name, furnace in pairs(all) do
+                    local status = furnace.enabled and colors.lime or colors.red
+                    p.setTextColor(status)
+                    p.print(name)
+                    p.setTextColor(colors.lightGray)
+                    p.print("  Type: " .. furnace.type)
+                    p.print("  Status: " .. (furnace.enabled and "Enabled" or "Disabled"))
+                end
+                p.show()
+                return
+            end
+            
+            if subCmd == "discover" then
+                ctx.mess("Discovering furnaces on network...")
+                local discovered = furnaceManager.autoDiscover()
+                if discovered > 0 then
+                    ctx.succ(string.format("Discovered %d new furnace(s)", discovered))
+                else
+                    ctx.mess("No new furnaces found")
+                end
+                return
+            end
+            
+            if subCmd == "add" then
+                local name = args[2]
+                if not name then
+                    ctx.err("Usage: furnaces add <peripheral-name>")
+                    return
+                end
+                
+                local p = peripheral.wrap(name)
+                if not p then
+                    ctx.err("Peripheral not found: " .. name)
+                    return
+                end
+                
+                furnaceConfig.add(name)
+                ctx.succ("Added furnace: " .. name)
+                return
+            end
+            
+            if subCmd == "remove" then
+                local name = args[2]
+                if not name then
+                    ctx.err("Usage: furnaces remove <name>")
+                    return
+                end
+                
+                if not furnaceConfig.get(name) then
+                    ctx.err("Furnace not found: " .. name)
+                    return
+                end
+                
+                furnaceConfig.remove(name)
+                ctx.succ("Removed furnace: " .. name)
+                return
+            end
+            
+            if subCmd == "enable" then
+                local name = args[2]
+                if not name then
+                    ctx.err("Usage: furnaces enable <name>")
+                    return
+                end
+                
+                if not furnaceConfig.get(name) then
+                    ctx.err("Furnace not found: " .. name)
+                    return
+                end
+                
+                furnaceConfig.setEnabled(name, true)
+                ctx.succ("Enabled furnace: " .. name)
+                return
+            end
+            
+            if subCmd == "disable" then
+                local name = args[2]
+                if not name then
+                    ctx.err("Usage: furnaces disable <name>")
+                    return
+                end
+                
+                if not furnaceConfig.get(name) then
+                    ctx.err("Furnace not found: " .. name)
+                    return
+                end
+                
+                furnaceConfig.setEnabled(name, false)
+                ctx.succ("Disabled furnace: " .. name)
+                return
+            end
+            
+            if subCmd == "status" then
+                local status = furnaceManager.getStatus()
+                
+                if #status == 0 then
+                    ctx.mess("No furnaces configured")
+                    return
+                end
+                
+                local p = ctx.pager("=== Furnace Status ===")
+                for _, f in ipairs(status) do
+                    local color = colors.white
+                    if not f.connected then
+                        color = colors.red
+                    elseif not f.enabled then
+                        color = colors.gray
+                    elseif f.available then
+                        color = colors.lime
+                    else
+                        color = colors.yellow
+                    end
+                    
+                    p.setTextColor(color)
+                    p.print(f.name .. " (" .. f.type .. ")")
+                    
+                    if f.connected then
+                        p.setTextColor(colors.lightGray)
+                        local inputStr = f.input and (f.input.count .. "x " .. f.input.name:gsub("minecraft:", "")) or "empty"
+                        local fuelStr = f.fuel and (f.fuel.count .. "x " .. f.fuel.name:gsub("minecraft:", "")) or "empty"
+                        local outputStr = f.output and (f.output.count .. "x " .. f.output.name:gsub("minecraft:", "")) or "empty"
+                        p.print("  Input: " .. inputStr)
+                        p.print("  Fuel: " .. fuelStr)
+                        p.print("  Output: " .. outputStr)
+                    else
+                        p.setTextColor(colors.red)
+                        p.print("  (not connected)")
+                    end
+                end
+                p.show()
+                return
+            end
+            
+            if subCmd == "targets" then
+                local stock = storageManager.getAllStock()
+                local all = furnaceConfig.getSmeltTargetsWithStock(stock)
+                
+                if #all == 0 then
+                    ctx.mess("No smelt targets configured")
+                    print("Use 'add <item> <quantity> --smelt' to add smelt targets")
+                    return
+                end
+                
+                local p = ctx.pager("=== Smelt Targets ===")
+                for _, target in ipairs(all) do
+                    local displayName = target.item:gsub("minecraft:", "")
+                    local color = colors.white
+                    if target.current >= target.target then
+                        color = colors.lime
+                    elseif target.current > 0 then
+                        color = colors.yellow
+                    else
+                        color = colors.red
+                    end
+                    p.setTextColor(color)
+                    p.print(displayName)
+                    p.setTextColor(colors.lightGray)
+                    p.print(string.format("  %d/%d", target.current, target.target))
+                end
+                p.show()
+                return
+            end
+            
+            if subCmd == "recipes" then
+                local query = args[2] or ""
+                local results = furnaceManager.searchRecipes(query)
+                
+                if #results == 0 then
+                    ctx.mess("No smelting recipes found" .. (query ~= "" and " for '" .. query .. "'" or ""))
+                    return
+                end
+                
+                local p = ctx.pager("=== Smelting Recipes (" .. #results .. ") ===")
+                for _, r in ipairs(results) do
+                    local input = r.input:gsub("minecraft:", "")
+                    local output = r.output:gsub("minecraft:", "")
+                    p.setTextColor(colors.white)
+                    p.print(input .. " -> " .. output)
+                    p.setTextColor(colors.lightGray)
+                    p.print("  Type: " .. r.type)
+                end
+                p.show()
+                return
+            end
+            
+            ctx.err("Unknown subcommand: " .. subCmd)
+            ctx.mess("Use 'furnaces help' for available commands")
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"list", "discover", "add", "remove", "enable", "disable", "status", "targets", "recipes", "help"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and (args[1] == "remove" or args[1] == "enable" or args[1] == "disable") then
+                -- Complete furnace names
+                local query = (args[2] or ""):lower()
+                local all = furnaceConfig.getAll()
+                local matches = {}
+                for name in pairs(all) do
+                    if name:lower():find(query, 1, true) then
+                        table.insert(matches, name)
+                    end
+                end
+                return matches
+            elseif #args == 2 and args[1] == "add" then
+                -- Complete peripheral names for furnaces
+                local query = (args[2] or ""):lower()
+                local furnaceTypes = {"minecraft:furnace", "minecraft:blast_furnace", "minecraft:smoker", "furnace", "blast_furnace", "smoker"}
+                local matches = {}
+                for _, name in ipairs(peripheral.getNames()) do
+                    if name:lower():find(query, 1, true) then
+                        local types = {peripheral.getType(name)}
+                        for _, t in ipairs(types) do
+                            for _, furnaceType in ipairs(furnaceTypes) do
+                                if t == furnaceType then
+                                    table.insert(matches, name)
+                                    break
+                                end
+                            end
+                        end
+                    end
+                end
+                return matches
+            end
+            return {}
+        end
+    },
+    
     recipeprefs = {
         description = "Manage recipe variant preferences",
         execute = function(args, ctx)
@@ -2029,6 +2452,7 @@ local function handleTerminate()
     crafterManager.beforeShutdown()
     monitorManager.beforeShutdown()
     exportManager.beforeShutdown()
+    furnaceManager.beforeShutdown()
     
     comms.close()
     
@@ -2052,6 +2476,7 @@ local function main()
         staleJobCleanupLoop,
         monitorRefreshLoop,
         exportProcessLoop,
+        furnaceProcessLoop,
         chatboxHandler,
         function()
             cmd("AutoCrafter", VERSION, commands)

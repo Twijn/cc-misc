@@ -2,9 +2,9 @@
 --- Turtle component that executes crafting jobs from the server.
 --- All inventory operations are requested from the server to minimize peripheral calls.
 ---
----@version 2.1.0
+---@version 2.2.0
 
-local VERSION = "2.1.0"
+local VERSION = "2.2.0"
 
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""

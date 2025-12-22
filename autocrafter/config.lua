@@ -1,5 +1,5 @@
 --- AutoCrafter Default Configuration
----@version 2.0.0
+---@version 2.1.0
 
 return {
     -- Cache storage path (for inventories.json, item-details.json, stock.json)
@@ -42,6 +42,9 @@ return {
     -- Export check interval (seconds)
     exportCheckInterval = 5,
     
+    -- Furnace check interval (seconds)
+    furnaceCheckInterval = 5,
+
     -- Default peripheral type for export inventories
     exportDefaultType = "ender_storage",
     

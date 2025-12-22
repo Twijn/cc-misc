@@ -109,6 +109,7 @@ end
 ---@param stockLevels table Current stock levels
 ---@param allowPartial? boolean Whether to allow partial crafts (default: true)
 ---@return table|nil job The crafting job or nil if not possible
+---@return table|nil missing Table of missing materials if job not possible
 function crafting.createJob(recipe, quantity, stockLevels, allowPartial)
     if allowPartial == nil then allowPartial = true end
     

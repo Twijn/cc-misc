@@ -103,6 +103,41 @@ The export system allows automatic item transfer to/from external inventories li
 > exports additem ender_storage_0 coal 128 1  # Slot 1 only
 ```
 
+## Furnace/Smelting System
+
+The system supports automated smelting via furnaces, blast furnaces, and smokers.
+
+### Furnace Commands
+
+- `furnaces list` - List configured furnaces
+- `furnaces discover` - Auto-discover furnaces on the network
+- `furnaces add <name>` - Add a furnace by peripheral name
+- `furnaces remove <name>` - Remove a furnace
+- `furnaces enable/disable <name>` - Enable or disable a furnace
+- `furnaces status` - Show detailed furnace status
+- `furnaces targets` - List smelt targets
+- `furnaces recipes [search]` - Search available smelting recipes
+
+### Adding Smelt Targets
+
+Use the `--smelt` flag with the add command to add items to the smelt list:
+
+```
+# Add iron ingots as a smelt target (will smelt raw iron automatically)
+> add iron_ingot 128 --smelt
+
+# Add cooked beef as a smelt target
+> add cooked_beef 64 --smelt
+```
+
+### Furnace Types
+
+- **Furnace**: Can smelt anything
+- **Blast Furnace**: Smelts ores faster (preferred for ores)
+- **Smoker**: Cooks food faster (preferred for food)
+
+The system will automatically use the appropriate furnace type for each recipe.
+
 ## Configuration
 
 Settings are stored in `data/settings.json`:
@@ -140,16 +175,19 @@ autocrafter/
 │   ├── storage.lua      # Storage manager
 │   ├── crafter.lua      # Crafter coordination
 │   ├── monitor.lua      # Status display manager
-│   └── export.lua       # Export/ender storage manager
+│   ├── export.lua       # Export/ender storage manager
+│   └── furnace.lua      # Furnace/smelting manager
 └── config/
     ├── settings.lua     # Settings management
     ├── targets.lua      # Craft target management
-    └── exports.lua      # Export inventory management
+    ├── exports.lua      # Export inventory management
+    └── furnaces.lua     # Furnace configuration
 ```
 
 ## Future Expansions
 
 - **Ender Storage Integration**: ~~Control ender storage frequencies~~ ✓ Added via export system
+- **Furnace Integration**: ~~Automated smelting~~ ✓ Added via furnace system
 - **Remote API**: HTTP API for external access
 - **Multi-server networking**: Connect multiple storage systems
 - **Advanced filtering**: Item filters and priorities
@@ -162,7 +200,8 @@ autocrafter/
 - Wireless modem for crafter communication (optional, can use wired)
 - Storage inventory blocks (chests, barrels, etc.)
 - Crafty turtle(s) with crafting table
+- Furnaces, blast furnaces, or smokers (optional, for smelting)
 
 ## Version
 
-Current version: 1.0.0
+Current version: 1.2.0

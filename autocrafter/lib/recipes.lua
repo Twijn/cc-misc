@@ -3,9 +3,9 @@
 ---
 --- Supports both shaped and shapeless recipes from Minecraft's JSON format.
 ---
----@version 1.0.0
+---@version 1.2.0
 
-local VERSION = "1.1.0"
+local VERSION = "1.2.0"
 
 local recipes = {}
 local recipeCache = {}
