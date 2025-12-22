@@ -531,6 +531,7 @@ local function pushToFurnace(item, count, furnaceName)
 end
 
 ---Pull output items from a furnace to storage
+---Uses direct peripheral calls to avoid cache overhead for non-storage inventories.
 ---@param furnaceName string The furnace peripheral name
 ---@return number pulled Amount pulled from output slot
 local function pullFromFurnace(furnaceName)
@@ -542,24 +543,41 @@ local function pullFromFurnace(furnaceName)
         return 0
     end
     
+    local outputItem = contents.output
+    local remaining = outputItem.count
     local pulled = 0
-    local storageInvs = inventory.getStorageInventories()
     
+    -- Get storage inventories
+    local storageInvs = inventory.getStorageInventories()
+    if #storageInvs == 0 then
+        logger.warn("pullFromFurnace: No storage inventories available")
+        return 0
+    end
+    
+    -- Try to pull from furnace output slot (slot 3) to storage
+    -- Use direct peripheral calls since furnaces aren't in our cache
     for _, destName in ipairs(storageInvs) do
+        if remaining <= 0 then break end
+        
         local dest = inventory.getPeripheral(destName)
         if dest and dest.pullItems then
-            -- Pull from slot 3 (output slot) - use inventory.pullItems for proper cache handling
-            local transferred = inventory.pullItems(destName, furnaceName, 3)
-            pulled = pulled + transferred
+            -- Pull from slot 3 (output slot) directly
+            local success, transferred = pcall(function()
+                return dest.pullItems(furnaceName, 3, remaining)
+            end)
             
-            if transferred > 0 then
-                -- Check if we got everything
-                local newContents = getFurnaceContents(furnace)
-                if not newContents.output or newContents.output.count == 0 then
-                    break
-                end
+            if success and transferred and transferred > 0 then
+                pulled = pulled + transferred
+                remaining = remaining - transferred
+                logger.debug(string.format("pullFromFurnace: pulled %d from %s to %s", 
+                    transferred, furnaceName, destName))
             end
         end
+    end
+    
+    if pulled > 0 then
+        logger.info(string.format("pullFromFurnace: pulled %d %s from %s", 
+            pulled, outputItem.name, furnaceName))
     end
     
     return pulled

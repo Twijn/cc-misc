@@ -1782,6 +1782,210 @@ function inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
     return totalPulled, nil
 end
 
+---Pull multiple slots from an inventory into storage in a single batch operation
+---This is much faster than calling pullSlot multiple times due to parallel execution.
+---@param sourceInv string Source inventory name (e.g., turtle network name)
+---@param slotContents table Array of {slot, name, count, nbt?} for each slot to pull
+---@return table results Array of {slot, pulled, error?} for each slot
+---@return number totalPulled Total items pulled across all slots
+function inventory.pullSlotsBatch(sourceInv, slotContents)
+    logger.debug(string.format("pullSlotsBatch: sourceInv=%s, %d slots", sourceInv, #slotContents))
+    
+    if #slotContents == 0 then
+        return {}, 0
+    end
+    
+    -- Get storage inventories - STRICTLY use defined storage type
+    local storageInvs = inventory.getStorageInventories()
+    if #storageInvs == 0 then
+        logger.error("pullSlotsBatch: No storage inventories available!")
+        local results = {}
+        for _, slotInfo in ipairs(slotContents) do
+            table.insert(results, {slot = slotInfo.slot, pulled = 0, error = "no_storage"})
+        end
+        return results, 0
+    end
+    
+    -- Build validated storage peripheral list
+    local validatedStorage = {}
+    for _, name in ipairs(storageInvs) do
+        if name ~= sourceInv then
+            local types = {peripheral.getType(name)}
+            local isValidStorage = false
+            for _, t in ipairs(types) do
+                if t == storagePeripheralType then
+                    isValidStorage = true
+                    break
+                end
+            end
+            if isValidStorage then
+                local p = inventory.getPeripheral(name)
+                if p and p.pullItems then
+                    table.insert(validatedStorage, {name = name, peripheral = p})
+                end
+            end
+        end
+    end
+    
+    if #validatedStorage == 0 then
+        logger.error("pullSlotsBatch: No valid storage peripherals!")
+        local results = {}
+        for _, slotInfo in ipairs(slotContents) do
+            table.insert(results, {slot = slotInfo.slot, pulled = 0, error = "no_valid_storage"})
+        end
+        return results, 0
+    end
+    
+    -- Use batch mode to defer cache rebuilding
+    inventory.beginBatch()
+    
+    local results = {}
+    local totalPulled = 0
+    local affectedInventories = {}
+    
+    -- Phase 1: Fill partial stacks first (sequential to avoid conflicts)
+    for _, slotInfo in ipairs(slotContents) do
+        local slot = slotInfo.slot
+        local itemName = slotInfo.name
+        local remaining = slotInfo.count
+        local itemNbt = slotInfo.nbt
+        local slotPulled = 0
+        
+        if remaining > 0 then
+            -- Find partial stacks of this item in storage
+            local partialStacks = findPartialStacks(itemName, itemNbt, storageInvs)
+            
+            for _, partial in ipairs(partialStacks) do
+                if remaining <= 0 then break end
+                
+                local storage = nil
+                for _, s in ipairs(validatedStorage) do
+                    if s.name == partial.inventory then
+                        storage = s
+                        break
+                    end
+                end
+                
+                if storage then
+                    local toPull = math.min(remaining, partial.space)
+                    local success, pulled = pcall(function()
+                        return storage.peripheral.pullItems(sourceInv, slot, toPull, partial.slot)
+                    end)
+                    
+                    if success and pulled and pulled > 0 then
+                        slotPulled = slotPulled + pulled
+                        remaining = remaining - pulled
+                        affectedInventories[partial.inventory] = true
+                        updateCacheAfterAddition(partial.inventory, partial.slot, itemName, pulled, itemNbt)
+                    end
+                end
+            end
+        end
+        
+        -- Update slotInfo.count for phase 2
+        slotInfo._remaining = remaining
+        slotInfo._pulled = slotPulled
+    end
+    
+    -- Phase 2: Pull remaining items to empty slots in parallel
+    local slotsNeedingEmptySpace = {}
+    for i, slotInfo in ipairs(slotContents) do
+        if slotInfo._remaining and slotInfo._remaining > 0 then
+            table.insert(slotsNeedingEmptySpace, {index = i, slotInfo = slotInfo})
+        end
+    end
+    
+    if #slotsNeedingEmptySpace > 0 and parallelEnabled and #validatedStorage >= 1 then
+        -- Build parallel tasks - round-robin assignment to storage
+        local tasks = {}
+        local taskMeta = {}
+        
+        for i, entry in ipairs(slotsNeedingEmptySpace) do
+            local slotInfo = entry.slotInfo
+            local storageIdx = ((i - 1) % #validatedStorage) + 1
+            local storage = validatedStorage[storageIdx]
+            
+            table.insert(taskMeta, {index = entry.index, slotInfo = slotInfo, storage = storage})
+            table.insert(tasks, function()
+                local success, pulled = pcall(function()
+                    return storage.peripheral.pullItems(sourceInv, slotInfo.slot, slotInfo._remaining)
+                end)
+                if success and pulled and pulled > 0 then
+                    return pulled, storage.name
+                end
+                return 0, nil
+            end)
+        end
+        
+        -- Execute in parallel
+        local parallelResults = executeParallel(tasks, transferThreads)
+        
+        -- Process results
+        for i, result in ipairs(parallelResults) do
+            local pulled = result[1] or 0
+            local storageName = result[2]
+            local meta = taskMeta[i]
+            
+            if pulled > 0 and storageName then
+                meta.slotInfo._pulled = (meta.slotInfo._pulled or 0) + pulled
+                meta.slotInfo._remaining = (meta.slotInfo._remaining or 0) - pulled
+                affectedInventories[storageName] = true
+            end
+        end
+    else
+        -- Sequential fallback
+        for _, entry in ipairs(slotsNeedingEmptySpace) do
+            local slotInfo = entry.slotInfo
+            local remaining = slotInfo._remaining
+            
+            for _, storage in ipairs(validatedStorage) do
+                if remaining <= 0 then break end
+                
+                local success, pulled = pcall(function()
+                    return storage.peripheral.pullItems(sourceInv, slotInfo.slot, remaining)
+                end)
+                
+                if success and pulled and pulled > 0 then
+                    slotInfo._pulled = (slotInfo._pulled or 0) + pulled
+                    remaining = remaining - pulled
+                    slotInfo._remaining = remaining
+                    affectedInventories[storage.name] = true
+                end
+            end
+        end
+    end
+    
+    -- Build final results
+    for _, slotInfo in ipairs(slotContents) do
+        local pulled = slotInfo._pulled or 0
+        local remaining = slotInfo._remaining or 0
+        totalPulled = totalPulled + pulled
+        
+        local err = nil
+        if remaining > 0 then
+            err = "partial"
+        end
+        
+        table.insert(results, {
+            slot = slotInfo.slot,
+            pulled = pulled,
+            error = err,
+        })
+    end
+    
+    -- Scan affected inventories with deferred rebuild
+    for invName in pairs(affectedInventories) do
+        inventory.scanSingle(invName, true)
+    end
+    
+    -- End batch and rebuild cache once
+    inventory.endBatch()
+    
+    logger.info(string.format("pullSlotsBatch: pulled %d total items from %d slots", totalPulled, #slotContents))
+    
+    return results, totalPulled
+end
+
 ---@return number seconds Time since last scan in seconds
 function inventory.timeSinceLastScan()
     return os.clock() - lastScanTime

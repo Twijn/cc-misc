@@ -296,10 +296,10 @@ local function logInventoryState()
 end
 
 ---Clear the turtle inventory to storage (via server request)
----Uses a robust slot-by-slot approach where the turtle enumerates its own
----inventory (using local turtle API) and tells the server exactly what to pull.
----This avoids race conditions and unreliable remote inventory queries.
----@param maxRetries? number Maximum retry attempts per slot (default 3)
+---Uses a batch approach where the turtle enumerates its own inventory
+---(using local turtle API) and sends all slots to the server in one request.
+---This is much faster than the old slot-by-slot approach.
+---@param maxRetries? number Maximum retry attempts for the batch (default 3)
 ---@return boolean success Whether inventory was fully cleared
 local function clearInventory(maxRetries)
     maxRetries = maxRetries or 3
@@ -319,57 +319,102 @@ local function clearInventory(maxRetries)
     end
     
     -- Enumerate inventory using LOCAL turtle API (always reliable)
+    -- Build batch request with all non-empty slots
+    local slotContents = {}
     local totalItems = 0
-    local totalCleared = 0
-    local failedSlots = {}
     
     for slot = 1, 16 do
         local contents = getSlotContents(slot)
         if contents then
             totalItems = totalItems + contents.count
             logger.debug(string.format("Slot %d: %dx %s", slot, contents.count, contents.name))
+            table.insert(slotContents, {
+                slot = slot,
+                name = contents.name,
+                count = contents.count,
+                nbt = contents.nbt,
+            })
+        end
+    end
+    
+    if #slotContents == 0 then
+        turtle.select(1)
+        return true
+    end
+    
+    -- Send batch request to server
+    local totalCleared = 0
+    local failedSlots = {}
+    
+    for attempt = 1, maxRetries do
+        logger.debug(string.format("Sending batch pull request, attempt %d/%d, %d slots", 
+            attempt, maxRetries, #slotContents))
+        
+        -- Send batch request
+        comms.broadcast(config.messageTypes.REQUEST_PULL_SLOTS_BATCH, {
+            sourceInv = turtleName,
+            slotContents = slotContents,
+        })
+        
+        -- Wait for response
+        local message = comms.receive(5, config.messageTypes.RESPONSE_PULL_SLOTS_BATCH)
+        if message then
+            local results = message.data.results or {}
+            local batchPulled = message.data.totalPulled or 0
+            totalCleared = totalCleared + batchPulled
             
-            -- Try to clear this slot with retries
-            local slotCleared = false
-            for attempt = 1, maxRetries do
-                -- Ask server to pull this specific slot
-                local pulled, err = requestPullSlot(
-                    turtleName, 
-                    slot, 
-                    contents.name, 
-                    contents.count,
-                    contents.nbt
-                )
-                
-                -- Verify locally that the slot is now empty (or has fewer items)
-                local remaining = turtle.getItemCount(slot)
-                
-                if remaining == 0 then
-                    -- Slot is clear
-                    totalCleared = totalCleared + contents.count
-                    slotCleared = true
-                    break
-                elseif remaining < contents.count then
-                    -- Partial clear - update and continue
-                    logger.debug(string.format("Slot %d: partial clear, %d remaining", slot, remaining))
-                    contents.count = remaining
-                    totalCleared = totalCleared + (contents.count - remaining)
-                    -- Don't break, try again for remaining items
-                else
-                    -- Nothing cleared
-                    if err == "no_storage" then
-                        logger.warn("Storage is full or unavailable")
-                        table.insert(failedSlots, {slot = slot, reason = "no_storage"})
-                        break  -- Don't retry if storage is full
-                    elseif err == "timeout" then
-                        logger.debug(string.format("Slot %d: timeout on attempt %d/%d", slot, attempt, maxRetries))
-                        sleep(0.2)  -- Wait a bit before retry
+            logger.debug(string.format("Batch response: %d items pulled", batchPulled))
+            
+            -- Process results and check for failures
+            failedSlots = {}
+            slotContents = {}
+            
+            for _, result in ipairs(results) do
+                local remaining = turtle.getItemCount(result.slot)
+                if remaining > 0 then
+                    -- Slot still has items - add to retry list
+                    local contents = getSlotContents(result.slot)
+                    if contents then
+                        table.insert(slotContents, {
+                            slot = result.slot,
+                            name = contents.name,
+                            count = contents.count,
+                            nbt = contents.nbt,
+                        })
+                        if result.error then
+                            table.insert(failedSlots, {slot = result.slot, reason = result.error})
+                        end
                     end
                 end
             end
             
-            if not slotCleared and turtle.getItemCount(slot) > 0 then
-                table.insert(failedSlots, {slot = slot, reason = "failed"})
+            -- If no slots need retrying, we're done
+            if #slotContents == 0 then
+                break
+            end
+            
+            -- Check for storage full error
+            local hasStorageFull = false
+            for _, failure in ipairs(failedSlots) do
+                if failure.reason == "no_storage" or failure.reason == "no_valid_storage" then
+                    hasStorageFull = true
+                    break
+                end
+            end
+            
+            if hasStorageFull then
+                logger.warn("Storage is full or unavailable, stopping retry")
+                break
+            end
+            
+            if attempt < maxRetries then
+                sleep(0.2)  -- Brief pause before retry
+            end
+        else
+            -- Timeout - retry
+            logger.debug(string.format("Batch request timeout, attempt %d/%d", attempt, maxRetries))
+            if attempt < maxRetries then
+                sleep(0.3)
             end
         end
     end

@@ -149,6 +149,26 @@ function manager.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
     return pulled, err
 end
 
+---Pull multiple slots from an inventory in a single batch operation
+---This is much faster than calling pullSlot multiple times.
+---@param sourceInv string Source inventory name (e.g., turtle network name)
+---@param slotContents table Array of {slot, name, count, nbt?} for each slot to pull
+---@return table results Array of {slot, pulled, error?} for each slot
+---@return number totalPulled Total items pulled
+function manager.pullSlotsBatch(sourceInv, slotContents)
+    logger.debug(string.format("storageManager.pullSlotsBatch: %s, %d slots", 
+        sourceInv, #slotContents))
+    
+    local results, totalPulled = inventory.pullSlotsBatch(sourceInv, slotContents)
+    
+    if totalPulled > 0 then
+        logger.info(string.format("Batch pulled %d items from %d slots in %s", 
+            totalPulled, #slotContents, sourceInv))
+    end
+    
+    return results, totalPulled
+end
+
 ---Withdraw items to a player's inventory via manipulator
 ---@param item string Item ID to withdraw
 ---@param count number Amount to withdraw

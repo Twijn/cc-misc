@@ -307,6 +307,20 @@ local function messageHandler()
                     error = err,
                 }, sender)
                 
+            elseif msgType == config.messageTypes.REQUEST_PULL_SLOTS_BATCH then
+                -- Crafter wants to pull multiple slots in one batch (more efficient)
+                local slotContents = data.slotContents or {}
+                
+                logger.debug(string.format("REQUEST_PULL_SLOTS_BATCH from %s: %s, %d slots", 
+                    tostring(sender), tostring(data.sourceInv), #slotContents))
+                
+                local results, totalPulled = storageManager.pullSlotsBatch(data.sourceInv, slotContents)
+                
+                comms.send(config.messageTypes.RESPONSE_PULL_SLOTS_BATCH, {
+                    results = results,
+                    totalPulled = totalPulled,
+                }, sender)
+                
             elseif msgType == config.messageTypes.SERVER_QUERY then
                 -- Client asking if server exists
                 comms.send(config.messageTypes.SERVER_ANNOUNCE, {
