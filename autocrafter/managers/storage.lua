@@ -187,16 +187,21 @@ end
 
 ---Deposit items from a player's inventory via manipulator
 ---@param playerName string Player name to get items from
----@param item? string Optional item filter
+---@param item? string|table Optional item filter(s) (single item or array of items)
 ---@param maxCount? number Optional max items to deposit
+---@param excludes? table Optional array of item IDs to exclude from deposit
 ---@return number deposited Amount deposited
 ---@return string|nil error Error message if failed
-function manager.depositFromPlayer(playerName, item, maxCount)
-    local deposited, err = inventory.depositFromPlayer(playerName, item, maxCount)
+function manager.depositFromPlayer(playerName, item, maxCount, excludes)
+    local deposited, err = inventory.depositFromPlayer(playerName, item, maxCount, excludes)
     
     if deposited > 0 then
         if item then
-            logger.info(string.format("Deposited %d %s from player %s", deposited, item, playerName))
+            if type(item) == "table" then
+                logger.info(string.format("Deposited %d items (filtered) from player %s", deposited, playerName))
+            else
+                logger.info(string.format("Deposited %d %s from player %s", deposited, item, playerName))
+            end
         else
             logger.info(string.format("Deposited %d items from player %s", deposited, playerName))
         end

@@ -1,8 +1,9 @@
 --- AutoCrafter Export Configuration
 --- Manages automated item export to external inventories (e.g., ender storage).
 --- Supports both "stock" mode (keep items stocked) and "empty" mode (drain items).
+--- Supports slot ranges and "vacuum" slots that deposit non-matching items back to storage.
 ---
----@version 1.0.0
+---@version 1.1.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
@@ -14,9 +15,12 @@ exports.setDefault("inventories", {})
 local module = {}
 
 ---@class ExportSlot
----@field item string The item ID to export
+---@field item string The item ID to export ("*" for vacuum slot that accepts any non-matching item)
 ---@field quantity number Target quantity (for stock mode) or 0 (for empty mode)
 ---@field slot? number Optional specific slot (nil = any slot)
+---@field slotStart? number Start of slot range (inclusive)
+---@field slotEnd? number End of slot range (inclusive)
+---@field vacuum? boolean If true, deposits non-matching items from these slots to storage
 
 ---@class ExportInventory
 ---@field name string The peripheral name
@@ -62,7 +66,10 @@ end
 ---@param item string The item ID
 ---@param quantity number Target quantity (0 for empty mode = drain all)
 ---@param slot? number Optional specific slot
-function module.addItem(invName, item, quantity, slot)
+---@param slotStart? number Optional start of slot range (inclusive)
+---@param slotEnd? number Optional end of slot range (inclusive)
+---@param vacuum? boolean If true, this is a vacuum slot that deposits non-matching items
+function module.addItem(invName, item, quantity, slot, slotStart, slotEnd, vacuum)
     local inventories = exports.get("inventories") or {}
     local inv = inventories[invName]
     
@@ -73,11 +80,14 @@ function module.addItem(invName, item, quantity, slot)
     
     inv.slots = inv.slots or {}
     
-    -- Check if item already exists
+    -- Check if item already exists with same slot config
     for i, slotConfig in ipairs(inv.slots) do
-        if slotConfig.item == item and slotConfig.slot == slot then
+        local matchesSlot = slotConfig.slot == slot
+        local matchesRange = slotConfig.slotStart == slotStart and slotConfig.slotEnd == slotEnd
+        if slotConfig.item == item and (matchesSlot or matchesRange) then
             -- Update existing
             inv.slots[i].quantity = quantity
+            inv.slots[i].vacuum = vacuum
             exports.set("inventories", inventories)
             logger.info(string.format("Updated export: %s -> %s x%d", invName, item, quantity))
             return
@@ -85,13 +95,61 @@ function module.addItem(invName, item, quantity, slot)
     end
     
     -- Add new
-    table.insert(inv.slots, {
+    local newSlot = {
         item = item,
         quantity = quantity,
         slot = slot,
-    })
+        slotStart = slotStart,
+        slotEnd = slotEnd,
+        vacuum = vacuum,
+    }
+    table.insert(inv.slots, newSlot)
     exports.set("inventories", inventories)
-    logger.info(string.format("Added export: %s -> %s x%d", invName, item, quantity))
+    
+    if slotStart and slotEnd then
+        logger.info(string.format("Added export: %s -> %s x%d (slots %d-%d%s)", 
+            invName, item, quantity, slotStart, slotEnd, vacuum and " vacuum" or ""))
+    elseif slot then
+        logger.info(string.format("Added export: %s -> %s x%d (slot %d%s)", 
+            invName, item, quantity, slot, vacuum and " vacuum" or ""))
+    else
+        logger.info(string.format("Added export: %s -> %s x%d%s", 
+            invName, item, quantity, vacuum and " vacuum" or ""))
+    end
+end
+
+---Add a slot range to an export inventory
+---@param invName string The peripheral name
+---@param item string The item ID
+---@param quantity number Target quantity per slot
+---@param slotStart number Start of slot range (inclusive)
+---@param slotEnd number End of slot range (inclusive)
+---@param vacuum? boolean If true, non-matching items in range are deposited to storage
+function module.addSlotRange(invName, item, quantity, slotStart, slotEnd, vacuum)
+    module.addItem(invName, item, quantity, nil, slotStart, slotEnd, vacuum)
+end
+
+---Add a vacuum slot range (deposits non-matching items from these slots to storage)
+---@param invName string The peripheral name
+---@param slotStart number Start of slot range (inclusive)
+---@param slotEnd number End of slot range (inclusive)
+function module.addVacuumRange(invName, slotStart, slotEnd)
+    module.addItem(invName, "*", 0, nil, slotStart, slotEnd, true)
+end
+
+---Get expanded slot list from a slot config (handles ranges)
+---@param slotConfig ExportSlot The slot configuration
+---@return table slots Array of slot numbers
+function module.getExpandedSlots(slotConfig)
+    local slots = {}
+    if slotConfig.slot then
+        table.insert(slots, slotConfig.slot)
+    elseif slotConfig.slotStart and slotConfig.slotEnd then
+        for s = slotConfig.slotStart, slotConfig.slotEnd do
+            table.insert(slots, s)
+        end
+    end
+    return slots
 end
 
 ---Remove an item from an export inventory

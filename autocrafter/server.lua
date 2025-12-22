@@ -1,9 +1,9 @@
 --- AutoCrafter Server
 --- Main server component for automated crafting and storage management.
 ---
----@version 1.2.0
+---@version 1.3.0
 
-local VERSION = "1.2.0"
+local VERSION = "1.3.0"
 
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""
@@ -478,6 +478,7 @@ end
 local commands = {
     status = {
         description = "Show system status",
+        category = "general",
         execute = function(args, ctx)
             local storageStats = storageManager.getStats()
             local queueStats = queueManager.getStats()
@@ -509,6 +510,7 @@ local commands = {
     
     queue = {
         description = "View or manage crafting queue",
+        category = "queue",
         execute = function(args, ctx)
             local subCmd = args[1]
             
@@ -583,6 +585,7 @@ local commands = {
     
     add = {
         description = "Add item to auto-craft or auto-smelt list",
+        category = "queue",
         execute = function(args, ctx)
             if #args < 2 then
                 ctx.err("Usage: add <item> <quantity> [--smelt]")
@@ -683,6 +686,8 @@ local commands = {
     
     remove = {
         description = "Remove item from auto-craft or auto-smelt list",
+        category = "queue",
+        aliases = {"rm", "del"},
         execute = function(args, ctx)
             if #args < 1 then
                 ctx.err("Usage: remove <item> [--smelt]")
@@ -770,6 +775,8 @@ local commands = {
     
     list = {
         description = "List auto-craft and auto-smelt items",
+        category = "queue",
+        aliases = {"ls", "targets"},
         execute = function(args, ctx)
             local stock = storageManager.getAllStock()
             local craftTargets = targets.getWithStock(stock)
@@ -834,6 +841,7 @@ local commands = {
     
     scan = {
         description = "Force inventory rescan",
+        category = "storage",
         execute = function(args, ctx)
             local forceRefresh = args[1] == "full" or args[1] == "-f"
             if forceRefresh then
@@ -850,6 +858,7 @@ local commands = {
     
     cache = {
         description = "View or clear cache statistics",
+        category = "storage",
         execute = function(args, ctx)
             if args[1] == "clear" then
                 ctx.mess("Clearing all caches...")
@@ -872,6 +881,8 @@ local commands = {
     
     withdraw = {
         description = "Withdraw items from storage to player",
+        category = "storage",
+        aliases = {"w", "get"},
         execute = function(args, ctx)
             if #args < 2 then
                 ctx.err("Usage: withdraw <item> <count>")
@@ -925,37 +936,160 @@ local commands = {
     
     deposit = {
         description = "Deposit items from player to storage",
+        category = "storage",
+        aliases = {"d", "put"},
         execute = function(args, ctx)
             if not storageManager.hasManipulator() then
                 ctx.err("No manipulator available for player transfers")
                 return
             end
             
-            local item = args[1]
-            local count = args[2] and tonumber(args[2]) or nil
+            -- Parse args: deposit [item1] [item2] ... [--all] [--no-exclude]
+            local items = {}
+            local depositAll = false
+            local useExcludes = true
             
-            if item and not item:find(":") then
-                item = "minecraft:" .. item
+            for _, arg in ipairs(args) do
+                if arg == "--all" or arg == "-a" then
+                    depositAll = true
+                elseif arg == "--no-exclude" or arg == "-n" then
+                    useExcludes = false
+                else
+                    -- Treat as item filter
+                    local item = arg
+                    if not item:find(":") then
+                        item = "minecraft:" .. item
+                    end
+                    table.insert(items, item)
+                end
             end
             
-            local deposited, err = storageManager.depositFromPlayer("player", item, count)
+            -- Get excludes from settings
+            local excludes = nil
+            if useExcludes and (#items == 0 or depositAll) then
+                excludes = settings.getDepositExcludes()
+            end
+            
+            local itemFilter = nil
+            if #items > 0 and not depositAll then
+                itemFilter = #items == 1 and items[1] or items
+            end
+            
+            local deposited, err = storageManager.depositFromPlayer("player", itemFilter, nil, excludes)
             if deposited > 0 then
-                if item then
-                    ctx.succ(string.format("Deposited %d %s from player", deposited, item:gsub("minecraft:", "")))
+                if itemFilter then
+                    if type(itemFilter) == "table" then
+                        ctx.succ(string.format("Deposited %d items (filtered) from player", deposited))
+                    else
+                        ctx.succ(string.format("Deposited %d %s from player", deposited, itemFilter:gsub("minecraft:", "")))
+                    end
                 else
                     ctx.succ(string.format("Deposited %d items from player", deposited))
+                    if useExcludes and excludes and #excludes > 0 then
+                        ctx.mess(string.format("(excluded %d item types - use --no-exclude to include all)", #excludes))
+                    end
                 end
             else
                 ctx.mess("Nothing to deposit" .. (err and (": " .. err) or ""))
             end
         end,
         complete = function(args)
+            local lastArg = args[#args] or ""
+            if lastArg:sub(1, 1) == "-" then
+                return {"--all", "--no-exclude"}
+            end
+            return {}
+        end
+    },
+    
+    excludes = {
+        description = "Manage deposit excludes (items kept when depositing)",
+        category = "storage",
+        aliases = {"exclude"},
+        execute = function(args, ctx)
+            local subCmd = args[1]
+            
+            if not subCmd or subCmd == "list" then
+                local excludes = settings.getDepositExcludes()
+                if #excludes == 0 then
+                    ctx.mess("No deposit excludes configured")
+                    return
+                end
+                
+                local p = ctx.pager("=== Deposit Excludes (" .. #excludes .. ") ===")
+                p.setTextColor(colors.lightGray)
+                p.print("These items are kept when depositing all:")
+                p.print("")
+                for _, item in ipairs(excludes) do
+                    p.setTextColor(colors.white)
+                    p.print("  " .. item:gsub("minecraft:", ""))
+                end
+                p.print("")
+                p.setTextColor(colors.lightBlue)
+                p.print("Use 'excludes add <item>' to add")
+                p.print("Use 'excludes remove <item>' to remove")
+                p.print("Use 'excludes reset' to restore defaults")
+                p.show()
+                return
+            end
+            
+            if subCmd == "add" then
+                local item = args[2]
+                if not item then
+                    ctx.err("Usage: excludes add <item>")
+                    return
+                end
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                settings.addDepositExclude(item)
+                ctx.succ("Added to excludes: " .. item:gsub("minecraft:", ""))
+                return
+            end
+            
+            if subCmd == "remove" or subCmd == "rm" then
+                local item = args[2]
+                if not item then
+                    ctx.err("Usage: excludes remove <item>")
+                    return
+                end
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                settings.removeDepositExclude(item)
+                ctx.succ("Removed from excludes: " .. item:gsub("minecraft:", ""))
+                return
+            end
+            
+            if subCmd == "reset" then
+                settings.set("depositExcludes", nil)  -- Clear to use defaults
+                ctx.succ("Reset excludes to defaults")
+                return
+            end
+            
+            ctx.err("Unknown subcommand: " .. subCmd)
+            ctx.mess("Available: list, add, remove, reset")
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"list", "add", "remove", "reset"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            end
             return {}
         end
     },
     
     history = {
         description = "View job history (completed/failed)",
+        category = "queue",
+        aliases = {"hist"},
         execute = function(args, ctx)
             local historyType = args[1]  -- "completed", "failed", or nil for both
             
@@ -1023,6 +1157,7 @@ local commands = {
     
     crafters = {
         description = "List connected crafters",
+        category = "crafters",
         execute = function(args, ctx)
             local allCrafters = crafterManager.getCrafters()
             
@@ -1055,6 +1190,7 @@ local commands = {
     
     recipes = {
         description = "Search available recipes",
+        category = "recipes",
         execute = function(args, ctx)
             local query = args[1] or ""
             local results = recipes.search(query)
@@ -1075,6 +1211,7 @@ local commands = {
     
     recipe = {
         description = "View recipe details",
+        category = "recipes",
         execute = function(args, ctx)
             if #args < 1 then
                 ctx.err("Usage: recipe <item>")
@@ -1210,8 +1347,71 @@ local commands = {
     
     settings = {
         description = "View/edit settings",
+        category = "config",
+        aliases = {"config", "cfg"},
         execute = function(args, ctx)
-            if #args == 0 then
+            local subCmd = args[1]
+            
+            if subCmd == "edit" then
+                -- Interactive FormUI editor for settings
+                local all = settings.getAll()
+                
+                local form = FormUI.new("Edit Settings")
+                
+                -- Create fields for each setting type
+                local fields = {}
+                local settingsList = {
+                    { key = "modemChannel", label = "Modem Channel", type = "number" },
+                    { key = "scanInterval", label = "Scan Interval (sec)", type = "number" },
+                    { key = "craftCheckInterval", label = "Craft Check Interval (sec)", type = "number" },
+                    { key = "maxBatchSize", label = "Max Batch Size", type = "number" },
+                    { key = "serverLabel", label = "Server Label", type = "text" },
+                    { key = "crafterTimeout", label = "Crafter Timeout (sec)", type = "number" },
+                    { key = "parallelTransferThreads", label = "Transfer Threads", type = "number" },
+                    { key = "parallelScanThreads", label = "Scan Threads", type = "number" },
+                    { key = "parallelBatchSize", label = "Parallel Batch Size", type = "number" },
+                    { key = "parallelEnabled", label = "Parallel Enabled", type = "checkbox" },
+                }
+                
+                for _, setting in ipairs(settingsList) do
+                    local currentValue = settings.get(setting.key)
+                    if setting.type == "number" then
+                        fields[setting.key] = form:number(setting.label, currentValue or 0)
+                    elseif setting.type == "text" then
+                        fields[setting.key] = form:text(setting.label, currentValue or "", nil, true)
+                    elseif setting.type == "checkbox" then
+                        fields[setting.key] = form:checkbox(setting.label, currentValue == true)
+                    end
+                end
+                
+                form:addSubmitCancel()
+                
+                local result = form:run()
+                if not result then
+                    ctx.mess("Cancelled")
+                    return
+                end
+                
+                -- Apply changes
+                local changed = 0
+                for _, setting in ipairs(settingsList) do
+                    local newValue = fields[setting.key]()
+                    local oldValue = settings.get(setting.key)
+                    if newValue ~= oldValue then
+                        settings.set(setting.key, newValue)
+                        changed = changed + 1
+                    end
+                end
+                
+                if changed > 0 then
+                    ctx.succ(string.format("Updated %d setting(s)", changed))
+                else
+                    ctx.mess("No changes made")
+                end
+                return
+            end
+            
+            if not subCmd or subCmd == "list" then
                 -- Show current settings
                 local all = settings.getAll()
                 print("")
@@ -1222,12 +1422,16 @@ local commands = {
                     term.setTextColor(colors.white)
                     print(tostring(value))
                 end
+                print("")
+                ctx.mess("Use 'settings edit' to modify interactively")
+                ctx.mess("Use 'settings <key> <value>' to set directly")
                 return
             end
             
-            -- Set a setting
+            -- Set a setting directly: settings <key> <value>
             if #args < 2 then
                 ctx.err("Usage: settings <key> <value>")
+                ctx.mess("Or use: settings edit (interactive mode)")
                 return
             end
             
@@ -1246,11 +1450,29 @@ local commands = {
             
             settings.set(key, value)
             ctx.succ(string.format("Set %s = %s", key, tostring(value)))
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"edit", "list", "modemChannel", "scanInterval", "craftCheckInterval", 
+                    "maxBatchSize", "serverLabel", "crafterTimeout", "parallelTransferThreads",
+                    "parallelScanThreads", "parallelBatchSize", "parallelEnabled"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:lower():find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            end
+            return {}
         end
     },
     
     stock = {
         description = "Search item stock",
+        category = "storage",
+        aliases = {"find", "search"},
         execute = function(args, ctx)
             local query = args[1] or ""
             local results = storageManager.searchItems(query)
@@ -1274,6 +1496,8 @@ local commands = {
     
     exports = {
         description = "Manage export inventories",
+        category = "exports",
+        aliases = {"export", "exp"},
         execute = function(args, ctx)
             local subCmd = args[1]
             
@@ -1509,10 +1733,18 @@ local commands = {
                     local itemDisplay = {}
                     for i, item in ipairs(items) do
                         local display = item.item:gsub("minecraft:", "")
-                        if item.slot then
+                        if display == "*" then display = "(vacuum)" end
+                        
+                        if item.slotStart and item.slotEnd then
+                            display = display .. string.format(" x%d (slots %d-%d)", item.quantity, item.slotStart, item.slotEnd)
+                        elseif item.slot then
                             display = display .. string.format(" x%d (slot %d)", item.quantity, item.slot)
                         else
                             display = display .. string.format(" x%d", item.quantity)
+                        end
+                        
+                        if item.vacuum then
+                            display = display .. " [vacuum]"
                         end
                         table.insert(itemDisplay, display)
                     end
@@ -1542,6 +1774,8 @@ local commands = {
                     end
                     form:button("Change Mode", "mode")
                     form:label("")
+                    form:button("Add Slot Range", "addrange")
+                    form:button("Add Vacuum Slots", "addvacuum")
                     form:button("Done", "done")
                     
                     local result = form:run()
@@ -1564,12 +1798,14 @@ local commands = {
                             local qtyField = addForm:number("Quantity", cfg.mode == "stock" and 64 or 0)
                             local useSlotField = addForm:checkbox("Use specific slot", false)
                             local slotField = addForm:number("Slot number", 1)
+                            local vacuumField = addForm:checkbox("Vacuum (remove non-matching)", false)
                             addForm:label("")
                             if cfg.mode == "stock" then
-                                addForm:label("Quantity = amount to keep stocked")
+                                addForm:label("Quantity = amount to keep stocked per slot")
                             else
                                 addForm:label("Quantity = amount to leave (0 = take all)")
                             end
+                            addForm:label("Vacuum = deposits non-matching items to storage")
                             addForm:addSubmitCancel()
                             
                             local addResult = addForm:run()
@@ -1578,6 +1814,7 @@ local commands = {
                                 local qty = qtyField()
                                 local useSlot = useSlotField()
                                 local slot = useSlot and slotField() or nil
+                                local vacuum = vacuumField()
                                 
                                 -- Add minecraft: prefix if missing
                                 if itemName ~= "" and not itemName:find(":") then
@@ -1585,7 +1822,65 @@ local commands = {
                                 end
                                 
                                 if itemName ~= "" then
-                                    exportConfig.addItem(invName, itemName, qty, slot)
+                                    exportConfig.addItem(invName, itemName, qty, slot, nil, nil, vacuum)
+                                    -- Refresh items list
+                                    cfg = exportConfig.get(invName)
+                                    items = cfg.slots or {}
+                                end
+                            end
+                            
+                        elseif action == "addrange" then
+                            -- Form to add a slot range
+                            local rangeForm = FormUI.new("Add Slot Range")
+                            local itemField = rangeForm:text("Item Name", "", nil, false)
+                            local qtyField = rangeForm:number("Quantity per slot", cfg.mode == "stock" and 64 or 0)
+                            local startField = rangeForm:number("Start Slot", 1)
+                            local endField = rangeForm:number("End Slot", 9)
+                            local vacuumField = rangeForm:checkbox("Vacuum (remove non-matching)", true)
+                            rangeForm:label("")
+                            rangeForm:label("Example: slots 1-9 with 64 coal each")
+                            rangeForm:label("Vacuum removes non-matching items from slots")
+                            rangeForm:addSubmitCancel()
+                            
+                            local rangeResult = rangeForm:run()
+                            if rangeResult then
+                                local itemName = itemField()
+                                local qty = qtyField()
+                                local slotStart = startField()
+                                local slotEnd = endField()
+                                local vacuum = vacuumField()
+                                
+                                -- Add minecraft: prefix if missing
+                                if itemName ~= "" and not itemName:find(":") then
+                                    itemName = "minecraft:" .. itemName
+                                end
+                                
+                                if itemName ~= "" and slotStart <= slotEnd then
+                                    exportConfig.addSlotRange(invName, itemName, qty, slotStart, slotEnd, vacuum)
+                                    -- Refresh items list
+                                    cfg = exportConfig.get(invName)
+                                    items = cfg.slots or {}
+                                end
+                            end
+                            
+                        elseif action == "addvacuum" then
+                            -- Form to add vacuum-only slots
+                            local vacuumForm = FormUI.new("Add Vacuum Slots")
+                            vacuumForm:label("Vacuum slots automatically deposit")
+                            vacuumForm:label("ANY items placed there to storage.")
+                            vacuumForm:label("Great for 'drop-off' areas!")
+                            vacuumForm:label("")
+                            local startField = vacuumForm:number("Start Slot", 10)
+                            local endField = vacuumForm:number("End Slot", 27)
+                            vacuumForm:addSubmitCancel()
+                            
+                            local vacuumResult = vacuumForm:run()
+                            if vacuumResult then
+                                local slotStart = startField()
+                                local slotEnd = endField()
+                                
+                                if slotStart <= slotEnd then
+                                    exportConfig.addVacuumRange(invName, slotStart, slotEnd)
                                     -- Refresh items list
                                     cfg = exportConfig.get(invName)
                                     items = cfg.slots or {}
@@ -1597,8 +1892,14 @@ local commands = {
                             local removeNames = {}
                             for _, item in ipairs(items) do
                                 local display = item.item:gsub("minecraft:", "")
-                                if item.slot then
+                                if display == "*" then display = "(vacuum)" end
+                                if item.slotStart and item.slotEnd then
+                                    display = display .. string.format(" (slots %d-%d)", item.slotStart, item.slotEnd)
+                                elseif item.slot then
                                     display = display .. " (slot " .. item.slot .. ")"
+                                end
+                                if item.vacuum then
+                                    display = display .. " [vacuum]"
                                 end
                                 table.insert(removeNames, display)
                             end
@@ -1683,6 +1984,8 @@ local commands = {
     
     furnaces = {
         description = "Manage furnaces for smelting",
+        category = "furnaces",
+        aliases = {"furnace", "smelt"},
         execute = function(args, ctx)
             local subCmd = args[1]
             
@@ -2218,6 +2521,8 @@ local commands = {
     
     recipeprefs = {
         description = "Manage recipe variant preferences",
+        category = "recipes",
+        aliases = {"rp", "prefs"},
         execute = function(args, ctx)
             local recipePrefs = require("config.recipes")
             local subCmd = args[1]
@@ -2510,9 +2815,6 @@ local commands = {
 -- Register log level commands (loglevel, log-level, ll aliases)
 logger.registerCommands(commands)
 
--- Register alias for recipeprefs command
-commands.rp = commands.recipeprefs
-
 --- Send a message to a player via chatbox
 ---@param user string The username to send to
 ---@param message string The message to send
@@ -2548,7 +2850,8 @@ local function chatboxHandler()
         elseif command == "help" then
             chatTell(user, "=== AutoCrafter Commands ===")
             chatTell(user, "\\withdraw <item> <count> - Get items from storage")
-            chatTell(user, "\\deposit [item] [count] - Store items from your inventory")
+            chatTell(user, "\\deposit [items...] - Store items (excludes tools/armor/food)")
+            chatTell(user, "\\deposit --all - Store ALL items (no excludes)")
             chatTell(user, "\\stock [search] - Search item stock")
             chatTell(user, "\\recipe <item> - View recipe details")
             chatTell(user, "\\status - Show system status")
@@ -2588,25 +2891,53 @@ local function chatboxHandler()
             if not storageManager.hasManipulator() then
                 chatTell(user, "No manipulator available for item transfers", true)
             else
-                local itemQuery = args and args[1] or nil
-                local count = args and args[2] and tonumber(args[2]) or nil
+                -- Parse args: deposit [item1] [item2] ... or deposit --all
+                local items = {}
+                local depositAll = false
+                local useExcludes = true
                 
-                -- Resolve item name using fuzzy matching if specified
-                local item = nil
-                if itemQuery then
-                    item = itemQuery
-                    if not item:find(":") then
-                        item = "minecraft:" .. item
+                if args then
+                    for _, arg in ipairs(args) do
+                        if arg == "--all" or arg == "-a" then
+                            depositAll = true
+                        elseif arg == "--no-exclude" or arg == "-n" then
+                            useExcludes = false
+                        else
+                            local item = arg
+                            if not item:find(":") then
+                                item = "minecraft:" .. item
+                            end
+                            table.insert(items, item)
+                        end
                     end
                 end
                 
-                local deposited, err = storageManager.depositFromPlayer(user, item, count)
+                -- Get excludes from settings if depositing all
+                local excludes = nil
+                if useExcludes and (#items == 0 or depositAll) then
+                    excludes = settings.getDepositExcludes()
+                end
+                
+                local itemFilter = nil
+                if #items > 0 and not depositAll then
+                    itemFilter = #items == 1 and items[1] or items
+                end
+                
+                local deposited, err = storageManager.depositFromPlayer(user, itemFilter, nil, excludes)
                 
                 if deposited > 0 then
-                    if item then
-                        chatTell(user, string.format("Deposited %dx %s", deposited, item:gsub("minecraft:", "")))
+                    if itemFilter then
+                        if type(itemFilter) == "table" then
+                            chatTell(user, string.format("Deposited %d items (filtered)", deposited))
+                        else
+                            chatTell(user, string.format("Deposited %dx %s", deposited, itemFilter:gsub("minecraft:", "")))
+                        end
                     else
-                        chatTell(user, string.format("Deposited %d items", deposited))
+                        local msg = string.format("Deposited %d items", deposited)
+                        if useExcludes and excludes and #excludes > 0 then
+                            msg = msg .. " (some items excluded)"
+                        end
+                        chatTell(user, msg)
                     end
                 else
                     chatTell(user, "Nothing to deposit" .. (err and (": " .. err) or ""), true)

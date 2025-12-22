@@ -273,10 +273,71 @@ local function pullAllFromExport(sourceInv)
     return pulled
 end
 
----Process a single export inventory
+---Process vacuum slots (remove items that don't match expected item in slot range)
 ---@param name string The peripheral name
----@param config table The export configuration
----@return table result Processing results {pushed, pulled}
+---@param inv table The wrapped peripheral
+---@param slotConfig table The slot configuration
+---@return number pulled Amount of non-matching items pulled to storage
+local function processVacuumSlots(name, inv, slotConfig)
+    local pulled = 0
+    local expectedItem = slotConfig.item
+    local storageInvs = inventory.getStorageInventories()
+    
+    if #storageInvs == 0 then return 0 end
+    
+    -- Get list of slots to check
+    local slotsToCheck = exportConfig.getExpandedSlots(slotConfig)
+    
+    -- If no specific slots and it's a wildcard vacuum, vacuum ALL slots
+    if #slotsToCheck == 0 and expectedItem == "*" then
+        local list = inv.list()
+        if list then
+            for slot in pairs(list) do
+                table.insert(slotsToCheck, slot)
+            end
+        end
+    end
+    
+    local list = inv.list()
+    if not list then return 0 end
+    
+    for _, slot in ipairs(slotsToCheck) do
+        local slotItem = list[slot]
+        if slotItem then
+            local shouldPull = false
+            
+            if expectedItem == "*" then
+                -- Wildcard vacuum: pull everything from these slots
+                shouldPull = true
+            elseif slotItem.name ~= expectedItem then
+                -- Specific item vacuum: pull non-matching items
+                shouldPull = true
+            end
+            
+            if shouldPull then
+                -- Pull to storage
+                for _, destName in ipairs(storageInvs) do
+                    local dest = inventory.getPeripheral(destName)
+                    if dest and dest.pullItems then
+                        local transferred = dest.pullItems(name, slot) or 0
+                        if transferred > 0 then
+                            pulled = pulled + transferred
+                            inventory.scanSingle(destName, true)
+                            break
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    if pulled > 0 then
+        inventory.rebuildFromCache()
+    end
+    
+    return pulled
+end
+
 local function processExportInventory(name, config)
     local result = {pushed = 0, pulled = 0}
     
@@ -302,8 +363,53 @@ local function processExportInventory(name, config)
         local item = slotConfig.item
         local targetQty = slotConfig.quantity
         local specificSlot = slotConfig.slot
+        local slotStart = slotConfig.slotStart
+        local slotEnd = slotConfig.slotEnd
+        local isVacuum = slotConfig.vacuum
         
-        if config.mode == "stock" then
+        -- Process vacuum slots first (remove non-matching items)
+        if isVacuum then
+            local vacuumed = processVacuumSlots(name, inv, slotConfig)
+            result.pulled = result.pulled + vacuumed
+            if vacuumed > 0 then
+                logger.debug(string.format("Vacuumed %d non-matching items from %s", vacuumed, name))
+            end
+        end
+        
+        -- Skip further processing for wildcard vacuum slots
+        if item == "*" then
+            goto continue
+        end
+        
+        -- Handle slot ranges
+        if slotStart and slotEnd then
+            for slot = slotStart, slotEnd do
+                if config.mode == "stock" then
+                    local currentCount = getSlotCount(inv, slot, item)
+                    if currentCount < targetQty then
+                        local needed = targetQty - currentCount
+                        local pushed, sources = pushToExport(item, needed, name, slot)
+                        result.pushed = result.pushed + pushed
+                        
+                        if pushed > 0 then
+                            logger.debug(string.format("Stocked %d %s to %s slot %d", pushed, item, name, slot))
+                        end
+                    end
+                elseif config.mode == "empty" then
+                    local currentCount = getSlotCount(inv, slot, item)
+                    if currentCount > 0 then
+                        local toPull = currentCount
+                        if targetQty > 0 then
+                            toPull = math.max(0, currentCount - targetQty)
+                        end
+                        if toPull > 0 then
+                            local pulled = pullFromExport(item, toPull, name, slot)
+                            result.pulled = result.pulled + pulled
+                        end
+                    end
+                end
+            end
+        elseif config.mode == "stock" then
             -- Stock mode: keep the export inventory stocked with items from storage
             local currentCount
             if specificSlot then
@@ -354,6 +460,8 @@ local function processExportInventory(name, config)
                 end
             end
         end
+        
+        ::continue::
     end
     
     return result

@@ -2218,7 +2218,7 @@ function inventory.withdrawToPlayer(item, count, playerName)
             
             -- Update cache directly instead of rescanning
             if transferred > 0 then
-                updateCacheAfterRemoval(loc.inventory, loc.slot, loc.name, transferred)
+                updateCacheAfterRemoval(loc.inventory, loc.slot, item, transferred)
             end
         end
     end
@@ -2232,11 +2232,12 @@ end
 
 ---Deposit items from a player's inventory via manipulator
 ---@param playerName string The player name to get items from
----@param item? string Optional item filter (nil for all items)
+---@param item? string|table Optional item filter(s) (nil for all items, string for single, table for multiple)
 ---@param maxCount? number Optional max items to deposit (nil for all)
+---@param excludes? table Optional array of item IDs to exclude from deposit
 ---@return number deposited Amount deposited
 ---@return string|nil error Error message if failed
-function inventory.depositFromPlayer(playerName, item, maxCount)
+function inventory.depositFromPlayer(playerName, item, maxCount, excludes)
     local manip = inventory.getManipulator()
     if not manip then
         return 0, "No manipulator available"
@@ -2268,6 +2269,27 @@ function inventory.depositFromPlayer(playerName, item, maxCount)
         return 0, "Cannot list player inventory"
     end
     
+    -- Build filter set from item param (can be string or table of strings)
+    local filterSet = nil
+    if item then
+        filterSet = {}
+        if type(item) == "string" then
+            filterSet[item] = true
+        elseif type(item) == "table" then
+            for _, i in ipairs(item) do
+                filterSet[i] = true
+            end
+        end
+    end
+    
+    -- Build exclude set
+    local excludeSet = {}
+    if excludes then
+        for _, ex in ipairs(excludes) do
+            excludeSet[ex] = true
+        end
+    end
+    
     local deposited = 0
     local remaining = maxCount  -- nil means unlimited
     local affectedInventories = {}
@@ -2279,10 +2301,37 @@ function inventory.depositFromPlayer(playerName, item, maxCount)
             break
         end
         
-        -- Filter by item if specified (support partial matching)
-        local matches = not item
-        if item then
-            matches = slotItem.name == item or slotItem.name:lower():find(item:lower():gsub("minecraft:", ""), 1, true)
+        -- Check excludes first (before filters)
+        local isExcluded = excludeSet[slotItem.name]
+        if not isExcluded and excludes then
+            -- Also check partial matches for pattern excludes
+            for _, ex in ipairs(excludes) do
+                if slotItem.name:find(ex, 1, true) then
+                    isExcluded = true
+                    break
+                end
+            end
+        end
+        if isExcluded then
+            goto continue
+        end
+        
+        -- Filter by item(s) if specified (support partial matching)
+        local matches = not filterSet
+        if filterSet then
+            -- Check exact match first
+            if filterSet[slotItem.name] then
+                matches = true
+            else
+                -- Check partial matches
+                for filterItem in pairs(filterSet) do
+                    local searchPart = filterItem:gsub("minecraft:", ""):lower()
+                    if slotItem.name:lower():find(searchPart, 1, true) then
+                        matches = true
+                        break
+                    end
+                end
+            end
         end
         
         if matches then
@@ -2292,8 +2341,9 @@ function inventory.depositFromPlayer(playerName, item, maxCount)
                 toTransfer = math.min(toTransfer, remaining)
             end
             
-            -- Find a destination storage inventory
-            for name in pairs(invData) do
+            -- Find a destination storage inventory (only use storage inventories)
+            local storageInvs = inventory.getStorageInventories()
+            for _, name in ipairs(storageInvs) do
                 local dest = inventory.getPeripheral(name)
                 if dest then
                     -- Push from player inventory to storage
@@ -2316,6 +2366,8 @@ function inventory.depositFromPlayer(playerName, item, maxCount)
                 end
             end
         end
+        
+        ::continue::
     end
     
     -- Batch update affected inventories
@@ -2323,7 +2375,7 @@ function inventory.depositFromPlayer(playerName, item, maxCount)
         inventory.scanSingle(invName)
     end
     
-    if deposited == 0 and not item then
+    if deposited == 0 and not filterSet then
         return 0, "No items to deposit or failed to transfer"
     elseif deposited == 0 then
         return 0, "Item not found in player inventory or failed to transfer"

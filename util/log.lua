@@ -16,10 +16,10 @@
 ---log.setLevel("debug")  -- Show all messages including debug
 ---log.setLevel("warn")   -- Show only warnings and errors
 ---
----@version 1.3.0
+---@version 1.4.0
 -- @module log
 
-local VERSION = "1.3.0"
+local VERSION = "1.4.0"
 
 local module = {}
 
@@ -201,12 +201,14 @@ function module.getLevels()
 end
 
 ---Register log level commands with a cmd command table
----This adds "loglevel", "log-level", and "ll" as aliases for setting/viewing log level
+---This adds "loglevel" command with aliases "log-level" and "ll"
 ---@param commands table The commands table to add the log level command to
 ---@return table commands The modified commands table (also modifies in place)
 function module.registerCommands(commands)
     local logLevelCommand = {
         description = "View or set the console log level",
+        category = "system",
+        aliases = {"log-level", "ll"},
         execute = function(args, ctx)
             if #args == 0 then
                 -- Show current level
@@ -251,10 +253,8 @@ function module.registerCommands(commands)
         end
     }
     
-    -- Register all aliases
+    -- Register primary command (aliases handled automatically by cmd.lua)
     commands["loglevel"] = logLevelCommand
-    commands["log-level"] = logLevelCommand
-    commands["ll"] = logLevelCommand
     
     return commands
 end
