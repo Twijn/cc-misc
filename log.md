@@ -76,7 +76,7 @@ Get all available log levels
 
 ### `module.registerCommands(commands)`
 
-Register log level commands with a cmd command table This adds "loglevel", "log-level", and "ll" as aliases for setting/viewing log level
+Register log level commands with a cmd command table This adds "loglevel" command with aliases "log-level" and "ll"
 
 **Parameters:**
 

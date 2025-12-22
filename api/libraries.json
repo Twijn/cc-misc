@@ -2,8 +2,8 @@
   "libraries": [
     {
       "name": "cmd",
-      "version": "1.1.0",
-      "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, and string utility functions.",
+      "version": "1.2.0",
+      "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, string utility functions, command categories for organized help display, and proper alias handling.",
       "dependencies": [
         "pager"
       ],
@@ -138,7 +138,7 @@
     },
     {
       "name": "log",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, and configurable log levels.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/log.lua",
@@ -274,5 +274,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-12-22T03:58:46Z"
+  "updated": "2025-12-22T08:15:15Z"
 }

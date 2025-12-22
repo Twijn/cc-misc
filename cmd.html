@@ -246,8 +246,8 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>cmd <span class="version-badge">v1.1.0</span></h1>
-        <p>Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, and string utility functions.</p>
+        <h1>cmd <span class="version-badge">v1.2.0</span></h1>
+        <p>Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, string utility functions, command categories for organized help display, and proper alias handling.</p>
     </div>
     
     <div class="install-section">
@@ -372,6 +372,8 @@ local cmd = require(libDir .. "cmd")
 local customCommands = {
  hello = {
    description = "Say hello to someone",
+   category = "general",
+   aliases = {"hi", "greet"},
    execute = function(args, context)
      local name = args[1] or "World"
      context.succ("Hello, " .. name .. "!")
@@ -379,6 +381,7 @@ local customCommands = {
  },
  longlist = {
    description = "Show a long list with pagination",
+   category = "utilities",
    execute = function(args, context)
      local p = context.pager("My Long List")
      for i = 1, 100 do
@@ -392,7 +395,7 @@ cmd("MyApp", "1.0.0", customCommands)</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>string.split(self, sep?, plain?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/cmd.lua#L161' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/cmd.lua#L404' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Split a string into an array of substrings based on a separator</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -406,7 +409,7 @@ cmd("MyApp", "1.0.0", customCommands)</code></pre>
     </div>
     <div class='function'>
         <h3><code>string.startsWith(self, target, caseSensitive?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/cmd.lua#L185' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/cmd.lua#L428' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Check if a string starts with a target substring</p>
         <div class='params'>
             <strong>Parameters:</strong>
