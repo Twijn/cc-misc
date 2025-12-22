@@ -1155,18 +1155,25 @@ function inventory.clearSlots(sourceInv, slots)
     -- Get source inventory contents to know what items are in each slot
     local sourceSlots = {}
     local sourcePeripheral = inventory.getPeripheral(sourceInv)
+    local couldListSource = false
     
     if sourcePeripheral and sourcePeripheral.list then
-        local sourceList = sourcePeripheral.list()
-        if sourceList then
+        local success, sourceList = pcall(function() return sourcePeripheral.list() end)
+        if success and sourceList then
+            couldListSource = true
             for slot, slotItem in pairs(sourceList) do
                 local slotNum = tonumber(slot) or slot
                 sourceSlots[slotNum] = slotItem
             end
+            logger.debug(string.format("Listed source inventory %s, found items in %d slots", sourceInv, #sourceSlots))
+        else
+            logger.debug(string.format("Could not list source inventory %s (success=%s)", sourceInv, tostring(success)))
         end
+    else
+        logger.debug(string.format("Source peripheral %s not available or has no list method", sourceInv))
     end
     
-    -- Phase 1: Try to fill partial stacks first for each slot
+    -- Phase 1: Try to fill partial stacks first for each slot (only if we could list source)
     for _, slot in ipairs(slots) do
         local slotInfo = sourceSlots[slot]
         if slotInfo and slotInfo.name then
@@ -1222,8 +1229,18 @@ function inventory.clearSlots(sourceInv, slots)
     for _, slot in ipairs(slots) do
         local slotInfo = sourceSlots[slot]
         -- Skip if slot is empty or already fully cleared in phase 1
-        if not slotInfo or (slotInfo.count and slotInfo.count <= 0) then
-            -- Already cleared
+        -- BUT: if we couldn't list the source, we must try anyway
+        local shouldSkip = false
+        if couldListSource then
+            -- We could list the source, so trust our slotInfo
+            if not slotInfo or (slotInfo.count and slotInfo.count <= 0) then
+                shouldSkip = true
+            end
+        end
+        -- If we couldn't list source, never skip - always try to clear
+        
+        if shouldSkip then
+            logger.debug(string.format("clearSlots slot %d: skipping (already empty or cleared in phase 1)", slot))
         else
             local slotCleared = false
             local attempts = 0

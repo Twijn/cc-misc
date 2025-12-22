@@ -116,7 +116,12 @@ end
 ---@param slots table Array of slot numbers to clear
 ---@return number cleared Amount of items cleared
 function manager.clearSlots(sourceInv, slots)
+    logger.debug(string.format("storageManager.clearSlots called: sourceInv=%s, slots=%s", 
+        tostring(sourceInv), textutils.serialize(slots or {})))
+    
     local cleared = inventory.clearSlots(sourceInv, slots)
+    
+    logger.debug(string.format("storageManager.clearSlots result: cleared=%d", cleared))
     
     if cleared > 0 then
         logger.info(string.format("Cleared %d items from %d slots in %s", cleared, #slots, sourceInv))

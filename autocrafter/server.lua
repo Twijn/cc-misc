@@ -358,7 +358,10 @@ local function messageHandler()
                 
             elseif msgType == config.messageTypes.REQUEST_CLEAR_SLOTS then
                 -- Crafter wants to clear specific slots
+                logger.debug(string.format("REQUEST_CLEAR_SLOTS from %s: sourceInv=%s, slots=%s", 
+                    tostring(sender), tostring(data.sourceInv), textutils.serialize(data.slots or {})))
                 local cleared = storageManager.clearSlots(data.sourceInv, data.slots)
+                logger.debug(string.format("REQUEST_CLEAR_SLOTS result: cleared=%d", cleared))
                 comms.send(config.messageTypes.RESPONSE_CLEAR_SLOTS, {
                     cleared = cleared,
                 }, sender)

@@ -229,18 +229,11 @@ local function requestClearSlots(sourceInv, slots)
             slots = slots,
         })
         
-        -- Wait for response - use shorter timeout per attempt
-        local attemptTimeout = os.clock() + 2
-        while os.clock() < attemptTimeout do
-            local message = comms.receive(0.5)
-            if message then
-                if message.type == config.messageTypes.RESPONSE_CLEAR_SLOTS then
-                    logger.debug(string.format("requestClearSlots: received response, cleared=%d", message.data.cleared or 0))
-                    return message.data.cleared or 0
-                else
-                    logger.debug(string.format("requestClearSlots: received unexpected message type: %s", message.type))
-                end
-            end
+        -- Wait for response - use filter to only get the response we want
+        local message = comms.receive(5, config.messageTypes.RESPONSE_CLEAR_SLOTS)
+        if message then
+            logger.debug(string.format("requestClearSlots: received response, cleared=%d", message.data.cleared or 0))
+            return message.data.cleared or 0
         end
         
         -- Timeout on this attempt, retry with new request
