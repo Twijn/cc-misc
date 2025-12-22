@@ -417,21 +417,13 @@ local function pushFuelToFurnace(furnaceName, stockLevels)
     for _, loc in ipairs(locations) do
         if pushed >= toPush then break end
         
-        local source = inventory.getPeripheral(loc.inventory)
-        if source then
-            local amount = math.min(toPush - pushed, loc.count)
-            -- Push to slot 2 (fuel slot)
-            local transferred = source.pushItems(furnaceName, loc.slot, amount, 2) or 0
-            pushed = pushed + transferred
-            
-            if transferred > 0 then
-                inventory.scanSingle(loc.inventory, true)
-            end
-        end
+        local amount = math.min(toPush - pushed, loc.count)
+        -- Push to slot 2 (fuel slot) - use inventory.pushItems for proper cache handling
+        local transferred = inventory.pushItems(loc.inventory, loc.slot, furnaceName, amount, 2)
+        pushed = pushed + transferred
     end
     
     if pushed > 0 then
-        inventory.rebuildFromCache()
         logger.debug(string.format("Pushed %d %s fuel to %s", pushed, fuelItem, furnaceName))
     end
     
@@ -529,23 +521,10 @@ local function pushToFurnace(item, count, furnaceName)
     for _, loc in ipairs(locations) do
         if pushed >= count then break end
         
-        local source = inventory.getPeripheral(loc.inventory)
-        if source then
-            local toPush = math.min(count - pushed, loc.count)
-            -- Push to slot 1 (input slot)
-            local transferred = source.pushItems(furnaceName, loc.slot, toPush, 1) or 0
-            pushed = pushed + transferred
-            
-            if transferred > 0 then
-                -- Update cache for source inventory
-                inventory.scanSingle(loc.inventory, true)
-            end
-        end
-    end
-    
-    -- Rebuild cache if we pushed anything
-    if pushed > 0 then
-        inventory.rebuildFromCache()
+        local toPush = math.min(count - pushed, loc.count)
+        -- Push to slot 1 (input slot) - use inventory.pushItems for proper cache handling
+        local transferred = inventory.pushItems(loc.inventory, loc.slot, furnaceName, toPush, 1)
+        pushed = pushed + transferred
     end
     
     return pushed
@@ -569,24 +548,18 @@ local function pullFromFurnace(furnaceName)
     for _, destName in ipairs(storageInvs) do
         local dest = inventory.getPeripheral(destName)
         if dest and dest.pullItems then
-            -- Pull from slot 3 (output slot)
-            local transferred = dest.pullItems(furnaceName, 3) or 0
+            -- Pull from slot 3 (output slot) - use inventory.pullItems for proper cache handling
+            local transferred = inventory.pullItems(destName, furnaceName, 3)
             pulled = pulled + transferred
             
             if transferred > 0 then
-                inventory.scanSingle(destName, true)
-            end
-            
-            -- Check if we got everything
-            local newContents = getFurnaceContents(furnace)
-            if not newContents.output or newContents.output.count == 0 then
-                break
+                -- Check if we got everything
+                local newContents = getFurnaceContents(furnace)
+                if not newContents.output or newContents.output.count == 0 then
+                    break
+                end
             end
         end
-    end
-    
-    if pulled > 0 then
-        inventory.rebuildFromCache()
     end
     
     return pulled
@@ -605,6 +578,9 @@ function manager.processSmelt(stockLevels)
         fuelPushed = 0,
         emptyBucketsPulled = 0,
     }
+    
+    -- Use batch mode to defer cache rebuilds until the end
+    inventory.beginBatch()
     
     -- First, pull completed items and empty buckets from all furnaces
     for _, furnaceData in pairs(furnaceConfig.getAll()) do
@@ -687,8 +663,11 @@ function manager.processSmelt(stockLevels)
         ::continue::
     end
     
-    -- Process dried kelp mode if enabled
+    -- Process dried kelp mode if enabled (before ending batch)
     stats.driedKelpProcessed = manager.processDriedKelpMode(stockLevels)
+    
+    -- End batch mode and rebuild cache once at the very end
+    inventory.endBatch()
     
     return stats
 end
