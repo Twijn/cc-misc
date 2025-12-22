@@ -85,6 +85,7 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/lib/inventory.lua", path = "lib/inventory.lua", name = "inventory.lua", category = "Libraries"},
     {url = BASE_URL .. "/autocrafter/lib/crafting.lua", path = "lib/crafting.lua", name = "crafting.lua", category = "Libraries"},
     {url = BASE_URL .. "/autocrafter/lib/ui.lua", path = "lib/ui.lua", name = "ui.lua", category = "Libraries"},
+    {url = BASE_URL .. "/autocrafter/lib/menu.lua", path = "lib/menu.lua", name = "menu.lua", category = "Libraries"},
     {url = BASE_URL .. "/autocrafter/managers/queue.lua", path = "managers/queue.lua", name = "queue.lua", category = "Managers"},
     {url = BASE_URL .. "/autocrafter/managers/storage.lua", path = "managers/storage.lua", name = "storage.lua", category = "Managers"},
     {url = BASE_URL .. "/autocrafter/managers/crafter.lua", path = "managers/crafter.lua", name = "crafter.lua", category = "Managers"},
@@ -95,6 +96,7 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/config/targets.lua", path = "config/targets.lua", name = "targets.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/exports.lua", path = "config/exports.lua", name = "exports.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/recipes.lua", path = "config/recipes.lua", name = "recipes.lua", category = "Config"},
+    {url = BASE_URL .. "/autocrafter/config/recipeprefs.lua", path = "config/recipeprefs.lua", name = "recipeprefs.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = "config/furnaces.lua", name = "furnaces.lua", category = "Config"},
 }
 

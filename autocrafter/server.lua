@@ -2163,10 +2163,18 @@ local commands = {
             local recipePrefs = require("config.recipes")
             local subCmd = args[1]
             
-            if not subCmd or subCmd == "help" then
+            if not subCmd then
+                -- No subcommand - open interactive menu
+                local recipeprefsConfig = require("config.recipeprefs")
+                recipeprefsConfig.showMenu()
+                return
+            end
+            
+            if subCmd == "help" then
                 print("")
                 ctx.mess("=== Recipe Preferences Commands ===")
                 term.setTextColor(colors.lightGray)
+                print("  recipeprefs             - Open interactive menu (recommended)")
                 print("  recipeprefs list [item]   - List items with preferences or recipes for item")
                 print("  recipeprefs show <item>   - Show all recipe variants for an item")
                 print("  recipeprefs prefer <item> <#> - Set preferred recipe variant")

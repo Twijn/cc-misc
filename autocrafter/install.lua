@@ -143,6 +143,7 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/lib/inventory.lua", path = diskPrefix .. "lib/inventory.lua"},
     {url = BASE_URL .. "/autocrafter/lib/crafting.lua", path = diskPrefix .. "lib/crafting.lua"},
     {url = BASE_URL .. "/autocrafter/lib/ui.lua", path = diskPrefix .. "lib/ui.lua"},
+    {url = BASE_URL .. "/autocrafter/lib/menu.lua", path = diskPrefix .. "lib/menu.lua"},
     {url = BASE_URL .. "/autocrafter/managers/queue.lua", path = diskPrefix .. "managers/queue.lua"},
     {url = BASE_URL .. "/autocrafter/managers/storage.lua", path = diskPrefix .. "managers/storage.lua"},
     {url = BASE_URL .. "/autocrafter/managers/crafter.lua", path = diskPrefix .. "managers/crafter.lua"},
@@ -153,6 +154,7 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/config/targets.lua", path = diskPrefix .. "config/targets.lua"},
     {url = BASE_URL .. "/autocrafter/config/exports.lua", path = diskPrefix .. "config/exports.lua"},
     {url = BASE_URL .. "/autocrafter/config/recipes.lua", path = diskPrefix .. "config/recipes.lua"},
+    {url = BASE_URL .. "/autocrafter/config/recipeprefs.lua", path = diskPrefix .. "config/recipeprefs.lua"},
     {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = diskPrefix .. "config/furnaces.lua"},
 }
 

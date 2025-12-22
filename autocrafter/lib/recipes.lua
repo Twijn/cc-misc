@@ -197,7 +197,6 @@ end
 ---@return number count Total number of recipes loaded
 function recipes.init(paths)
     paths = paths or {
-        "/rom/mcdata/minecraft/recipes",
         "/rom/mcdata",
     }
     
