@@ -190,7 +190,7 @@ function manager.drawStatus(data)
     if data.targets and #data.targets > 0 then
         monitor.setTextColor(colors.yellow)
         monitor.setCursorPos(2, y)
-        monitor.write("-- Targets --")
+        monitor.write("-- Craft Targets --")
         y = y + 1
         
         for i, target in ipairs(data.targets) do
@@ -222,6 +222,100 @@ function manager.drawStatus(data)
             
             y = y + 1
         end
+        y = y + 1
+    end
+    
+    -- Smelt targets
+    if data.smeltTargets and #data.smeltTargets > 0 then
+        monitor.setTextColor(colors.yellow)
+        monitor.setCursorPos(2, y)
+        monitor.write("-- Smelt Targets --")
+        y = y + 1
+        
+        for i, target in ipairs(data.smeltTargets) do
+            if y > h - 1 then break end
+            
+            monitor.setCursorPos(2, y)
+            
+            -- Status indicator
+            if target.current >= target.target then
+                monitor.setTextColor(colors.lime)
+                monitor.write("+ ")
+            else
+                monitor.setTextColor(colors.red)
+                monitor.write("~ ")
+            end
+            
+            -- Item name (shortened)
+            monitor.setTextColor(colors.white)
+            local name = target.item:gsub("minecraft:", "")
+            if #name > w - 12 then
+                name = name:sub(1, w - 15) .. "..."
+            end
+            monitor.write(name)
+            
+            -- Count
+            monitor.setCursorPos(w - 8, y)
+            monitor.setTextColor(colors.lightGray)
+            monitor.write(string.format("%d/%d", target.current, target.target))
+            
+            y = y + 1
+        end
+        y = y + 1
+    end
+    
+    -- Fuel summary (compact)
+    if data.fuelSummary and data.fuelSummary.fuelStock then
+        monitor.setTextColor(colors.yellow)
+        monitor.setCursorPos(2, y)
+        monitor.write("-- Fuel --")
+        y = y + 1
+        
+        -- Show top 3 fuels in compact form
+        local fuelList = {}
+        for i, fuel in ipairs(data.fuelSummary.fuelStock) do
+            if i > 3 then break end
+            local name = fuel.item:gsub("minecraft:", "")
+            -- Shorten common fuel names
+            name = name:gsub("_bucket", "")
+            name = name:gsub("_block", "B")
+            name = name:gsub("charcoal", "char")
+            if #name > 8 then name = name:sub(1, 6) .. ".." end
+            
+            local stockColor = fuel.stock > 0 and colors.lime or colors.red
+            table.insert(fuelList, {name = name, stock = fuel.stock, color = stockColor})
+        end
+        
+        monitor.setCursorPos(2, y)
+        for i, fuel in ipairs(fuelList) do
+            monitor.setTextColor(colors.white)
+            monitor.write(fuel.name .. ":")
+            monitor.setTextColor(fuel.color)
+            monitor.write(tostring(fuel.stock))
+            if i < #fuelList then
+                monitor.setTextColor(colors.gray)
+                monitor.write(" ")
+            end
+        end
+        y = y + 1
+        
+        -- Total smelt capacity
+        monitor.setCursorPos(2, y)
+        monitor.setTextColor(colors.lightGray)
+        monitor.write("Cap: ")
+        local cap = data.fuelSummary.totalSmeltCapacity or 0
+        if cap >= 1000 then
+            monitor.setTextColor(colors.lime)
+            monitor.write(string.format("%.1fk", cap / 1000))
+        elseif cap > 0 then
+            monitor.setTextColor(colors.orange)
+            monitor.write(tostring(math.floor(cap)))
+        else
+            monitor.setTextColor(colors.red)
+            monitor.write("0")
+        end
+        monitor.setTextColor(colors.lightGray)
+        monitor.write(" items")
     end
     
     lastRefresh = os.clock()

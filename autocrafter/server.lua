@@ -476,6 +476,8 @@ local function monitorRefreshLoop()
                 queue = queueManager.getStats(),
                 crafters = crafterManager.getStats(),
                 targets = targets.getWithStock(stock),
+                smeltTargets = furnaceConfig.getSmeltTargetsWithStock(stock),
+                fuelSummary = furnaceManager.getFuelSummary(stock),
             })
         end
         sleep(config.monitorRefreshInterval or 5)
