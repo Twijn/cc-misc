@@ -69,6 +69,21 @@ local function initialize()
     queueManager.init()
     storageManager.init(config.storagePeripheralType)
     storageManager.setScanInterval(settings.get("scanInterval"))
+    
+    -- Verify storage peripherals are available
+    local storageInvs = inventory.getStorageInventories()
+    if #storageInvs == 0 then
+        term.setTextColor(colors.red)
+        print("ERROR: No storage peripherals found!")
+        print("Configured type: " .. (config.storagePeripheralType or "not set"))
+        print("Items will NOT be stored correctly until this is fixed.")
+        term.setTextColor(colors.white)
+    else
+        term.setTextColor(colors.lime)
+        print(string.format("Storage peripherals: %d (%s)", #storageInvs, config.storagePeripheralType))
+        term.setTextColor(colors.white)
+    end
+    
     crafterManager.init()
     monitorManager.init(config.monitorRefreshInterval)
     exportManager.init()

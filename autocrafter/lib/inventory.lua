@@ -477,8 +477,19 @@ function inventory.discoverInventories(forceRefresh)
             -- Track storage inventories separately
             if isStorage then
                 table.insert(storageInventories, name)
+                logger.debug(string.format("Discovered storage peripheral: %s", name))
             end
         end
+    end
+    
+    -- Log storage discovery results
+    logger.info(string.format("Discovered %d inventories, %d are storage type (%s)", 
+        #inventoryNames, #storageInventories, storagePeripheralType))
+    
+    if #storageInventories == 0 then
+        logger.warn("WARNING: No storage peripherals found!")
+        logger.warn("Configured storage type: " .. storagePeripheralType)
+        logger.warn("Items will NOT be deposited until storage peripherals are available.")
     end
     
     -- Also find and cache modem
@@ -503,6 +514,57 @@ function inventory.getStorageInventories()
     -- Rebuild from inventory names if needed
     inventory.discoverInventories(true)
     return storageInventories
+end
+
+---Get configured storage peripheral type
+---@return string type The storage peripheral type
+function inventory.getStorageType()
+    return storagePeripheralType
+end
+
+---Debug function to list all peripherals and their types
+---Useful for diagnosing storage configuration issues
+---@return table diagnostics Table with storage diagnostics
+function inventory.debugStoragePeripherals()
+    local diagnostics = {
+        configuredType = storagePeripheralType,
+        storageInventories = {},
+        allInventories = {},
+        warnings = {},
+    }
+    
+    -- List all peripherals with inventory capability
+    for _, name in ipairs(peripheral.getNames()) do
+        local types = {peripheral.getType(name)}
+        local hasInventory = false
+        local hasStorage = false
+        
+        for _, t in ipairs(types) do
+            if t == "inventory" then hasInventory = true end
+            if t == storagePeripheralType then hasStorage = true end
+        end
+        
+        if hasInventory then
+            local info = {
+                name = name,
+                types = types,
+                isStorage = hasStorage,
+            }
+            table.insert(diagnostics.allInventories, info)
+            
+            if hasStorage then
+                table.insert(diagnostics.storageInventories, name)
+            end
+        end
+    end
+    
+    -- Generate warnings
+    if #diagnostics.storageInventories == 0 then
+        table.insert(diagnostics.warnings, "No storage peripherals found with type: " .. storagePeripheralType)
+        table.insert(diagnostics.warnings, "Check your config.lua storagePeripheralType setting")
+    end
+    
+    return diagnostics
 end
 
 ---Check if an inventory is a storage inventory
@@ -1093,45 +1155,58 @@ function inventory.deposit(sourceInv, item)
     
     logger.debug(string.format("inventory.deposit called: sourceInv=%s, item=%s", sourceInv, tostring(item)))
     
-    -- Get storage inventories only
+    -- Get storage inventories only - STRICTLY use defined storage type
     local storageInvs = inventory.getStorageInventories()
     logger.debug(string.format("Found %d storage inventories", #storageInvs))
     
     if #storageInvs == 0 then
-        -- Fall back to all cached inventories if no storage type found
-        logger.warn("No storage inventories found, falling back to all cached inventories")
-        local invData = inventoryCache.getAll()  
-        for name in pairs(invData) do
-            if name ~= sourceInv then
-                table.insert(storageInvs, name)
-            end
-        end
-        logger.debug(string.format("Fallback found %d inventories", #storageInvs))
+        -- NO FALLBACK - only use defined storage blocks
+        logger.error("No storage inventories found! Configure storagePeripheralType in config.lua")
+        logger.error(string.format("Current storage type: %s", storagePeripheralType))
+        return 0
     end
     
     -- Pre-wrap all storage peripherals for efficiency
+    -- STRICTLY validate each peripheral is the correct storage type
     local storagePeripherals = {}
     local storageByName = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
-            local dest = inventory.getPeripheral(name)
-            if dest and dest.pullItems then
-                local entry = {
-                    name = name, 
-                    peripheral = dest,
-                }
-                table.insert(storagePeripherals, entry)
-                storageByName[name] = entry
+            -- Double-check this is actually the correct storage type
+            local types = {peripheral.getType(name)}
+            local isValidStorage = false
+            for _, t in ipairs(types) do
+                if t == storagePeripheralType then
+                    isValidStorage = true
+                    break
+                end
+            end
+            
+            if isValidStorage then
+                local dest = inventory.getPeripheral(name)
+                if dest and dest.pullItems then
+                    local entry = {
+                        name = name, 
+                        peripheral = dest,
+                    }
+                    table.insert(storagePeripherals, entry)
+                    storageByName[name] = entry
+                    logger.debug(string.format("deposit: validated storage peripheral %s", name))
+                end
+            else
+                logger.warn(string.format("deposit: skipping %s - not a valid storage type (types: %s)", 
+                    name, table.concat(types, ", ")))
             end
         end
     end
     
     if #storagePeripherals == 0 then
-        logger.error("No storage peripherals available for deposit!")
+        logger.error("No valid storage peripherals available for deposit!")
+        logger.error(string.format("Expected storage type: %s", storagePeripheralType))
         return 0
     end
     
-    logger.debug(string.format("Using %d storage peripherals for deposit", #storagePeripherals))
+    logger.debug(string.format("Using %d validated storage peripherals for deposit", #storagePeripherals))
     
     -- First, get list of source slots from source inventory (turtle or other inventory)
     -- For turtles, we just iterate 1-16
@@ -1347,34 +1422,47 @@ function inventory.clearSlots(sourceInv, slots)
     
     logger.debug(string.format("inventory.clearSlots called: sourceInv=%s, slots=%s", sourceInv, textutils.serialize(slots)))
     
-    -- Get storage inventories only
+    -- Get storage inventories only - STRICTLY use defined storage type
     local storageInvs = inventory.getStorageInventories()
     logger.debug(string.format("Found %d storage inventories for clearSlots", #storageInvs))
     
     if #storageInvs == 0 then
-        -- Fall back to all cached inventories if no storage type found
-        logger.warn("No storage inventories found for clearSlots, falling back to all cached inventories")
-        local invData = inventoryCache.getAll()
-        for name in pairs(invData) do
-            if name ~= sourceInv then
-                table.insert(storageInvs, name)
-            end
-        end
+        -- NO FALLBACK - only use defined storage blocks
+        logger.error("No storage inventories found for clearSlots! Configure storagePeripheralType in config.lua")
+        logger.error(string.format("Current storage type: %s", storagePeripheralType))
+        return 0
     end
     
     -- Pre-wrap all storage peripherals for efficiency
+    -- STRICTLY validate each peripheral is the correct storage type
     local storagePeripherals = {}
     local storageByName = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
-            local dest = inventory.getPeripheral(name)
-            if dest and dest.pullItems then
-                local entry = {
-                    name = name, 
-                    peripheral = dest,
-                }
-                table.insert(storagePeripherals, entry)
-                storageByName[name] = entry
+            -- Double-check this is actually the correct storage type
+            local types = {peripheral.getType(name)}
+            local isValidStorage = false
+            for _, t in ipairs(types) do
+                if t == storagePeripheralType then
+                    isValidStorage = true
+                    break
+                end
+            end
+            
+            if isValidStorage then
+                local dest = inventory.getPeripheral(name)
+                if dest and dest.pullItems then
+                    local entry = {
+                        name = name, 
+                        peripheral = dest,
+                    }
+                    table.insert(storagePeripherals, entry)
+                    storageByName[name] = entry
+                    logger.debug(string.format("clearSlots: validated storage peripheral %s", name))
+                end
+            else
+                logger.warn(string.format("clearSlots: skipping %s - not a valid storage type (types: %s)", 
+                    name, table.concat(types, ", ")))
             end
         end
     end
@@ -1592,18 +1680,48 @@ function inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
         return 0, nil  -- Nothing to pull
     end
     
-    -- Get storage inventories
+    -- Get storage inventories - STRICTLY use defined storage type
     local storageInvs = inventory.getStorageInventories()
     if #storageInvs == 0 then
-        logger.error("pullSlot: No storage inventories available")
+        logger.error("pullSlot: No storage inventories available! Configure storagePeripheralType in config.lua")
+        logger.error(string.format("pullSlot: Current storage type: %s", storagePeripheralType))
         return 0, "no_storage"
+    end
+    
+    -- Build a validated list of storage peripherals
+    local validatedStorage = {}
+    for _, name in ipairs(storageInvs) do
+        if name ~= sourceInv then
+            -- Double-check this is actually the correct storage type
+            local types = {peripheral.getType(name)}
+            local isValidStorage = false
+            for _, t in ipairs(types) do
+                if t == storagePeripheralType then
+                    isValidStorage = true
+                    break
+                end
+            end
+            
+            if isValidStorage then
+                local dest = inventory.getPeripheral(name)
+                if dest and dest.pullItems then
+                    table.insert(validatedStorage, name)
+                end
+            end
+        end
+    end
+    
+    if #validatedStorage == 0 then
+        logger.error("pullSlot: No valid storage peripherals after validation!")
+        return 0, "no_valid_storage"
     end
     
     local totalPulled = 0
     local remaining = itemCount
     
     -- Phase 1: Try to fill partial stacks of the same item first
-    local partialStacks = findPartialStacks(itemName, itemNbt, storageInvs)
+    -- Filter partial stacks to only include validated storage
+    local partialStacks = findPartialStacks(itemName, itemNbt, validatedStorage)
     
     for _, partial in ipairs(partialStacks) do
         if remaining <= 0 then break end
@@ -1627,26 +1745,24 @@ function inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
         end
     end
     
-    -- Phase 2: Pull remaining to any storage with space
+    -- Phase 2: Pull remaining to validated storage peripherals only
     if remaining > 0 then
-        for _, storageName in ipairs(storageInvs) do
-            if storageName ~= sourceInv then
-                local storage = inventory.getPeripheral(storageName)
-                if storage and storage.pullItems then
-                    -- Try to pull remaining items
-                    local success, pulled = pcall(function()
-                        return storage.pullItems(sourceInv, slot, remaining)
-                    end)
+        for _, storageName in ipairs(validatedStorage) do
+            local storage = inventory.getPeripheral(storageName)
+            if storage and storage.pullItems then
+                -- Try to pull remaining items
+                local success, pulled = pcall(function()
+                    return storage.pullItems(sourceInv, slot, remaining)
+                end)
+                
+                if success and pulled and pulled > 0 then
+                    logger.debug(string.format("pullSlot: pulled %d to %s (new slot)", 
+                        pulled, storageName))
+                    totalPulled = totalPulled + pulled
+                    remaining = remaining - pulled
                     
-                    if success and pulled and pulled > 0 then
-                        logger.debug(string.format("pullSlot: pulled %d to %s (new slot)", 
-                            pulled, storageName))
-                        totalPulled = totalPulled + pulled
-                        remaining = remaining - pulled
-                        
-                        if remaining <= 0 then
-                            break
-                        end
+                    if remaining <= 0 then
+                        break
                     end
                 end
             end
