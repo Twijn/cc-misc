@@ -170,7 +170,7 @@ function PagerCollector:show()
         if scrollPos >= totalLines - viewHeight + 1 then
             progress = 100
         end
-        local statusText = string.format(" Lines %d-%d of %d (%d%%) | ↑↓:scroll PgUp/PgDn:page q:quit",
+        local statusText = string.format(" Lines %d-%d of %d (%d%%) | Up/Dn:scroll PgUp/PgDn:page q:quit",
             scrollPos, endPos, totalLines, progress)
         write(statusText:sub(1, w))
         

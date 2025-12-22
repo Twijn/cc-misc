@@ -128,7 +128,7 @@ local function viewItemRecipes(item)
             -- Add source as sub-item
             table.insert(menuOptions, {
                 separator = true,
-                label = "    └─ " .. getShortSource(recipe.source)
+                label = "    +- " .. getShortSource(recipe.source)
             })
         end
         
