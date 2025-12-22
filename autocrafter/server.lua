@@ -1705,6 +1705,14 @@ local commands = {
                 print("  furnaces status - Show furnace status")
                 print("  furnaces targets - List smelt targets")
                 print("  furnaces recipes [search] - Search smelting recipes")
+                print("  furnaces fuel - Show fuel config & stock")
+                print("  furnaces fuel list - List preferred fuels")
+                print("  furnaces fuel add <item> [pos] - Add fuel to list")
+                print("  furnaces fuel remove <item> - Remove fuel from list")
+                print("  furnaces lava - Show lava bucket config")
+                print("  furnaces lava enable/disable - Toggle lava bucket")
+                print("  furnaces lava input <chest> - Set lava input chest")
+                print("  furnaces lava output <chest> - Set empty bucket chest")
                 return
             end
             
@@ -1905,17 +1913,214 @@ local commands = {
                 return
             end
             
+            if subCmd == "fuel" then
+                local fuelCmd = args[2]
+                local stock = storageManager.getAllStock()
+                
+                if not fuelCmd or fuelCmd == "list" or fuelCmd == "status" then
+                    local summary = furnaceManager.getFuelSummary(stock)
+                    local p = ctx.pager("=== Fuel Configuration ===")
+                    
+                    p.setTextColor(colors.yellow)
+                    p.print("Preferred Fuels (in priority order):")
+                    p.setTextColor(colors.white)
+                    
+                    for i, fuel in ipairs(summary.fuelStock) do
+                        local name = fuel.item:gsub("minecraft:", "")
+                        local stockColor = fuel.stock > 0 and colors.green or colors.red
+                        p.setTextColor(colors.white)
+                        p.write(string.format("  %d. %s", i, name))
+                        p.setTextColor(stockColor)
+                        p.write(string.format(" [%d]", fuel.stock))
+                        p.setTextColor(colors.lightGray)
+                        p.print(string.format(" (smelt x%.1f)", fuel.burnTime))
+                    end
+                    
+                    p.print("")
+                    p.setTextColor(colors.yellow)
+                    p.print("Total Smelt Capacity: " .. math.floor(summary.totalSmeltCapacity) .. " items")
+                    
+                    p.setTextColor(colors.lightGray)
+                    p.print("")
+                    p.print("Lava Bucket: " .. (summary.config.enableLavaBucket and "Enabled" or "Disabled"))
+                    if summary.config.lavaBucketInputChest then
+                        p.print("  Input: " .. summary.config.lavaBucketInputChest)
+                    end
+                    if summary.config.lavaBucketOutputChest then
+                        p.print("  Output: " .. summary.config.lavaBucketOutputChest)
+                    end
+                    
+                    p.show()
+                    return
+                end
+                
+                if fuelCmd == "add" then
+                    local item = args[3]
+                    local pos = tonumber(args[4])
+                    
+                    if not item then
+                        ctx.err("Usage: furnaces fuel add <item> [position]")
+                        return
+                    end
+                    
+                    -- Add minecraft: prefix if not present
+                    if not item:find(":") then
+                        item = "minecraft:" .. item
+                    end
+                    
+                    furnaceConfig.addPreferredFuel(item, pos)
+                    ctx.mess("Added " .. item .. " to preferred fuels" .. (pos and " at position " .. pos or ""))
+                    return
+                end
+                
+                if fuelCmd == "remove" then
+                    local item = args[3]
+                    
+                    if not item then
+                        ctx.err("Usage: furnaces fuel remove <item>")
+                        return
+                    end
+                    
+                    if not item:find(":") then
+                        item = "minecraft:" .. item
+                    end
+                    
+                    if furnaceConfig.removePreferredFuel(item) then
+                        ctx.mess("Removed " .. item .. " from preferred fuels")
+                    else
+                        ctx.err("Fuel not found in preferred list: " .. item)
+                    end
+                    return
+                end
+                
+                ctx.err("Unknown fuel subcommand: " .. fuelCmd)
+                print("Use 'furnaces fuel list' to see current config")
+                return
+            end
+            
+            if subCmd == "lava" then
+                local lavaCmd = args[2]
+                
+                if not lavaCmd then
+                    local config = furnaceConfig.getFuelConfig()
+                    ctx.mess("=== Lava Bucket Configuration ===")
+                    print("  Status: " .. (config.enableLavaBucket and "Enabled" or "Disabled"))
+                    print("  Input Chest: " .. (config.lavaBucketInputChest or "(not set)"))
+                    print("  Output Chest: " .. (config.lavaBucketOutputChest or "(not set)"))
+                    print("")
+                    print("Use 'furnaces lava enable/disable' to toggle")
+                    print("Use 'furnaces lava input <chest>' to set input")
+                    print("Use 'furnaces lava output <chest>' to set output")
+                    return
+                end
+                
+                if lavaCmd == "enable" then
+                    furnaceConfig.setLavaBucketEnabled(true)
+                    ctx.mess("Enabled lava bucket fuel")
+                    return
+                end
+                
+                if lavaCmd == "disable" then
+                    furnaceConfig.setLavaBucketEnabled(false)
+                    ctx.mess("Disabled lava bucket fuel")
+                    return
+                end
+                
+                if lavaCmd == "input" then
+                    local chest = args[3]
+                    if not chest then
+                        ctx.err("Usage: furnaces lava input <chest-name>")
+                        print("Use 'clear' to remove the input chest")
+                        return
+                    end
+                    
+                    if chest == "clear" or chest == "none" then
+                        furnaceConfig.setLavaBucketInputChest(nil)
+                        ctx.mess("Cleared lava bucket input chest")
+                        return
+                    end
+                    
+                    -- Verify peripheral exists
+                    if not peripheral.wrap(chest) then
+                        ctx.err("Peripheral not found: " .. chest)
+                        return
+                    end
+                    
+                    furnaceConfig.setLavaBucketInputChest(chest)
+                    ctx.mess("Set lava bucket input chest: " .. chest)
+                    return
+                end
+                
+                if lavaCmd == "output" then
+                    local chest = args[3]
+                    if not chest then
+                        ctx.err("Usage: furnaces lava output <chest-name>")
+                        print("Use 'clear' to remove the output chest")
+                        return
+                    end
+                    
+                    if chest == "clear" or chest == "none" then
+                        furnaceConfig.setLavaBucketOutputChest(nil)
+                        ctx.mess("Cleared lava bucket output chest")
+                        return
+                    end
+                    
+                    -- Verify peripheral exists
+                    if not peripheral.wrap(chest) then
+                        ctx.err("Peripheral not found: " .. chest)
+                        return
+                    end
+                    
+                    furnaceConfig.setLavaBucketOutputChest(chest)
+                    ctx.mess("Set lava bucket output chest: " .. chest)
+                    return
+                end
+                
+                ctx.err("Unknown lava subcommand: " .. lavaCmd)
+                return
+            end
+            
             ctx.err("Unknown subcommand: " .. subCmd)
             ctx.mess("Use 'furnaces help' for available commands")
         end,
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"list", "discover", "add", "remove", "enable", "disable", "status", "targets", "recipes", "help"}
+                local options = {"list", "discover", "add", "remove", "enable", "disable", "status", "targets", "recipes", "fuel", "lava", "help"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) then
                         table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and args[1] == "fuel" then
+                local query = (args[2] or ""):lower()
+                local options = {"list", "add", "remove", "status"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and args[1] == "lava" then
+                local query = (args[2] or ""):lower()
+                local options = {"enable", "disable", "input", "output"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 3 and args[1] == "lava" and (args[2] == "input" or args[2] == "output") then
+                -- Complete peripheral names for lava chest config
+                local query = (args[3] or ""):lower()
+                local matches = {}
+                for _, name in ipairs(peripheral.getNames()) do
+                    if name:lower():find(query, 1, true) then
+                        table.insert(matches, name)
                     end
                 end
                 return matches

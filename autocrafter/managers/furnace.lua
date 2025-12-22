@@ -14,6 +14,33 @@ local furnacePeripherals = {}
 local lastSmeltCheck = 0
 local smeltCheckInterval = 5  -- Seconds between smelt checks
 
+-- Fuel burn times (in ticks, 1 item smelted = 200 ticks)
+-- Values represent number of items that can be smelted per fuel item
+local fuelBurnTimes = {
+    ["minecraft:lava_bucket"] = 100,
+    ["minecraft:coal_block"] = 80,
+    ["minecraft:blaze_rod"] = 12,
+    ["minecraft:coal"] = 8,
+    ["minecraft:charcoal"] = 8,
+    ["minecraft:dried_kelp_block"] = 20,
+    ["minecraft:bamboo_block"] = 2,
+    ["minecraft:oak_log"] = 1.5,
+    ["minecraft:spruce_log"] = 1.5,
+    ["minecraft:birch_log"] = 1.5,
+    ["minecraft:jungle_log"] = 1.5,
+    ["minecraft:acacia_log"] = 1.5,
+    ["minecraft:dark_oak_log"] = 1.5,
+    ["minecraft:mangrove_log"] = 1.5,
+    ["minecraft:cherry_log"] = 1.5,
+    ["minecraft:oak_planks"] = 1.5,
+    ["minecraft:spruce_planks"] = 1.5,
+    ["minecraft:birch_planks"] = 1.5,
+    ["minecraft:jungle_planks"] = 1.5,
+    ["minecraft:acacia_planks"] = 1.5,
+    ["minecraft:dark_oak_planks"] = 1.5,
+    ["minecraft:stick"] = 0.5,
+}
+
 -- Smelting recipes (input -> output mappings)
 -- This is a simplified set - can be extended or loaded from ROM
 local smeltingRecipes = {
@@ -201,6 +228,210 @@ local function isFurnaceAvailable(furnace)
     return true
 end
 
+---Check if a furnace needs fuel
+---@param furnace table The wrapped furnace peripheral
+---@return boolean needsFuel Whether the furnace needs fuel
+---@return number|nil fuelCount Current fuel count (nil if no fuel)
+local function furnaceNeedsFuel(furnace)
+    local contents = getFurnaceContents(furnace)
+    
+    -- Check if fuel slot is empty or low
+    if not contents.fuel then
+        return true, 0
+    end
+    
+    -- Consider needing fuel if below 32 items (except lava bucket which is 1)
+    local threshold = 32
+    if contents.fuel.name == "minecraft:lava_bucket" then
+        return false, contents.fuel.count
+    end
+    
+    if contents.fuel.count < threshold then
+        return true, contents.fuel.count
+    end
+    
+    return false, contents.fuel.count
+end
+
+---Get fuel burn time for an item
+---@param item string The fuel item ID
+---@return number burnTime Number of items this fuel can smelt
+function manager.getFuelBurnTime(item)
+    return fuelBurnTimes[item] or 0
+end
+
+---Check if an item is valid fuel
+---@param item string The item ID
+---@return boolean isFuel Whether the item is valid fuel
+function manager.isFuel(item)
+    return fuelBurnTimes[item] ~= nil
+end
+
+---Get all fuel burn times
+---@return table fuelBurnTimes Map of item -> burn time
+function manager.getAllFuelBurnTimes()
+    return fuelBurnTimes
+end
+
+---Get fuel stock levels for preferred fuels
+---@param stockLevels table Current stock levels
+---@return table fuelStock Array of {item, stock, burnTime, priority}
+function manager.getFuelStock(stockLevels)
+    local preferredFuels = furnaceConfig.getPreferredFuels()
+    local fuelStock = {}
+    
+    for priority, fuelItem in ipairs(preferredFuels) do
+        -- Skip lava bucket if not enabled
+        if fuelItem == "minecraft:lava_bucket" and not furnaceConfig.isLavaBucketEnabled() then
+            goto continue
+        end
+        
+        local stock = stockLevels[fuelItem] or 0
+        local burnTime = fuelBurnTimes[fuelItem] or 0
+        
+        table.insert(fuelStock, {
+            item = fuelItem,
+            stock = stock,
+            burnTime = burnTime,
+            priority = priority,
+            totalSmeltCapacity = stock * burnTime,
+        })
+        
+        ::continue::
+    end
+    
+    return fuelStock
+end
+
+---Find the best available fuel from storage
+---@param stockLevels table Current stock levels
+---@return string|nil fuelItem The best fuel item ID, or nil if none available
+---@return number available Amount available
+local function findBestFuel(stockLevels)
+    local preferredFuels = furnaceConfig.getPreferredFuels()
+    
+    for _, fuelItem in ipairs(preferredFuels) do
+        -- Skip lava bucket if not enabled
+        if fuelItem == "minecraft:lava_bucket" and not furnaceConfig.isLavaBucketEnabled() then
+            goto continue
+        end
+        
+        local available = stockLevels[fuelItem] or 0
+        if available > 0 then
+            return fuelItem, available
+        end
+        
+        ::continue::
+    end
+    
+    return nil, 0
+end
+
+---Push fuel to a furnace
+---@param furnaceName string The furnace peripheral name
+---@param stockLevels table Current stock levels
+---@return number pushed Amount of fuel pushed
+---@return string|nil fuelUsed The fuel item that was pushed
+local function pushFuelToFurnace(furnaceName, stockLevels)
+    local furnace = getFurnacePeripheral(furnaceName)
+    if not furnace then return 0, nil end
+    
+    local needsFuel, currentFuel = furnaceNeedsFuel(furnace)
+    if not needsFuel then return 0, nil end
+    
+    -- Find best available fuel
+    local fuelItem, available = findBestFuel(stockLevels)
+    if not fuelItem then return 0, nil end
+    
+    -- Handle lava bucket specially - check input chest first
+    if fuelItem == "minecraft:lava_bucket" then
+        local lavaInputChest = furnaceConfig.getLavaBucketInputChest()
+        if lavaInputChest then
+            local lavaChest = peripheral.wrap(lavaInputChest)
+            if lavaChest and lavaChest.pushItems then
+                -- Find lava bucket in the chest
+                local items = lavaChest.list and lavaChest.list() or {}
+                for slot, item in pairs(items) do
+                    if item.name == "minecraft:lava_bucket" then
+                        -- Push to fuel slot (slot 2)
+                        local transferred = lavaChest.pushItems(furnaceName, slot, 1, 2) or 0
+                        if transferred > 0 then
+                            logger.debug(string.format("Pushed lava bucket from %s to %s", lavaInputChest, furnaceName))
+                            return transferred, fuelItem
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    -- Normal fuel - push from storage
+    local toPush = math.min(available, 64 - (currentFuel or 0))
+    if toPush <= 0 then return 0, nil end
+    
+    -- Find fuel in storage
+    local locations = inventory.findItem(fuelItem)
+    if #locations == 0 then return 0, nil end
+    
+    -- Sort by count (largest first)
+    table.sort(locations, function(a, b) return a.count > b.count end)
+    
+    local pushed = 0
+    
+    for _, loc in ipairs(locations) do
+        if pushed >= toPush then break end
+        
+        local source = inventory.getPeripheral(loc.inventory)
+        if source then
+            local amount = math.min(toPush - pushed, loc.count)
+            -- Push to slot 2 (fuel slot)
+            local transferred = source.pushItems(furnaceName, loc.slot, amount, 2) or 0
+            pushed = pushed + transferred
+            
+            if transferred > 0 then
+                inventory.scanSingle(loc.inventory, true)
+            end
+        end
+    end
+    
+    if pushed > 0 then
+        inventory.rebuildFromCache()
+        logger.debug(string.format("Pushed %d %s fuel to %s", pushed, fuelItem, furnaceName))
+    end
+    
+    return pushed, fuelItem
+end
+
+---Pull empty buckets from furnace fuel slot (after lava bucket is used)
+---@param furnaceName string The furnace peripheral name
+---@return number pulled Amount of buckets pulled
+local function pullEmptyBucketsFromFurnace(furnaceName)
+    if not furnaceConfig.isLavaBucketEnabled() then return 0 end
+    
+    local outputChest = furnaceConfig.getLavaBucketOutputChest()
+    if not outputChest then return 0 end
+    
+    local furnace = getFurnacePeripheral(furnaceName)
+    if not furnace then return 0 end
+    
+    local contents = getFurnaceContents(furnace)
+    if not contents.fuel or contents.fuel.name ~= "minecraft:bucket" then
+        return 0
+    end
+    
+    local destChest = peripheral.wrap(outputChest)
+    if not destChest or not destChest.pullItems then return 0 end
+    
+    -- Pull from slot 2 (fuel slot)
+    local pulled = destChest.pullItems(furnaceName, 2) or 0
+    
+    if pulled > 0 then
+        logger.debug(string.format("Pulled %d empty buckets from %s to %s", pulled, furnaceName, outputChest))
+    end
+    
+    return pulled
+end
+
 ---Get which furnace types can smelt an item
 ---@param recipeType string The recipe type (ore, food, material)
 ---@return table types Array of furnace types that can smelt this
@@ -327,7 +558,7 @@ end
 
 ---Process smelting for all configured furnaces
 ---@param stockLevels table Current stock levels
----@return table stats {itemsPushed, itemsPulled, furnacesUsed}
+---@return table stats {itemsPushed, itemsPulled, furnacesUsed, fuelPushed}
 function manager.processSmelt(stockLevels)
     lastSmeltCheck = os.clock()
     
@@ -335,13 +566,33 @@ function manager.processSmelt(stockLevels)
         itemsPushed = 0,
         itemsPulled = 0,
         furnacesUsed = 0,
+        fuelPushed = 0,
+        emptyBucketsPulled = 0,
     }
     
-    -- First, pull completed items from all furnaces
+    -- First, pull completed items and empty buckets from all furnaces
     for _, furnaceData in pairs(furnaceConfig.getAll()) do
         if furnaceData.enabled then
             local pulled = pullFromFurnace(furnaceData.name)
             stats.itemsPulled = stats.itemsPulled + pulled
+            
+            -- Pull empty buckets if lava bucket fuel is enabled
+            local buckets = pullEmptyBucketsFromFurnace(furnaceData.name)
+            stats.emptyBucketsPulled = stats.emptyBucketsPulled + buckets
+        end
+    end
+    
+    -- Refuel furnaces that need fuel
+    for _, furnaceData in pairs(furnaceConfig.getAll()) do
+        if furnaceData.enabled then
+            local fuelPushed, fuelType = pushFuelToFurnace(furnaceData.name, stockLevels)
+            if fuelPushed > 0 then
+                stats.fuelPushed = stats.fuelPushed + fuelPushed
+                -- Update stock levels
+                if fuelType and fuelType ~= "minecraft:lava_bucket" then
+                    stockLevels[fuelType] = (stockLevels[fuelType] or 0) - fuelPushed
+                end
+            end
         end
     end
     
@@ -423,6 +674,7 @@ function manager.getStatus()
             info.fuel = contents.fuel
             info.output = contents.output
             info.available = isFurnaceAvailable(p)
+            info.needsFuel, info.fuelCount = furnaceNeedsFuel(p)
         end
         
         table.insert(status, info)
@@ -433,6 +685,25 @@ function manager.getStatus()
     end)
     
     return status
+end
+
+---Get fuel configuration and stock summary
+---@param stockLevels table Current stock levels
+---@return table summary Fuel configuration and stock info
+function manager.getFuelSummary(stockLevels)
+    local config = furnaceConfig.getFuelConfig()
+    local fuelStock = manager.getFuelStock(stockLevels)
+    
+    local totalCapacity = 0
+    for _, fuel in ipairs(fuelStock) do
+        totalCapacity = totalCapacity + fuel.totalSmeltCapacity
+    end
+    
+    return {
+        config = config,
+        fuelStock = fuelStock,
+        totalSmeltCapacity = totalCapacity,
+    }
 end
 
 ---Auto-discover furnaces on the network

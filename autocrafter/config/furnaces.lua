@@ -11,6 +11,18 @@ local furnaces = persist("furnace-config.json")
 furnaces.setDefault("furnaces", {})
 furnaces.setDefault("smeltTargets", {})
 
+-- Fuel configuration defaults
+furnaces.setDefault("preferredFuels", {
+    "minecraft:coal",
+    "minecraft:charcoal",
+    "minecraft:coal_block",
+    "minecraft:blaze_rod",
+    "minecraft:lava_bucket",
+})
+furnaces.setDefault("lavaBucketInputChest", nil)  -- Chest to pull lava buckets from
+furnaces.setDefault("lavaBucketOutputChest", nil) -- Chest to return empty buckets to
+furnaces.setDefault("enableLavaBucket", false)    -- Whether to use lava buckets as fuel
+
 local module = {}
 
 ---@class FurnaceConfig
@@ -196,6 +208,129 @@ function module.getNeededSmelt(stockLevels)
     end
     
     return needed
+end
+
+-- ============================================================================
+-- Fuel Configuration Functions
+-- ============================================================================
+
+---Get the preferred fuel list
+---@return string[] fuels Array of fuel item IDs in priority order
+function module.getPreferredFuels()
+    return furnaces.get("preferredFuels") or {
+        "minecraft:coal",
+        "minecraft:charcoal",
+        "minecraft:coal_block",
+        "minecraft:blaze_rod",
+        "minecraft:lava_bucket",
+    }
+end
+
+---Set the preferred fuel list
+---@param fuels string[] Array of fuel item IDs in priority order
+function module.setPreferredFuels(fuels)
+    furnaces.set("preferredFuels", fuels)
+    logger.info("Updated preferred fuel list")
+end
+
+---Add a fuel to the preferred list
+---@param fuelItem string The fuel item ID
+---@param position? number Position in the list (default: end)
+function module.addPreferredFuel(fuelItem, position)
+    local fuels = module.getPreferredFuels()
+    
+    -- Remove if already exists
+    for i, fuel in ipairs(fuels) do
+        if fuel == fuelItem then
+            table.remove(fuels, i)
+            break
+        end
+    end
+    
+    -- Add at position or end
+    if position and position >= 1 and position <= #fuels + 1 then
+        table.insert(fuels, position, fuelItem)
+    else
+        table.insert(fuels, fuelItem)
+    end
+    
+    furnaces.set("preferredFuels", fuels)
+    logger.info(string.format("Added fuel %s to preferred list", fuelItem))
+end
+
+---Remove a fuel from the preferred list
+---@param fuelItem string The fuel item ID
+function module.removePreferredFuel(fuelItem)
+    local fuels = module.getPreferredFuels()
+    
+    for i, fuel in ipairs(fuels) do
+        if fuel == fuelItem then
+            table.remove(fuels, i)
+            furnaces.set("preferredFuels", fuels)
+            logger.info(string.format("Removed fuel %s from preferred list", fuelItem))
+            return true
+        end
+    end
+    
+    return false
+end
+
+---Get lava bucket input chest
+---@return string|nil chest The chest peripheral name
+function module.getLavaBucketInputChest()
+    return furnaces.get("lavaBucketInputChest")
+end
+
+---Set lava bucket input chest
+---@param chest string|nil The chest peripheral name (nil to disable)
+function module.setLavaBucketInputChest(chest)
+    furnaces.set("lavaBucketInputChest", chest)
+    if chest then
+        logger.info("Set lava bucket input chest: " .. chest)
+    else
+        logger.info("Cleared lava bucket input chest")
+    end
+end
+
+---Get lava bucket output chest (for empty buckets)
+---@return string|nil chest The chest peripheral name
+function module.getLavaBucketOutputChest()
+    return furnaces.get("lavaBucketOutputChest")
+end
+
+---Set lava bucket output chest (for empty buckets)
+---@param chest string|nil The chest peripheral name (nil to disable)
+function module.setLavaBucketOutputChest(chest)
+    furnaces.set("lavaBucketOutputChest", chest)
+    if chest then
+        logger.info("Set lava bucket output chest: " .. chest)
+    else
+        logger.info("Cleared lava bucket output chest")
+    end
+end
+
+---Check if lava bucket fuel is enabled
+---@return boolean enabled Whether lava bucket fuel is enabled
+function module.isLavaBucketEnabled()
+    return furnaces.get("enableLavaBucket") == true
+end
+
+---Enable or disable lava bucket fuel
+---@param enabled boolean Whether to enable lava bucket fuel
+function module.setLavaBucketEnabled(enabled)
+    furnaces.set("enableLavaBucket", enabled)
+    logger.info(string.format("%s lava bucket fuel", enabled and "Enabled" or "Disabled"))
+end
+
+---Get fuel configuration summary
+---@return table config {preferredFuels, lavaBucketInput, lavaBucketOutput, enableLavaBucket}
+function module.getFuelConfig()
+    return {
+        preferredFuels = module.getPreferredFuels(),
+        lavaBucketInputChest = module.getLavaBucketInputChest(),
+        lavaBucketOutputChest = module.getLavaBucketOutputChest(),
+        enableLavaBucket = module.isLavaBucketEnabled(),
+    }
 end
 
 return module
