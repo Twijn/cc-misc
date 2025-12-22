@@ -727,13 +727,15 @@ function manager.processDriedKelpMode(stockLevels)
     end
     
     -- Check if we have enough dried kelp to craft blocks
+    -- Refresh dried kelp count from cache (may have been updated by furnace pulls)
     -- Return the count so the caller can queue the crafting job
-    if currentDriedKelp >= 9 then
-        local blocksToCraft = math.floor(currentDriedKelp / 9)
+    local freshDriedKelp = inventory.getStock("minecraft:dried_kelp")
+    if freshDriedKelp >= 9 then
+        local blocksToCraft = math.floor(freshDriedKelp / 9)
         blocksToCraft = math.min(blocksToCraft, blocksNeeded)
         if blocksToCraft > 0 then
             stats.blocksToQueue = blocksToCraft
-            logger.debug(string.format("Dried kelp mode: need to craft %d dried kelp blocks", blocksToCraft))
+            logger.debug(string.format("Dried kelp mode: need to craft %d dried kelp blocks (have %d dried kelp)", blocksToCraft, freshDriedKelp))
         end
     end
     
