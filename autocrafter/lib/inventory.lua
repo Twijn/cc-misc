@@ -2,10 +2,11 @@
 --- Manages inventory scanning and item storage with comprehensive caching.
 --- All peripheral calls are cached to minimize network/peripheral overhead.
 --- Uses internal cache updates after transfers instead of rescanning.
+--- Supports parallel execution for faster inventory operations.
 ---
----@version 3.0.0
+---@version 3.1.0
 
-local VERSION = "3.0.0"
+local VERSION = "3.1.0"
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
@@ -25,6 +26,13 @@ local inventoryCache = persist(cachePath .. "/inventories.json")
 local itemDetailCache = persist(cachePath .. "/item-details.json")
 local stockCache = persist(cachePath .. "/stock.json")
 
+-- Parallelism configuration (from config, with defaults)
+local parallelConfig = config.parallelism or {}
+local transferThreads = parallelConfig.transferThreads or 4
+local scanThreads = parallelConfig.scanThreads or 16
+local batchSize = parallelConfig.batchSize or 8
+local parallelEnabled = parallelConfig.enabled ~= false  -- Default true
+
 -- Runtime state (not persisted)
 local wrappedPeripherals = {}  -- Cached peripheral.wrap() results
 local itemLocations = {}       -- Map of item -> locations
@@ -42,6 +50,85 @@ local manipulator = nil        -- Cached manipulator peripheral
 local deferredRebuild = false  -- Flag to defer cache rebuilding for batch operations
 local emptySlotCache = {}      -- Cache of empty slots per inventory: {invName = {slot1, slot2, ...}}
 local stockLevelsDirty = false -- Flag to indicate stock levels need recalculation
+
+-- Mutex-like state for thread-safe results collection
+local parallelResults = {}
+local parallelResultsLock = false
+
+---Execute functions in parallel with configurable thread limit
+---Batches work into groups of threadLimit and executes each batch in parallel
+---@param tasks table Array of functions to execute
+---@param threadLimit? number Maximum concurrent tasks (default: transferThreads config)
+---@return table results Array of results from each task (in order)
+local function executeParallel(tasks, threadLimit)
+    if not parallelEnabled or #tasks == 0 then
+        -- Sequential fallback
+        local results = {}
+        for i, task in ipairs(tasks) do
+            results[i] = {task()}
+        end
+        return results
+    end
+    
+    threadLimit = threadLimit or transferThreads
+    local results = {}
+    
+    -- Process in batches to respect thread limit
+    for batchStart = 1, #tasks, threadLimit do
+        local batchEnd = math.min(batchStart + threadLimit - 1, #tasks)
+        local batchTasks = {}
+        local batchResults = {}
+        
+        for i = batchStart, batchEnd do
+            local taskIndex = i
+            table.insert(batchTasks, function()
+                batchResults[taskIndex] = {tasks[taskIndex]()}
+            end)
+        end
+        
+        -- Execute batch in parallel
+        if #batchTasks > 0 then
+            parallel.waitForAll(table.unpack(batchTasks))
+        end
+        
+        -- Collect results
+        for i = batchStart, batchEnd do
+            results[i] = batchResults[i]
+        end
+    end
+    
+    return results
+end
+
+---Update parallelism configuration at runtime
+---@param newConfig table New parallelism settings
+function inventory.setParallelConfig(newConfig)
+    if newConfig.transferThreads then
+        transferThreads = newConfig.transferThreads
+    end
+    if newConfig.scanThreads then
+        scanThreads = newConfig.scanThreads
+    end
+    if newConfig.batchSize then
+        batchSize = newConfig.batchSize
+    end
+    if newConfig.enabled ~= nil then
+        parallelEnabled = newConfig.enabled
+    end
+    logger.info(string.format("Parallelism config updated: threads=%d, batch=%d, enabled=%s",
+        transferThreads, batchSize, tostring(parallelEnabled)))
+end
+
+---Get current parallelism configuration
+---@return table config Current parallelism settings
+function inventory.getParallelConfig()
+    return {
+        transferThreads = transferThreads,
+        scanThreads = scanThreads,
+        batchSize = batchSize,
+        enabled = parallelEnabled,
+    }
+end
 
 ---Get item detail cache key
 ---@param item table The item with name and optional nbt
@@ -886,6 +973,7 @@ function inventory.pullItems(toInv, fromInv, fromSlot, count, toSlot)
 end
 
 ---Withdraw items to a specific inventory (batch update)
+---Uses parallel execution for faster multi-source withdrawals
 ---Uses internal cache updates instead of rescanning
 ---@param item string The item ID to withdraw
 ---@param count number Amount to withdraw
@@ -902,39 +990,87 @@ function inventory.withdraw(item, count, destInv, destSlot)
     local withdrawn = 0
     local maxRetries = 2
     
-    for _, loc in ipairs(locations) do
-        if withdrawn >= count then break end
-        
-        local source = inventory.getPeripheral(loc.inventory)
-        if source then
-            local toWithdraw = math.min(count - withdrawn, loc.count)
-            local transferred = 0
+    -- If we have a specific destSlot, we can't parallelize (items would conflict)
+    -- Also don't parallelize if disabled or only 1-2 locations
+    if destSlot or not parallelEnabled or #locations <= 2 then
+        -- Sequential execution
+        for _, loc in ipairs(locations) do
+            if withdrawn >= count then break end
             
-            -- Try with retries for reliability
-            for attempt = 1, maxRetries do
-                local result = source.pushItems(destInv, loc.slot, toWithdraw, destSlot)
-                if result and result > 0 then
-                    transferred = result
-                    break
+            local source = inventory.getPeripheral(loc.inventory)
+            if source then
+                local toWithdraw = math.min(count - withdrawn, loc.count)
+                local transferred = 0
+                
+                for attempt = 1, maxRetries do
+                    local result = source.pushItems(destInv, loc.slot, toWithdraw, destSlot)
+                    if result and result > 0 then
+                        transferred = result
+                        break
+                    end
+                    if attempt < maxRetries then
+                        os.queueEvent("yield")
+                        os.pullEvent("yield")
+                    end
                 end
-                if attempt < maxRetries then
-                    -- Small yield before retry
-                    os.queueEvent("yield")
-                    os.pullEvent("yield")
+                
+                if transferred > 0 then
+                    withdrawn = withdrawn + transferred
+                    updateCacheAfterRemoval(loc.inventory, loc.slot, item, transferred)
+                    if destSlot and transferred < toWithdraw then
+                        destSlot = nil
+                    end
                 end
             end
+        end
+    else
+        -- Parallel execution: build tasks for all needed locations
+        local tasks = {}
+        local taskMeta = {}  -- Track which location each task corresponds to
+        local remaining = count
+        
+        -- Build task list (limited to what we need)
+        for i, loc in ipairs(locations) do
+            if remaining <= 0 then break end
             
+            local source = inventory.getPeripheral(loc.inventory)
+            if source then
+                local toWithdraw = math.min(remaining, loc.count)
+                remaining = remaining - toWithdraw
+                
+                table.insert(taskMeta, {
+                    loc = loc,
+                    toWithdraw = toWithdraw,
+                })
+                
+                table.insert(tasks, function()
+                    local transferred = 0
+                    for attempt = 1, maxRetries do
+                        local result = source.pushItems(destInv, loc.slot, toWithdraw)
+                        if result and result > 0 then
+                            transferred = result
+                            break
+                        end
+                        if attempt < maxRetries then
+                            os.queueEvent("yield")
+                            os.pullEvent("yield")
+                        end
+                    end
+                    return transferred
+                end)
+            end
+        end
+        
+        -- Execute in parallel
+        local results = executeParallel(tasks, transferThreads)
+        
+        -- Process results and update caches
+        for i, result in ipairs(results) do
+            local transferred = result[1] or 0
             if transferred > 0 then
                 withdrawn = withdrawn + transferred
-                
-                -- Update cache directly instead of rescanning
-                updateCacheAfterRemoval(loc.inventory, loc.slot, item, transferred)
-                
-                -- If we're pushing to a specific slot and it's now full, 
-                -- clear destSlot so next push can go anywhere
-                if destSlot and transferred < toWithdraw then
-                    destSlot = nil
-                end
+                local meta = taskMeta[i]
+                updateCacheAfterRemoval(meta.loc.inventory, meta.loc.slot, item, transferred)
             end
         end
     end
@@ -945,6 +1081,7 @@ end
 ---Deposit items from an inventory into storage (batch update)
 ---Storage inventories pull from the source (works with turtles)
 ---Prioritizes filling existing partial stacks before using empty slots
+---Uses parallel execution in Phase 2 for faster bulk deposits
 ---Uses internal cache to find partial stacks and empty slots, updates cache after transfers
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param item? string Optional item filter (not used when pulling from turtle)
@@ -1018,7 +1155,7 @@ function inventory.deposit(sourceInv, item)
     -- Track which inventories we've modified (for scanning later)
     local modifiedInventories = {}
     
-    -- Phase 1: Try to fill partial stacks first for each item type
+    -- Phase 1: Try to fill partial stacks first for each item type (sequential - order matters)
     -- This saves storage space by consolidating items
     for slot, slotInfo in pairs(sourceSlots) do
         if slotInfo and type(slotInfo) == "table" and slotInfo.name then
@@ -1060,84 +1197,124 @@ function inventory.deposit(sourceInv, item)
     
     logger.debug(string.format("Phase 1 (stack-fill) complete: deposited %d items so far", deposited))
     
-    -- Phase 2: Deposit remaining items to empty slots
-    -- Build sorted list of inventories with empty slots
-    local storageWithSpace = {}
-    for _, storage in ipairs(storagePeripherals) do
-        local emptySlot = getEmptySlot(storage.name)
-        if emptySlot then
-            table.insert(storageWithSpace, storage)
+    -- Phase 2: Deposit remaining items to empty slots (can be parallelized)
+    -- Build list of slots that still need clearing
+    local slotsToDeposit = {}
+    for slot = 1, 16 do
+        local slotInfo = sourceSlots[slot]
+        if slotInfo and (type(slotInfo) ~= "table" or (slotInfo.count and slotInfo.count > 0)) then
+            table.insert(slotsToDeposit, slot)
         end
     end
     
-    local storageIndex = 1
-    local emptySlotStreak = 0
-    
-    for slot = 1, 16 do
-        local slotInfo = sourceSlots[slot]
-        -- Skip if slot is empty or already fully deposited in phase 1
-        if slotInfo and (type(slotInfo) ~= "table" or (slotInfo.count and slotInfo.count > 0)) then
-            local slotCleared = false
-            local attempts = 0
-            local maxAttempts = math.min(3, math.max(1, #storageWithSpace))
+    if #slotsToDeposit > 0 and parallelEnabled and #storagePeripherals >= 2 then
+        -- Parallel deposit: assign each slot to a different storage peripheral
+        local tasks = {}
+        local taskMeta = {}
+        
+        for i, slot in ipairs(slotsToDeposit) do
+            -- Round-robin assignment to storage peripherals
+            local storageIdx = ((i - 1) % #storagePeripherals) + 1
+            local storage = storagePeripherals[storageIdx]
             
-            while not slotCleared and attempts < maxAttempts and #storageWithSpace > 0 do
-                local storage = storageWithSpace[storageIndex]
-                if not storage then
-                    storageIndex = 1
-                    storage = storageWithSpace[1]
+            table.insert(taskMeta, {slot = slot, storage = storage})
+            table.insert(tasks, function()
+                local success, pulled = pcall(function()
+                    return storage.peripheral.pullItems(sourceInv, slot)
+                end)
+                if success and pulled and pulled > 0 then
+                    return pulled, storage.name
+                end
+                return 0, nil
+            end)
+        end
+        
+        -- Execute in parallel batches
+        local results = executeParallel(tasks, transferThreads)
+        
+        -- Process results
+        for i, result in ipairs(results) do
+            local pulled = result[1] or 0
+            local storageName = result[2]
+            if pulled > 0 and storageName then
+                deposited = deposited + pulled
+                modifiedInventories[storageName] = true
+            end
+        end
+    else
+        -- Sequential fallback (original logic)
+        local storageWithSpace = {}
+        for _, storage in ipairs(storagePeripherals) do
+            local emptySlot = getEmptySlot(storage.name)
+            if emptySlot then
+                table.insert(storageWithSpace, storage)
+            end
+        end
+        
+        local storageIndex = 1
+        local emptySlotStreak = 0
+        
+        for slot = 1, 16 do
+            local slotInfo = sourceSlots[slot]
+            if slotInfo and (type(slotInfo) ~= "table" or (slotInfo.count and slotInfo.count > 0)) then
+                local slotCleared = false
+                local attempts = 0
+                local maxAttempts = math.min(3, math.max(1, #storageWithSpace))
+                
+                while not slotCleared and attempts < maxAttempts and #storageWithSpace > 0 do
+                    local storage = storageWithSpace[storageIndex]
+                    if not storage then
+                        storageIndex = 1
+                        storage = storageWithSpace[1]
+                    end
+                    
+                    if storage then
+                        local success, pulled = pcall(function()
+                            return storage.peripheral.pullItems(sourceInv, slot)
+                        end)
+                        
+                        if not success then
+                            logger.debug(string.format("Slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
+                            attempts = attempts + 1
+                            storageIndex = (storageIndex % #storageWithSpace) + 1
+                        elseif pulled and pulled > 0 then
+                            logger.debug(string.format("Slot %d: pulled %d items to %s (empty slot)", slot, pulled, storage.name))
+                            deposited = deposited + pulled
+                            slotCleared = true
+                            emptySlotStreak = 0
+                            modifiedInventories[storage.name] = true
+                        else
+                            local emptySlot = getEmptySlot(storage.name)
+                            if not emptySlot then
+                                table.remove(storageWithSpace, storageIndex)
+                                if storageIndex > #storageWithSpace then
+                                    storageIndex = 1
+                                end
+                            else
+                                slotCleared = true
+                                emptySlotStreak = emptySlotStreak + 1
+                            end
+                            attempts = attempts + 1
+                        end
+                    else
+                        break
+                    end
                 end
                 
-                if storage then
-                    local success, pulled = pcall(function()
-                        return storage.peripheral.pullItems(sourceInv, slot)
-                    end)
-                    
-                    if not success then
-                        logger.debug(string.format("Slot %d: pullItems error from %s: %s", slot, storage.name, tostring(pulled)))
-                        attempts = attempts + 1
-                        storageIndex = (storageIndex % #storageWithSpace) + 1
-                    elseif pulled and pulled > 0 then
-                        logger.debug(string.format("Slot %d: pulled %d items to %s (empty slot)", slot, pulled, storage.name))
-                        deposited = deposited + pulled
-                        slotCleared = true
-                        emptySlotStreak = 0
-                        modifiedInventories[storage.name] = true
-                    else
-                        -- Slot was empty or storage is full - check if storage has space
-                        local emptySlot = getEmptySlot(storage.name)
-                        if not emptySlot then
-                            -- This storage is full, remove from list
-                            table.remove(storageWithSpace, storageIndex)
-                            if storageIndex > #storageWithSpace then
-                                storageIndex = 1
-                            end
-                        else
-                            -- Slot was already empty
-                            slotCleared = true
-                            emptySlotStreak = emptySlotStreak + 1
-                        end
-                        attempts = attempts + 1
-                    end
-                else
-                    break  -- No storage available
+                if not slotCleared and #storageWithSpace > 0 then
+                    emptySlotStreak = emptySlotStreak + 1
                 end
-            end
-            
-            if not slotCleared and #storageWithSpace > 0 then
+            else
                 emptySlotStreak = emptySlotStreak + 1
             end
-        else
-            emptySlotStreak = emptySlotStreak + 1
-        end
-        
-        -- Early exit: if 4+ consecutive empty slots at end, likely done
-        if emptySlotStreak >= 4 and slot >= 12 then
-            break
-        end
-        
-        if #storageWithSpace > 0 and slot % 4 == 0 then
-            storageIndex = (storageIndex % #storageWithSpace) + 1
+            
+            if emptySlotStreak >= 4 and slot >= 12 then
+                break
+            end
+            
+            if #storageWithSpace > 0 and slot % 4 == 0 then
+                storageIndex = (storageIndex % #storageWithSpace) + 1
+            end
         end
     end
     
@@ -1157,6 +1334,7 @@ end
 ---Clear specific slots from an inventory into storage (batch update)
 ---Storage inventories pull from the specified slots (works with turtles)
 ---Prioritizes filling existing partial stacks before using empty slots
+---Uses parallel execution in Phase 2 for faster bulk clears
 ---Uses deferred scanning and batch cache rebuild for efficiency
 ---@param sourceInv string Source inventory name (can be a turtle)
 ---@param slots table Array of slot numbers to clear
@@ -1227,7 +1405,7 @@ function inventory.clearSlots(sourceInv, slots)
         logger.debug(string.format("Source peripheral %s not available or has no list method", sourceInv))
     end
     
-    -- Phase 1: Try to fill partial stacks first for each slot (only if we could list source)
+    -- Phase 1: Try to fill partial stacks first for each slot (sequential - order matters)
     for _, slot in ipairs(slots) do
         local slotInfo = sourceSlots[slot]
         if slotInfo and slotInfo.name then
@@ -1268,34 +1446,69 @@ function inventory.clearSlots(sourceInv, slots)
     
     logger.debug(string.format("clearSlots Phase 1 (stack-fill) complete: cleared %d items so far", cleared))
     
-    -- Phase 2: Clear remaining items to empty slots
-    -- Build list of inventories with empty slots
-    local storageWithSpace = {}
-    for _, storage in ipairs(storagePeripherals) do
-        local emptySlot = getEmptySlot(storage.name)
-        if emptySlot then
-            table.insert(storageWithSpace, storage)
-        end
-    end
-    
-    local storageIndex = 1
-    
+    -- Phase 2: Clear remaining items to empty slots (can be parallelized)
+    -- Build list of slots that still need clearing
+    local slotsToClear = {}
     for _, slot in ipairs(slots) do
         local slotInfo = sourceSlots[slot]
-        -- Skip if slot is empty or already fully cleared in phase 1
-        -- BUT: if we couldn't list the source, we must try anyway
         local shouldSkip = false
         if couldListSource then
-            -- We could list the source, so trust our slotInfo
             if not slotInfo or (slotInfo.count and slotInfo.count <= 0) then
                 shouldSkip = true
             end
         end
-        -- If we couldn't list source, never skip - always try to clear
+        if not shouldSkip then
+            table.insert(slotsToClear, slot)
+        end
+    end
+    
+    if #slotsToClear > 0 and parallelEnabled and #storagePeripherals >= 2 then
+        -- Parallel clear: assign each slot to a different storage peripheral
+        local tasks = {}
+        local taskMeta = {}
         
-        if shouldSkip then
-            logger.debug(string.format("clearSlots slot %d: skipping (already empty or cleared in phase 1)", slot))
-        else
+        for i, slot in ipairs(slotsToClear) do
+            -- Round-robin assignment to storage peripherals
+            local storageIdx = ((i - 1) % #storagePeripherals) + 1
+            local storage = storagePeripherals[storageIdx]
+            
+            table.insert(taskMeta, {slot = slot, storage = storage})
+            table.insert(tasks, function()
+                local success, pulled = pcall(function()
+                    return storage.peripheral.pullItems(sourceInv, slot)
+                end)
+                if success and pulled and pulled > 0 then
+                    return pulled, storage.name
+                end
+                return 0, nil
+            end)
+        end
+        
+        -- Execute in parallel batches
+        local results = executeParallel(tasks, transferThreads)
+        
+        -- Process results
+        for i, result in ipairs(results) do
+            local pulled = result[1] or 0
+            local storageName = result[2]
+            if pulled > 0 and storageName then
+                cleared = cleared + pulled
+                affectedInventories[storageName] = true
+            end
+        end
+    else
+        -- Sequential fallback (original logic)
+        local storageWithSpace = {}
+        for _, storage in ipairs(storagePeripherals) do
+            local emptySlot = getEmptySlot(storage.name)
+            if emptySlot then
+                table.insert(storageWithSpace, storage)
+            end
+        end
+        
+        local storageIndex = 1
+        
+        for _, slot in ipairs(slotsToClear) do
             local slotCleared = false
             local attempts = 0
             local maxAttempts = math.min(5, math.max(1, #storageWithSpace))
@@ -1322,7 +1535,6 @@ function inventory.clearSlots(sourceInv, slots)
                         affectedInventories[storage.name] = true
                         slotCleared = true
                     else
-                        -- Check if storage still has space
                         local emptySlot = getEmptySlot(storage.name)
                         if not emptySlot then
                             table.remove(storageWithSpace, storageIndex)
@@ -1330,7 +1542,7 @@ function inventory.clearSlots(sourceInv, slots)
                                 storageIndex = 1
                             end
                         else
-                            slotCleared = true  -- Slot was already empty
+                            slotCleared = true
                         end
                         attempts = attempts + 1
                     end

@@ -183,36 +183,15 @@ local function initialize()
 end
 
 --- Process crafting targets and create jobs
---- Creates multiple jobs per item to utilize all available idle crafters
+--- Creates jobs to meet craft targets, queuing work for when crafters become available
 local function processCraftTargets()
     local stock = storageManager.getAllStock()
     local needed = targets.getNeeded(stock)
     
-    -- Get count of idle crafters and pending jobs
-    local crafterStats = crafterManager.getStats()
-    local idleCrafters = crafterStats.idle or 0
-    
-    -- Count all pending jobs (not yet assigned to a crafter)
+    -- Get all current jobs to check what's already queued
     local allJobs = queueManager.getJobs()
-    local pendingJobCount = 0
-    for _, job in ipairs(allJobs) do
-        if job.status == "pending" then
-            pendingJobCount = pendingJobCount + 1
-        end
-    end
-    
-    -- Available slots = idle crafters minus pending jobs waiting for assignment
-    local availableSlots = idleCrafters - pendingJobCount
-    
-    if availableSlots <= 0 then
-        return -- No capacity for new jobs
-    end
     
     for _, target in ipairs(needed) do
-        if availableSlots <= 0 then
-            break -- No more capacity
-        end
-        
         -- Count queued output for this item to avoid over-queuing
         local totalQueued = 0
         for _, job in ipairs(allJobs) do
@@ -236,34 +215,19 @@ local function processCraftTargets()
             goto continue
         end
         
-        local outputPerCraft = recipe.outputCount or 1
+        -- Create a job for this target (one job at a time per target to avoid flooding)
+        local job, err = queueManager.addJob(target.item, remainingNeeded, stock)
+        if not job then
+            if err then
+                logger.debug("Cannot craft more " .. target.item .. ": " .. err)
+            end
+            goto continue
+        end
         
-        -- Create jobs to distribute work across available crafters
-        -- Note: maxBatchSize no longer limits output - only ingredient stack sizes do
-        while remainingNeeded > 0 and availableSlots > 0 do
-            -- Create the job (will craft as much as possible based on materials/stack limits)
-            local job, err = queueManager.addJob(target.item, remainingNeeded, stock)
-            if not job then
-                if err then
-                    logger.debug("Cannot craft more " .. target.item .. ": " .. err)
-                end
-                -- Continue to try other items instead of blocking
-                break
-            end
-            
-            remainingNeeded = remainingNeeded - (job.expectedOutput or 0)
-            availableSlots = availableSlots - 1
-            
-            -- Update stock to reflect materials reserved for this job
-            -- This prevents creating jobs that can't be fulfilled
-            for item, count in pairs(job.materials or {}) do
-                stock[item] = (stock[item] or 0) - count
-            end
-            
-            -- If the job produced less than requested, we're out of materials for now
-            if job.expectedOutput < remainingNeeded then
-                break
-            end
+        -- Update stock to reflect materials reserved for this job
+        -- This prevents creating jobs that can't be fulfilled
+        for item, count in pairs(job.materials or {}) do
+            stock[item] = (stock[item] or 0) - count
         end
         
         ::continue::

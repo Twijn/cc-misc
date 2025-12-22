@@ -98,6 +98,26 @@ return {
         UNKNOWN = "unknown",
     },
     
+    -- Parallelism configuration for inventory operations
+    -- Higher values = faster operations but more peripheral calls at once
+    -- Set to 1 to disable parallelism (sequential execution)
+    parallelism = {
+        -- Number of concurrent transfer operations for withdraw/deposit/clear
+        -- Recommended: 4-8 for most systems, reduce if experiencing issues
+        transferThreads = 4,
+        
+        -- Number of concurrent inventory scans
+        -- This is already used by the scan function
+        scanThreads = 16,
+        
+        -- Batch size for grouping operations before parallel execution
+        -- Larger batches = fewer parallel.waitForAll calls but longer waits
+        batchSize = 8,
+        
+        -- Enable/disable parallel transfers entirely
+        enabled = true,
+    },
+    
     -- Chatbox commands (via backslash commands in-game)
     -- These are the commands players can use via \command
     chatCommands = {
