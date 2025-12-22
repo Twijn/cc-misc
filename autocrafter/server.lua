@@ -1715,6 +1715,9 @@ local commands = {
                 print("  furnaces lava enable/disable - Toggle lava bucket")
                 print("  furnaces lava input <chest> - Set lava input chest")
                 print("  furnaces lava output <chest> - Set empty bucket chest")
+                print("  furnaces kelp - Show dried kelp mode status")
+                print("  furnaces kelp enable/disable - Toggle kelp mode")
+                print("  furnaces kelp target <count> - Set kelp block target")
                 return
             end
             
@@ -2082,13 +2085,65 @@ local commands = {
                 return
             end
             
+            if subCmd == "kelp" then
+                local kelpCmd = args[2]
+                local stock = storageManager.getAllStock()
+                
+                if not kelpCmd then
+                    local status = furnaceManager.getDriedKelpStatus(stock)
+                    ctx.mess("=== Dried Kelp Mode ===")
+                    print("  Status: " .. (status.enabled and "Enabled" or "Disabled"))
+                    print("  Target: " .. status.target .. " dried kelp blocks")
+                    print("")
+                    print("  Current Stock:")
+                    print("    Kelp: " .. status.currentKelp)
+                    print("    Dried Kelp: " .. status.currentDriedKelp)
+                    print("    Dried Kelp Blocks: " .. status.currentBlocks)
+                    print("")
+                    if status.enabled and status.target > 0 then
+                        print("  Blocks needed: " .. status.blocksNeeded)
+                        print("  Can craft: " .. status.canCraftBlocks .. " blocks")
+                    end
+                    return
+                end
+                
+                if kelpCmd == "enable" then
+                    furnaceConfig.setDriedKelpModeEnabled(true)
+                    ctx.mess("Enabled dried kelp mode")
+                    return
+                end
+                
+                if kelpCmd == "disable" then
+                    furnaceConfig.setDriedKelpModeEnabled(false)
+                    ctx.mess("Disabled dried kelp mode")
+                    return
+                end
+                
+                if kelpCmd == "target" then
+                    local target = tonumber(args[3])
+                    if not target then
+                        ctx.err("Usage: furnaces kelp target <count>")
+                        print("Current target: " .. furnaceConfig.getDriedKelpTarget())
+                        return
+                    end
+                    
+                    furnaceConfig.setDriedKelpTarget(target)
+                    ctx.mess("Set dried kelp block target: " .. target)
+                    return
+                end
+                
+                ctx.err("Unknown kelp subcommand: " .. kelpCmd)
+                print("Use 'furnaces kelp' to see status")
+                return
+            end
+            
             ctx.err("Unknown subcommand: " .. subCmd)
             ctx.mess("Use 'furnaces help' for available commands")
         end,
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"list", "discover", "add", "remove", "enable", "disable", "status", "targets", "recipes", "fuel", "lava", "help"}
+                local options = {"list", "discover", "add", "remove", "enable", "disable", "status", "targets", "recipes", "fuel", "lava", "kelp", "help"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) then
@@ -2109,6 +2164,16 @@ local commands = {
             elseif #args == 2 and args[1] == "lava" then
                 local query = (args[2] or ""):lower()
                 local options = {"enable", "disable", "input", "output"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and args[1] == "kelp" then
+                local query = (args[2] or ""):lower()
+                local options = {"enable", "disable", "target"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) then

@@ -19,11 +19,13 @@ local smeltCheckInterval = 5  -- Seconds between smelt checks
 local fuelBurnTimes = {
     ["minecraft:lava_bucket"] = 100,
     ["minecraft:coal_block"] = 80,
+    ["minecraft:dried_kelp_block"] = 20,
     ["minecraft:blaze_rod"] = 12,
     ["minecraft:coal"] = 8,
     ["minecraft:charcoal"] = 8,
-    ["minecraft:dried_kelp_block"] = 20,
+    ["minecraft:dried_kelp"] = 0.5,
     ["minecraft:bamboo_block"] = 2,
+    ["minecraft:bamboo"] = 0.25,
     ["minecraft:oak_log"] = 1.5,
     ["minecraft:spruce_log"] = 1.5,
     ["minecraft:birch_log"] = 1.5,
@@ -651,7 +653,98 @@ function manager.processSmelt(stockLevels)
         ::continue::
     end
     
+    -- Process dried kelp mode if enabled
+    stats.driedKelpProcessed = manager.processDriedKelpMode(stockLevels)
+    
     return stats
+end
+
+---Process dried kelp mode - smelt kelp and queue crafting of dried kelp blocks
+---@param stockLevels table Current stock levels
+---@return table stats {kelpSmelted, blocksQueued}
+function manager.processDriedKelpMode(stockLevels)
+    local stats = {
+        kelpSmelted = 0,
+        blocksQueued = 0,
+    }
+    
+    if not furnaceConfig.isDriedKelpModeEnabled() then
+        return stats
+    end
+    
+    local target = furnaceConfig.getDriedKelpTarget()
+    if target <= 0 then
+        return stats
+    end
+    
+    local currentBlocks = stockLevels["minecraft:dried_kelp_block"] or 0
+    local currentDriedKelp = stockLevels["minecraft:dried_kelp"] or 0
+    local currentKelp = stockLevels["minecraft:kelp"] or 0
+    
+    -- Calculate how many blocks we need
+    local blocksNeeded = target - currentBlocks
+    if blocksNeeded <= 0 then
+        return stats
+    end
+    
+    -- Each dried kelp block requires 9 dried kelp
+    local driedKelpNeeded = blocksNeeded * 9
+    local driedKelpToSmelt = driedKelpNeeded - currentDriedKelp
+    
+    -- If we need to smelt more kelp, add a temporary smelt target
+    if driedKelpToSmelt > 0 and currentKelp > 0 then
+        local toSmelt = math.min(driedKelpToSmelt, currentKelp)
+        
+        -- Find available furnaces (kelp is food type, can use smoker)
+        local furnaces = manager.findAvailableFurnaces("food")
+        
+        for _, furnaceInfo in ipairs(furnaces) do
+            if stats.kelpSmelted >= toSmelt then break end
+            
+            local remaining = toSmelt - stats.kelpSmelted
+            local perFurnace = math.min(remaining, 64)
+            
+            local pushed = pushToFurnace("minecraft:kelp", perFurnace, furnaceInfo.name)
+            if pushed > 0 then
+                stats.kelpSmelted = stats.kelpSmelted + pushed
+                stockLevels["minecraft:kelp"] = (stockLevels["minecraft:kelp"] or 0) - pushed
+                logger.debug(string.format("Dried kelp mode: pushed %d kelp to %s", pushed, furnaceInfo.name))
+            end
+        end
+    end
+    
+    -- Check if we have enough dried kelp to craft blocks
+    -- Note: This just logs intent - actual crafting is handled by queue system
+    if currentDriedKelp >= 9 then
+        local blocksToCraft = math.floor(currentDriedKelp / 9)
+        blocksToCraft = math.min(blocksToCraft, blocksNeeded)
+        if blocksToCraft > 0 then
+            stats.blocksQueued = blocksToCraft
+            logger.debug(string.format("Dried kelp mode: can craft %d dried kelp blocks", blocksToCraft))
+        end
+    end
+    
+    return stats
+end
+
+---Get dried kelp mode status
+---@param stockLevels table Current stock levels
+---@return table status Status of dried kelp mode
+function manager.getDriedKelpStatus(stockLevels)
+    local config = furnaceConfig.getDriedKelpConfig()
+    local currentBlocks = stockLevels["minecraft:dried_kelp_block"] or 0
+    local currentDriedKelp = stockLevels["minecraft:dried_kelp"] or 0
+    local currentKelp = stockLevels["minecraft:kelp"] or 0
+    
+    return {
+        enabled = config.enabled,
+        target = config.target,
+        currentBlocks = currentBlocks,
+        currentDriedKelp = currentDriedKelp,
+        currentKelp = currentKelp,
+        blocksNeeded = math.max(0, config.target - currentBlocks),
+        canCraftBlocks = math.floor(currentDriedKelp / 9),
+    }
 end
 
 ---Get status of all furnaces

@@ -23,6 +23,10 @@ furnaces.setDefault("lavaBucketInputChest", nil)  -- Chest to pull lava buckets 
 furnaces.setDefault("lavaBucketOutputChest", nil) -- Chest to return empty buckets to
 furnaces.setDefault("enableLavaBucket", false)    -- Whether to use lava buckets as fuel
 
+-- Dried kelp mode - automatically smelts kelp and crafts into dried kelp blocks
+furnaces.setDefault("driedKelpMode", false)       -- Whether dried kelp mode is enabled
+furnaces.setDefault("driedKelpTarget", 0)         -- Target number of dried kelp blocks to maintain
+
 local module = {}
 
 ---@class FurnaceConfig
@@ -330,6 +334,45 @@ function module.getFuelConfig()
         lavaBucketInputChest = module.getLavaBucketInputChest(),
         lavaBucketOutputChest = module.getLavaBucketOutputChest(),
         enableLavaBucket = module.isLavaBucketEnabled(),
+    }
+end
+
+-- ============================================================================
+-- Dried Kelp Mode Functions
+-- ============================================================================
+
+---Check if dried kelp mode is enabled
+---@return boolean enabled Whether dried kelp mode is enabled
+function module.isDriedKelpModeEnabled()
+    return furnaces.get("driedKelpMode") == true
+end
+
+---Enable or disable dried kelp mode
+---@param enabled boolean Whether to enable dried kelp mode
+function module.setDriedKelpModeEnabled(enabled)
+    furnaces.set("driedKelpMode", enabled)
+    logger.info(string.format("%s dried kelp mode", enabled and "Enabled" or "Disabled"))
+end
+
+---Get dried kelp block target
+---@return number target Target number of dried kelp blocks
+function module.getDriedKelpTarget()
+    return furnaces.get("driedKelpTarget") or 0
+end
+
+---Set dried kelp block target
+---@param target number Target number of dried kelp blocks to maintain
+function module.setDriedKelpTarget(target)
+    furnaces.set("driedKelpTarget", target)
+    logger.info(string.format("Set dried kelp block target: %d", target))
+end
+
+---Get dried kelp mode configuration
+---@return table config {enabled, target}
+function module.getDriedKelpConfig()
+    return {
+        enabled = module.isDriedKelpModeEnabled(),
+        target = module.getDriedKelpTarget(),
     }
 end
 
