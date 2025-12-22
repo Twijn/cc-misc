@@ -371,8 +371,8 @@ local function pushFuelToFurnace(furnaceName, stockLevels)
     local toPush = math.min(available, 64 - (currentFuel or 0))
     if toPush <= 0 then return 0, nil end
     
-    -- Find fuel in storage
-    local locations = inventory.findItem(fuelItem)
+    -- Find fuel in storage only (not in export inventories)
+    local locations = inventory.findItem(fuelItem, true)
     if #locations == 0 then return 0, nil end
     
     -- Sort by count (largest first)
@@ -483,8 +483,8 @@ end
 ---@param furnaceName string The furnace peripheral name
 ---@return number pushed Amount actually pushed
 local function pushToFurnace(item, count, furnaceName)
-    -- Find item in storage
-    local locations = inventory.findItem(item)
+    -- Find item in storage only (not in export inventories)
+    local locations = inventory.findItem(item, true)
     if #locations == 0 then return 0 end
     
     -- Sort by count (largest first) for efficiency
@@ -714,13 +714,13 @@ function manager.processDriedKelpMode(stockLevels)
     end
     
     -- Check if we have enough dried kelp to craft blocks
-    -- Note: This just logs intent - actual crafting is handled by queue system
+    -- Return the count so the caller can queue the crafting job
     if currentDriedKelp >= 9 then
         local blocksToCraft = math.floor(currentDriedKelp / 9)
         blocksToCraft = math.min(blocksToCraft, blocksNeeded)
         if blocksToCraft > 0 then
-            stats.blocksQueued = blocksToCraft
-            logger.debug(string.format("Dried kelp mode: can craft %d dried kelp blocks", blocksToCraft))
+            stats.blocksToQueue = blocksToCraft
+            logger.debug(string.format("Dried kelp mode: need to craft %d dried kelp blocks", blocksToCraft))
         end
     end
     

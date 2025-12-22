@@ -124,8 +124,8 @@ end
 ---@return number pushed Amount actually pushed
 ---@return table sources Array of {inventory, count} pairs indicating where items came from
 local function pushToExport(item, count, destInv, destSlot)
-    -- Find item in storage
-    local locations = inventory.findItem(item)
+    -- Find item in storage only (not in other export inventories)
+    local locations = inventory.findItem(item, true)
     if #locations == 0 then return 0, {} end
     
     -- Sort by count (largest first) for efficiency

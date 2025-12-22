@@ -499,17 +499,28 @@ function inventory.scan(forceRefresh)
     -- Also build empty slot cache
     emptySlotCache = {}
     
+    -- Build storage set for filtering stock levels
+    local storageSet = {}
+    for _, name in ipairs(storageInventories) do
+        storageSet[name] = true
+    end
+    
     for name, data in pairs(scanResults) do
         newInventoryData[name] = data
         emptySlotCache[name] = {}
         
+        -- Only include items from storage inventories in stock levels
+        local isStorage = storageSet[name]
+        
         for slot, item in pairs(data.slots) do
             local key = getItemKey(item)
             
-            -- Update stock levels
-            newStockLevels[key] = (newStockLevels[key] or 0) + item.count
+            -- Only update stock levels for storage inventories
+            if isStorage then
+                newStockLevels[key] = (newStockLevels[key] or 0) + item.count
+            end
             
-            -- Track item locations (runtime only)
+            -- Track item locations (runtime only) - still track all for now
             if not itemLocations[key] then
                 itemLocations[key] = {}
             end
@@ -599,8 +610,17 @@ function inventory.rebuildFromCache()
     itemLocations = {}
     emptySlotCache = {}
     
+    -- Build storage set for filtering stock levels
+    local storageSet = {}
+    for _, name in ipairs(storageInventories) do
+        storageSet[name] = true
+    end
+    
     for name, data in pairs(invData) do
         emptySlotCache[name] = {}
+        
+        -- Only include items from storage inventories in stock levels
+        local isStorage = storageSet[name]
         
         if data.slots then
             for slot, item in pairs(data.slots) do
@@ -608,7 +628,10 @@ function inventory.rebuildFromCache()
                 -- Convert slot to number (JSON deserializes numeric keys as strings)
                 local slotNum = tonumber(slot) or slot
                 
-                newStockLevels[key] = (newStockLevels[key] or 0) + item.count
+                -- Only update stock levels for storage inventories
+                if isStorage then
+                    newStockLevels[key] = (newStockLevels[key] or 0) + item.count
+                end
                 
                 if not itemLocations[key] then
                     itemLocations[key] = {}
@@ -653,11 +676,32 @@ end
 
 ---Find slots containing an item (from cache)
 ---@param item string The item ID
+---@param storageOnly? boolean If true, only search in storage inventories (default: false)
 ---@return table locations Array of {inventory, slot, count}
-function inventory.findItem(item)
+function inventory.findItem(item, storageOnly)
+    -- Build storage set if filtering
+    local storageSet = nil
+    if storageOnly then
+        storageSet = {}
+        local storageInvs = inventory.getStorageInventories()
+        for _, name in ipairs(storageInvs) do
+            storageSet[name] = true
+        end
+    end
+    
     -- First check runtime cache
     if itemLocations[item] and #itemLocations[item] > 0 then
-        return itemLocations[item]
+        if not storageOnly then
+            return itemLocations[item]
+        end
+        -- Filter to storage inventories only
+        local filtered = {}
+        for _, loc in ipairs(itemLocations[item]) do
+            if storageSet[loc.inventory] then
+                table.insert(filtered, loc)
+            end
+        end
+        return filtered
     end
     
     -- Rebuild from persistent cache if needed
@@ -665,6 +709,11 @@ function inventory.findItem(item)
     local locations = {}
     
     for name, data in pairs(invData) do
+        -- Skip non-storage inventories if storageOnly is true
+        if storageOnly and not storageSet[name] then
+            goto continue
+        end
+        
         if data.slots then
             for slot, slotItem in pairs(data.slots) do
                 local key = getItemKey(slotItem)
@@ -679,9 +728,14 @@ function inventory.findItem(item)
                 end
             end
         end
+        
+        ::continue::
     end
     
-    itemLocations[item] = locations
+    -- Only cache if not filtered (full results)
+    if not storageOnly then
+        itemLocations[item] = locations
+    end
     return locations
 end
 
@@ -839,7 +893,7 @@ end
 ---@param destSlot? number Optional destination slot
 ---@return number withdrawn Amount actually withdrawn
 function inventory.withdraw(item, count, destInv, destSlot)
-    local locations = inventory.findItem(item)
+    local locations = inventory.findItem(item, true)  -- Only from storage inventories
     if #locations == 0 then return 0 end
     
     -- Sort locations by count (largest first) for efficiency
@@ -1505,8 +1559,8 @@ function inventory.withdrawToPlayer(item, count, playerName)
         return 0, "Cannot access player inventory"
     end
     
-    -- Find items in storage
-    local locations = inventory.findItem(item)
+    -- Find items in storage only (not in export inventories)
+    local locations = inventory.findItem(item, true)
     if #locations == 0 then
         return 0, "Item not found in storage"
     end

@@ -333,8 +333,8 @@ local function messageHandler()
                 }, sender)
                 
             elseif msgType == config.messageTypes.REQUEST_FIND_ITEM then
-                -- Crafter requesting item locations
-                local locations = inventory.findItem(data.item)
+                -- Crafter requesting item locations (from storage only)
+                local locations = inventory.findItem(data.item, true)
                 comms.send(config.messageTypes.RESPONSE_FIND_ITEM, {
                     item = data.item,
                     locations = locations,
@@ -430,7 +430,37 @@ local function furnaceProcessLoop()
     while running do
         if furnaceManager.needsCheck() then
             local stock = storageManager.getAllStock()
-            furnaceManager.processSmelt(stock)
+            local stats = furnaceManager.processSmelt(stock)
+            
+            -- Queue dried kelp block crafting if needed
+            if stats.driedKelpProcessed and stats.driedKelpProcessed.blocksToQueue then
+                local blocksToQueue = stats.driedKelpProcessed.blocksToQueue
+                if blocksToQueue > 0 then
+                    -- Check if there's already a pending job for dried kelp blocks
+                    local allJobs = queueManager.getJobs()
+                    local alreadyQueued = 0
+                    for _, job in ipairs(allJobs) do
+                        if job.status == "pending" or job.status == "assigned" or job.status == "crafting" then
+                            if job.recipe and job.recipe.output == "minecraft:dried_kelp_block" then
+                                alreadyQueued = alreadyQueued + (job.expectedOutput or 0)
+                            end
+                        end
+                    end
+                    
+                    -- Only queue if we haven't already queued enough
+                    local toQueue = blocksToQueue - alreadyQueued
+                    if toQueue > 0 then
+                        -- Refresh stock for accurate job creation
+                        stock = storageManager.getAllStock()
+                        local job, err = queueManager.addJob("minecraft:dried_kelp_block", toQueue, stock)
+                        if job then
+                            logger.info(string.format("Dried kelp mode: queued %d dried kelp blocks", toQueue))
+                        elseif err then
+                            logger.debug("Dried kelp mode: " .. err)
+                        end
+                    end
+                end
+            end
         end
         sleep(furnaceInterval)
     end
