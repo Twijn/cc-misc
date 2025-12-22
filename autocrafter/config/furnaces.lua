@@ -12,9 +12,9 @@ furnaces.setDefault("furnaces", {})
 furnaces.setDefault("smeltTargets", {})
 
 -- Fuel configuration defaults
+-- Note: charcoal is excluded as it's often a craft target
 furnaces.setDefault("preferredFuels", {
     "minecraft:coal",
-    "minecraft:charcoal",
     "minecraft:coal_block",
     "minecraft:blaze_rod",
     "minecraft:lava_bucket",
@@ -223,7 +223,6 @@ end
 function module.getPreferredFuels()
     return furnaces.get("preferredFuels") or {
         "minecraft:coal",
-        "minecraft:charcoal",
         "minecraft:coal_block",
         "minecraft:blaze_rod",
         "minecraft:lava_bucket",

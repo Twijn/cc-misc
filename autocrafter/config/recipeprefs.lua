@@ -244,23 +244,19 @@ end
 local function getItemsWithMultipleRecipes()
     local allItems = {}
     
-    -- Get all items from recipes module
-    local searched = recipes.search("") -- Empty search returns all
-    local seen = {}
+    -- Get all recipes directly - faster than search("")
+    local allRecipes = recipes.getAll()
     
-    for _, result in ipairs(searched) do
-        local output = result.output
-        if not seen[output] then
-            seen[output] = true
-            local variants = recipes.getRecipesFor(output, true)
-            if #variants >= 1 then
-                table.insert(allItems, {
-                    item = output,
-                    recipeCount = #variants,
-                    hasPrefs = #recipePrefs.get(output).priority > 0 or 
-                              next(recipePrefs.get(output).disabled or {}) ~= nil
-                })
-            end
+    for output, recipeList in pairs(allRecipes) do
+        if #recipeList >= 1 then
+            -- Get preferences once, reuse for both checks
+            local pref = recipePrefs.get(output)
+            table.insert(allItems, {
+                item = output,
+                recipeCount = #recipeList,
+                hasPrefs = #(pref.priority or {}) > 0 or 
+                          next(pref.disabled or {}) ~= nil
+            })
         end
     end
     

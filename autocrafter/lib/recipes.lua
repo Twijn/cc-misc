@@ -302,9 +302,11 @@ end
 function recipes.search(query)
     local results = {}
     query = query:lower()
+    local matchAll = query == ""
     
     for output, recipeList in pairs(recipesByOutput) do
-        if output:lower():find(query, 1, true) then
+        -- Fast path: empty query matches everything without string matching
+        if matchAll or output:lower():find(query, 1, true) then
             table.insert(results, {
                 output = output,
                 recipes = recipeList,

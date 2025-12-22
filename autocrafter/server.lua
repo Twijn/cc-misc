@@ -119,19 +119,22 @@ local function processCraftTargets()
     
     logger.debug(string.format("processCraftTargets: %d targets need crafting", #needed))
     
-    -- Get all current jobs to check what's already queued
+    -- Get all current jobs and build a lookup table of queued amounts per item
+    -- This is O(jobs) instead of O(targets * jobs)
     local allJobs = queueManager.getJobs()
-    
-    for _, target in ipairs(needed) do
-        -- Count queued output for this item to avoid over-queuing
-        local totalQueued = 0
-        for _, job in ipairs(allJobs) do
-            if job.recipe and job.recipe.output == target.item then
-                if job.status == "pending" or job.status == "assigned" or job.status == "crafting" then
-                    totalQueued = totalQueued + (job.expectedOutput or 0)
-                end
+    local queuedByItem = {}
+    for _, job in ipairs(allJobs) do
+        if job.recipe and job.recipe.output then
+            if job.status == "pending" or job.status == "assigned" or job.status == "crafting" then
+                local output = job.recipe.output
+                queuedByItem[output] = (queuedByItem[output] or 0) + (job.expectedOutput or 0)
             end
         end
+    end
+    
+    for _, target in ipairs(needed) do
+        -- Look up queued count from pre-built table (O(1) instead of O(jobs))
+        local totalQueued = queuedByItem[target.item] or 0
         
         -- Calculate how many items still need to be queued
         local remainingNeeded = target.needed - totalQueued
@@ -143,7 +146,7 @@ local function processCraftTargets()
         end
         
         -- Get recipe to determine output count per craft
-        local recipe = require("lib.recipes").getRecipeFor(target.item)
+        local recipe = recipes.getRecipeFor(target.item)
         if not recipe then
             logger.debug(string.format("processCraftTargets: no recipe for %s", target.item))
             goto continue
@@ -160,6 +163,9 @@ local function processCraftTargets()
         
         logger.debug(string.format("processCraftTargets: queued job #%d for %dx %s", 
             job.id, job.expectedOutput, target.item))
+        
+        -- Update queued lookup table for subsequent iterations
+        queuedByItem[target.item] = (queuedByItem[target.item] or 0) + job.expectedOutput
         
         -- Update stock to reflect materials reserved for this job
         -- This prevents creating jobs that can't be fulfilled
