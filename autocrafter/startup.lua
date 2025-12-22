@@ -9,7 +9,7 @@ local diskPrefix = fs.exists("disk") and "disk/" or ""
 
 -- Add lib to package path
 if not package.path:find(diskPrefix .. "lib") then
-    package.path = package.path .. ";" .. diskPrefix .. "?.lua;" .. diskPrefix .. "lib/?.lua"
+    package.path = package.path .. ";/" .. diskPrefix .. "?.lua;/" .. diskPrefix .. "lib/?.lua"
 end
 
 local isTurtle = turtle ~= nil

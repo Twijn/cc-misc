@@ -8,7 +8,7 @@ local VERSION = "1.1.1"
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""
 if not package.path:find(diskPrefix .. "lib") then
-    package.path = package.path .. ";" .. diskPrefix .. "?.lua;" .. diskPrefix .. "lib/?.lua"
+    package.path = package.path .. ";/" .. diskPrefix .. "?.lua;/" .. diskPrefix .. "lib/?.lua"
 end
 
 local logger = require("lib.log")
