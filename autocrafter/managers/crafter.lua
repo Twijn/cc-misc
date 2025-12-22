@@ -143,7 +143,7 @@ function manager.sendCraftRequest(crafterId, job)
         job = job,
     }, crafterId)
     
-    logger.info(string.format("Sent craft request for job #%d to crafter %d", job.id, crafterId))
+    logger.debug(string.format("Sent craft request for job #%d to crafter %d", job.id, crafterId))
     return true
 end
 

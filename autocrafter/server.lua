@@ -52,6 +52,11 @@ local function initialize()
     term.clear()
     term.setCursorPos(1, 1)
     
+    -- Set log level from config (default: warn for production)
+    if config.logLevel then
+        logger.setLevel(config.logLevel)
+    end
+    
     print("AutoCrafter Server v" .. VERSION)
     print("")
     

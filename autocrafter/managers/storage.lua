@@ -85,7 +85,7 @@ function manager.withdraw(item, count, destInv, destSlot)
     local withdrawn = inventory.withdraw(item, count, destInv, destSlot)
     
     if withdrawn > 0 then
-        logger.info(string.format("Withdrew %d %s to %s", withdrawn, item, destInv))
+        logger.debug(string.format("Withdrew %d %s to %s", withdrawn, item, destInv))
         -- Note: inventory.withdraw() already updates affected caches
     end
     
@@ -101,9 +101,9 @@ function manager.deposit(sourceInv, item)
     
     if deposited > 0 then
         if item then
-            logger.info(string.format("Deposited %d %s from %s", deposited, item, sourceInv))
+            logger.debug(string.format("Deposited %d %s from %s", deposited, item, sourceInv))
         else
-            logger.info(string.format("Deposited %d items from %s", deposited, sourceInv))
+            logger.debug(string.format("Deposited %d items from %s", deposited, sourceInv))
         end
         -- Note: inventory.deposit() already updates affected caches
     end
@@ -124,7 +124,7 @@ function manager.clearSlots(sourceInv, slots)
     logger.debug(string.format("storageManager.clearSlots result: cleared=%d", cleared))
     
     if cleared > 0 then
-        logger.info(string.format("Cleared %d items from %d slots in %s", cleared, #slots, sourceInv))
+        logger.debug(string.format("Cleared %d items from %d slots in %s", cleared, #slots, sourceInv))
     end
     
     return cleared
@@ -162,7 +162,7 @@ function manager.pullSlotsBatch(sourceInv, slotContents)
     local results, totalPulled = inventory.pullSlotsBatch(sourceInv, slotContents)
     
     if totalPulled > 0 then
-        logger.info(string.format("Batch pulled %d items from %d slots in %s", 
+        logger.debug(string.format("Batch pulled %d items from %d slots in %s", 
             totalPulled, #slotContents, sourceInv))
     end
     

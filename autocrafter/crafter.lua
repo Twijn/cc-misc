@@ -68,6 +68,11 @@ local function initialize()
     term.clear()
     term.setCursorPos(1, 1)
     
+    -- Set log level from config (default: warn for production)
+    if config.logLevel then
+        logger.setLevel(config.logLevel)
+    end
+    
     print("AutoCrafter Crafter v" .. VERSION)
     print("")
     
@@ -421,7 +426,7 @@ local function clearInventory(maxRetries)
     
     -- Final verification
     if isInventoryEmpty() then
-        logger.info(string.format("Inventory cleared: %d items moved to storage", totalCleared))
+        logger.debug(string.format("Inventory cleared: %d items moved to storage", totalCleared))
         turtle.select(1)
         return true
     end
@@ -570,7 +575,7 @@ local function executeCraft(job)
     local totalCraftsCompleted = 0
     local outputCount = recipe.outputCount or 1
     
-    logger.info(string.format("Starting job: %d crafts of %s (output: %dx per craft)", 
+    logger.debug(string.format("Starting job: %d crafts of %s (output: %dx per craft)", 
         totalCraftsNeeded, recipe.output, outputCount))
     
     -- Process in batches
@@ -613,7 +618,7 @@ local function executeCraft(job)
                     local possibleCrafts = math.floor(pulled / slotCounts[gridSlot])
                     if possibleCrafts > 0 and possibleCrafts < batchSize then
                         -- Reduce batch size to what we can actually craft
-                        logger.info(string.format("Reducing batch from %d to %d (only got %d/%d %s)", 
+                        logger.debug(string.format("Reducing batch from %d to %d (only got %d/%d %s)", 
                             batchSize, possibleCrafts, pulled, neededCount, item))
                         batchSize = possibleCrafts
                         -- Return excess items for this slot
@@ -639,7 +644,7 @@ local function executeCraft(job)
             clearInventory()
             if totalCraftsCompleted > 0 then
                 local totalOutput = totalCraftsCompleted * outputCount
-                logger.info(string.format("Partial completion: %d/%d crafts, %d items", 
+                logger.debug(string.format("Partial completion: %d/%d crafts, %d items", 
                     totalCraftsCompleted, totalCraftsNeeded, totalOutput))
                 return true, totalOutput
             else
@@ -655,7 +660,7 @@ local function executeCraft(job)
             totalCraftsCompleted = totalCraftsCompleted + batchSize
             local batchOutput = batchSize * outputCount
             
-            logger.info(string.format("Batch complete: crafted %d (total: %d/%d crafts)", 
+            logger.debug(string.format("Batch complete: crafted %d (total: %d/%d crafts)", 
                 batchOutput, totalCraftsCompleted, totalCraftsNeeded))
             
             -- Clear inventory after successful craft using the robust slot-by-slot method
@@ -679,7 +684,7 @@ local function executeCraft(job)
     clearInventory()
     
     local totalOutput = totalCraftsCompleted * outputCount
-    logger.info(string.format("Job complete: %d crafts, %d items output", totalCraftsCompleted, totalOutput))
+    logger.debug(string.format("Job complete: %d crafts, %d items output", totalCraftsCompleted, totalOutput))
     
     return true, totalOutput
 end

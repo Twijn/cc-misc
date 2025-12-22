@@ -2,6 +2,12 @@
 ---@version 2.1.0
 
 return {
+    -- Log level for console output
+    -- Options: "error", "warn", "info", "debug"
+    -- For production, use "warn" to reduce console noise
+    -- For debugging, use "debug" or "info" for more verbose output
+    logLevel = "warn",
+    
     -- Cache storage path (for inventories.json, item-details.json, stock.json)
     -- Must be an absolute path (starting with /) to bypass persist.lua's data/ prefix
     -- Set to nil to use default "/disk/data/cache"

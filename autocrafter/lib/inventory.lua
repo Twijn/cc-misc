@@ -115,7 +115,7 @@ function inventory.setParallelConfig(newConfig)
     if newConfig.enabled ~= nil then
         parallelEnabled = newConfig.enabled
     end
-    logger.info(string.format("Parallelism config updated: threads=%d, batch=%d, enabled=%s",
+    logger.debug(string.format("Parallelism config updated: threads=%d, batch=%d, enabled=%s",
         transferThreads, batchSize, tostring(parallelEnabled)))
 end
 
@@ -483,7 +483,7 @@ function inventory.discoverInventories(forceRefresh)
     end
     
     -- Log storage discovery results
-    logger.info(string.format("Discovered %d inventories, %d are storage type (%s)", 
+    logger.debug(string.format("Discovered %d inventories, %d are storage type (%s)", 
         #inventoryNames, #storageInventories, storagePeripheralType))
     
     if #storageInventories == 0 then
@@ -1772,7 +1772,7 @@ function inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
     end
     
     if totalPulled > 0 then
-        logger.info(string.format("pullSlot: pulled %d/%d %s from %s slot %d", 
+        logger.debug(string.format("pullSlot: pulled %d/%d %s from %s slot %d", 
             totalPulled, itemCount, itemName, sourceInv, slot))
     end
     
@@ -1983,7 +1983,7 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
     -- End batch and rebuild cache once
     inventory.endBatch()
     
-    logger.info(string.format("pullSlotsBatch: pulled %d total items from %d slots", totalPulled, #slotContents))
+    logger.debug(string.format("pullSlotsBatch: pulled %d total items from %d slots", totalPulled, #slotContents))
     
     return results, totalPulled
 end
