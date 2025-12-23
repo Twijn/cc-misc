@@ -16,10 +16,10 @@
 ---log.setLevel("debug")  -- Show all messages including debug
 ---log.setLevel("warn")   -- Show only warnings and errors
 ---
----@version 1.4.0
+---@version 1.4.1
 -- @module log
 
-local VERSION = "1.4.0"
+local VERSION = "1.4.1"
 
 local module = {}
 
@@ -61,16 +61,30 @@ local function displayDate()
     return os.date("%F %T")
 end
 
+---Get the full log file path and ensure directory exists
+---@return string path The full log file path
+local function getLogPath()
+    local path = "log/" .. fileDate() .. ".txt"
+    -- Extract directory from path and create it
+    local dir = path:match("(.+)/[^/]+$")
+    if dir then
+        fs.makeDir(dir)
+    end
+    return path
+end
+
 ---Flush the log buffer to disk
 local function flushBuffer()
     if logBufferSize == 0 then return end
     
-    fs.makeDir("log")
-    local f = fs.open("log/" .. fileDate() .. ".txt", "a")
-    for _, entry in ipairs(logBuffer) do
-        f.writeLine(entry)
+    local path = getLogPath()
+    local f = fs.open(path, "a")
+    if f then
+        for _, entry in ipairs(logBuffer) do
+            f.writeLine(entry)
+        end
+        f.close()
     end
-    f.close()
     
     logBuffer = {}
     logBufferSize = 0
@@ -154,15 +168,20 @@ function module.critical(msg)
     print(msg)
     
     -- Write immediately to log file
-    fs.makeDir("log")
-    local f = fs.open("log/" .. fileDate() .. ".txt", "a")
-    f.writeLine(string.format("%s [CRITICAL]: %s", displayDate(), msg))
-    f.close()
+    local path = getLogPath()
+    local f = fs.open(path, "a")
+    if f then
+        f.writeLine(string.format("%s [CRITICAL]: %s", displayDate(), msg))
+        f.close()
+    end
     
     -- Also write to dedicated crash log
+    fs.makeDir("log")
     local crashFile = fs.open("log/crash.txt", "a")
-    crashFile.writeLine(string.format("%s [CRITICAL]: %s", displayDate(), msg))
-    crashFile.close()
+    if crashFile then
+        crashFile.writeLine(string.format("%s [CRITICAL]: %s", displayDate(), msg))
+        crashFile.close()
+    end
 end
 
 ---Flush any pending log entries to disk
