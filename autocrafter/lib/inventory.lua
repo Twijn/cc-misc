@@ -439,6 +439,8 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
     -- Build parallel tasks
     local tasks, meta = {}, {}
     
+    logger.debug(string.format("pullSlotsBatch: %d storage containers available", #storage))
+    
     for i, slotInfo in ipairs(slotContents) do
         if slotInfo.count > 0 then
             local storageIdx = ((i - 1) % #storage) + 1
@@ -447,12 +449,38 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
             
             if p and p.pullItems then
                 meta[#meta + 1] = {index = i, slot = slotInfo.slot, storage = storageName}
+                local capturedSlot = slotInfo.slot
+                local capturedCount = slotInfo.count
+                local capturedStorage = storageName
                 tasks[#tasks + 1] = function()
-                    local ok, pulled = pcall(p.pullItems, sourceInv, slotInfo.slot, slotInfo.count)
-                    return ok and pulled or 0
+                    local ok, pulled = pcall(p.pullItems, sourceInv, capturedSlot, capturedCount)
+                    if not ok then
+                        logger.error(string.format("pullItems failed: %s -> %s slot %d: %s", 
+                            sourceInv, capturedStorage, capturedSlot, tostring(pulled)))
+                        return 0, tostring(pulled)
+                    end
+                    logger.debug(string.format("pullItems: %s slot %d -> %s = %d", 
+                        sourceInv, capturedSlot, capturedStorage, pulled or 0))
+                    return pulled or 0
                 end
+            else
+                logger.warn(string.format("No valid peripheral for storage %s", storageName))
             end
         end
+    end
+    
+    logger.debug(string.format("pullSlotsBatch: created %d tasks", #tasks))
+    
+    if #tasks == 0 then
+        logger.warn("pullSlotsBatch: no tasks created - check storage availability")
+        for _, slotInfo in ipairs(slotContents) do
+            results[#results + 1] = {
+                slot = slotInfo.slot,
+                pulled = 0,
+                error = "no_valid_storage"
+            }
+        end
+        return 0, results
     end
     
     local taskResults = parallel_run(tasks)
@@ -464,6 +492,8 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
         pullBySlot[meta[i].slot] = pulled
         totalPulled = totalPulled + pulled
     end
+    
+    logger.debug(string.format("pullSlotsBatch: totalPulled=%d from %d tasks", totalPulled, #taskResults))
     
     for _, slotInfo in ipairs(slotContents) do
         local pulled = pullBySlot[slotInfo.slot] or 0
