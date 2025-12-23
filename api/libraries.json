@@ -148,6 +148,7 @@
         "module.info",
         "module.warn",
         "module.error",
+        "module.critical",
         "module.flush",
         "module.setLevel",
         "module.getLevel",
@@ -274,5 +275,5 @@
       "classes": []
     }
   ],
-  "updated": "2025-12-22T08:15:15Z"
+  "updated": "2025-12-23T04:18:21Z"
 }

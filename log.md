@@ -48,6 +48,14 @@ Log an error message in red
 
 - `msg` (string): The message to log
 
+### `module.critical(msg)`
+
+Log a critical/crash message in red This is always logged both to console and file, and immediately flushed
+
+**Parameters:**
+
+- `msg` (string): The message to log
+
 ### `module.flush()`
 
 Flush any pending log entries to disk

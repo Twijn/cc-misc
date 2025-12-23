@@ -10,6 +10,7 @@
     "module.info",
     "module.warn",
     "module.error",
+    "module.critical",
     "module.flush",
     "module.setLevel",
     "module.getLevel",

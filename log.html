@@ -422,13 +422,24 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
         </div>
     </div>
     <div class='function'>
-        <h3><code>module.flush()</code></h3>
+        <h3><code>module.critical(msg)</code></h3>
         <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L146' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <p>Log a critical/crash message in red This is always logged both to console and file, and immediately flushed</p>
+        <div class='params'>
+            <strong>Parameters:</strong>
+            <ul>
+                <li><code>msg</code> (string): The message to log</li>
+            </ul>
+        </div>
+    </div>
+    <div class='function'>
+        <h3><code>module.flush()</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L168' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Flush any pending log entries to disk</p>
     </div>
     <div class='function'>
         <h3><code>module.setLevel(level)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L151' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L173' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Set the current log level Messages with levels more verbose than this will only be written to file, not console</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -440,19 +451,19 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.getLevel()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L181' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L203' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get the current log level name</p>
         <div class='returns'><strong>Returns:</strong> string levelName The current log level name</div>
     </div>
     <div class='function'>
         <h3><code>module.getLevels()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L192' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L214' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get all available log levels</p>
         <div class='returns'><strong>Returns:</strong> table levels Table with level names as keys and numbers as values</div>
     </div>
     <div class='function'>
         <h3><code>module.registerCommands(commands)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L203' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L225' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Register log level commands with a cmd command table This adds "loglevel" command with aliases "log-level" and "ll"</p>
         <div class='params'>
             <strong>Parameters:</strong>

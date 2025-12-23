@@ -967,11 +967,24 @@
           "line": 140
         },
         {
+          "name": "module.critical",
+          "params": [
+            {
+              "name": "msg",
+              "type": "string",
+              "description": "The message to log"
+            }
+          ],
+          "returns": "",
+          "description": "Log a critical/crash message in red This is always logged both to console and file, and immediately flushed",
+          "line": 146
+        },
+        {
           "name": "module.flush",
           "params": [],
           "returns": "",
           "description": "Flush any pending log entries to disk",
-          "line": 146
+          "line": 168
         },
         {
           "name": "module.setLevel",
@@ -984,21 +997,21 @@
           ],
           "returns": "string? error Error message if failed",
           "description": "Set the current log level Messages with levels more verbose than this will only be written to file, not console",
-          "line": 151
+          "line": 173
         },
         {
           "name": "module.getLevel",
           "params": [],
           "returns": "string levelName The current log level name",
           "description": "Get the current log level name",
-          "line": 181
+          "line": 203
         },
         {
           "name": "module.getLevels",
           "params": [],
           "returns": "table levels Table with level names as keys and numbers as values",
           "description": "Get all available log levels",
-          "line": 192
+          "line": 214
         },
         {
           "name": "module.registerCommands",
@@ -1011,7 +1024,7 @@
           ],
           "returns": "table commands The modified commands table (also modifies in place)",
           "description": "Register log level commands with a cmd command table This adds \"loglevel\" command with aliases \"log-level\" and \"ll\"",
-          "line": 203
+          "line": 225
         }
       ],
       "classes": []
@@ -1926,5 +1939,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-22T08:15:15Z"
+  "updated": "2025-12-23T04:18:21Z"
 }
