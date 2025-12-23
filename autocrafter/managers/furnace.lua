@@ -419,7 +419,7 @@ local function pushFuelToFurnace(furnaceName, stockLevels)
         
         local amount = math.min(toPush - pushed, loc.count)
         -- Push to slot 2 (fuel slot) - use inventory.pushItems for proper cache handling
-        local transferred = inventory.pushItems(loc.inventory, loc.slot, furnaceName, amount, 2)
+        local transferred = inventory.pushItems(loc.inv, loc.slot, furnaceName, amount, 2)
         pushed = pushed + transferred
     end
     
@@ -523,7 +523,7 @@ local function pushToFurnace(item, count, furnaceName)
         
         local toPush = math.min(count - pushed, loc.count)
         -- Push to slot 1 (input slot) - use inventory.pushItems for proper cache handling
-        local transferred = inventory.pushItems(loc.inventory, loc.slot, furnaceName, toPush, 1)
+        local transferred = inventory.pushItems(loc.inv, loc.slot, furnaceName, toPush, 1)
         pushed = pushed + transferred
     end
     

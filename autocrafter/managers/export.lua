@@ -138,11 +138,11 @@ local function pushToExport(item, count, destInv, destSlot)
         if pushed >= count then break end
         
         -- Skip if the source is the same as the destination
-        if loc.inventory == destInv then
+        if loc.inv == destInv then
             goto continue
         end
         
-        local source = inventory.getPeripheral(loc.inventory)
+        local source = inventory.getPeripheral(loc.inv)
         if source then
             local toPush = math.min(count - pushed, loc.count)
             local transferred = source.pushItems(destInv, loc.slot, toPush, destSlot) or 0
@@ -150,13 +150,13 @@ local function pushToExport(item, count, destInv, destSlot)
             
             if transferred > 0 then
                 -- Track this source
-                if sources[loc.inventory] then
-                    sources[loc.inventory] = sources[loc.inventory] + transferred
+                if sources[loc.inv] then
+                    sources[loc.inv] = sources[loc.inv] + transferred
                 else
-                    sources[loc.inventory] = transferred
+                    sources[loc.inv] = transferred
                 end
                 -- Update cache for source inventory
-                inventory.scanSingle(loc.inventory, true)
+                inventory.scanSingle(loc.inv, true)
             end
         end
         

@@ -352,8 +352,9 @@ end
 ---Deposit items from source into storage
 ---Storage pulls from source (works with turtles)
 ---@param sourceInv string Source inventory name
+---@param itemFilter? string Optional item ID to filter (only deposit this item)
 ---@return number deposited
-function inventory.deposit(sourceInv)
+function inventory.deposit(sourceInv, itemFilter)
     if #storage == 0 then
         logger.error("No storage inventories available")
         return 0
@@ -364,9 +365,19 @@ function inventory.deposit(sourceInv)
     local sourceSlots = {}
     
     if sourceP and sourceP.list then
-        sourceSlots = sourceP.list() or {}
+        local list = sourceP.list() or {}
+        -- Filter by item if specified
+        if itemFilter then
+            for slot, item in pairs(list) do
+                if item.name == itemFilter then
+                    sourceSlots[slot] = item
+                end
+            end
+        else
+            sourceSlots = list
+        end
     else
-        -- Assume turtle (16 slots)
+        -- Assume turtle (16 slots) - can't filter without list()
         for i = 1, 16 do sourceSlots[i] = true end
     end
     
