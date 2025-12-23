@@ -120,8 +120,32 @@ local function modemLoop()
     end
 end
 
-parallel.waitForAll(
-        turtleInventoryUpdateLoop,
-        timedLoop,
-        modemLoop
-)
+local function main()
+    parallel.waitForAll(
+            turtleInventoryUpdateLoop,
+            timedLoop,
+            modemLoop
+    )
+end
+
+-- Run main with crash protection
+local success, err = pcall(main)
+if not success then
+    -- Log the crash
+    local crashMsg = "SignShop aisle crashed: " .. tostring(err)
+    logger.critical(crashMsg)
+    logger.flush()
+    
+    -- Display crash info
+    term.setTextColor(colors.red)
+    print("")
+    print("=== SIGNSHOP AISLE CRASH ===")
+    print(crashMsg)
+    print("")
+    print("Check log/crash.txt for details.")
+    print("Press any key to exit...")
+    term.setTextColor(colors.white)
+    
+    os.pullEvent("key")
+    error(err)
+end

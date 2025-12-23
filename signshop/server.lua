@@ -64,6 +64,7 @@ local function performShutdown()
     end
     
     logger.info("Shutdown complete")
+    logger.flush()
 end
 
 local function handleTerminate()
@@ -71,9 +72,33 @@ local function handleTerminate()
     performShutdown()
 end
 
-local runFuncs = {handleTerminate}
-for name, manager in pairs(managers) do
-    if manager.run then table.insert(runFuncs, manager.run) end
+local function main()
+    local runFuncs = {handleTerminate}
+    for name, manager in pairs(managers) do
+        if manager.run then table.insert(runFuncs, manager.run) end
+    end
+    
+    parallel.waitForAny(table.unpack(runFuncs))
 end
 
-parallel.waitForAny(table.unpack(runFuncs))
+-- Run main with crash protection
+local success, err = pcall(main)
+if not success then
+    -- Log the crash
+    local crashMsg = "SignShop server crashed: " .. tostring(err)
+    logger.critical(crashMsg)
+    logger.flush()
+    
+    -- Display crash info
+    term.setTextColor(colors.red)
+    print("")
+    print("=== SIGNSHOP CRASH ===")
+    print(crashMsg)
+    print("")
+    print("Check log/crash.txt for details.")
+    print("Press any key to exit...")
+    term.setTextColor(colors.white)
+    
+    os.pullEvent("key")
+    error(err)
+end

@@ -277,6 +277,22 @@ local function updateCacheAfterAddition(invName, slot, itemName, count, nbt)
     end
 end
 
+---Check if an inventory is a storage type using the cached types
+---This is much faster than calling peripheral.getType() every time
+---@param invName string The inventory name
+---@return boolean isStorage Whether the inventory is a storage type
+local function isStorageType(invName)
+    local types = inventoryTypes[invName]
+    if not types then return false end
+    
+    for _, t in ipairs(types) do
+        if t == storagePeripheralType then
+            return true
+        end
+    end
+    return false
+end
+
 ---Get the maximum stack size for an item
 ---Uses cached item details when available, defaults to 64
 ---@param itemName string The item name (e.g., "minecraft:stone")
@@ -1168,36 +1184,21 @@ function inventory.deposit(sourceInv, item)
         return 0
     end
     
-    -- Pre-wrap all storage peripherals for efficiency
-    -- STRICTLY validate each peripheral is the correct storage type
+    -- Pre-wrap all storage peripherals for efficiency (using cached types - no peripheral.getType calls)
     local storagePeripherals = {}
     local storageByName = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
-            -- Double-check this is actually the correct storage type
-            local types = {peripheral.getType(name)}
-            local isValidStorage = false
-            for _, t in ipairs(types) do
-                if t == storagePeripheralType then
-                    isValidStorage = true
-                    break
-                end
-            end
-            
-            if isValidStorage then
-                local dest = inventory.getPeripheral(name)
-                if dest and dest.pullItems then
-                    local entry = {
-                        name = name, 
-                        peripheral = dest,
-                    }
-                    table.insert(storagePeripherals, entry)
-                    storageByName[name] = entry
-                    logger.debug(string.format("deposit: validated storage peripheral %s", name))
-                end
-            else
-                logger.warn(string.format("deposit: skipping %s - not a valid storage type (types: %s)", 
-                    name, table.concat(types, ", ")))
+            -- storageInvs already contains only storage-type peripherals,
+            -- so we just need to verify the peripheral is still accessible
+            local dest = inventory.getPeripheral(name)
+            if dest and dest.pullItems then
+                local entry = {
+                    name = name, 
+                    peripheral = dest,
+                }
+                table.insert(storagePeripherals, entry)
+                storageByName[name] = entry
             end
         end
     end
@@ -1435,36 +1436,21 @@ function inventory.clearSlots(sourceInv, slots)
         return 0
     end
     
-    -- Pre-wrap all storage peripherals for efficiency
-    -- STRICTLY validate each peripheral is the correct storage type
+    -- Pre-wrap all storage peripherals for efficiency (using cached types - no peripheral.getType calls)
     local storagePeripherals = {}
     local storageByName = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
-            -- Double-check this is actually the correct storage type
-            local types = {peripheral.getType(name)}
-            local isValidStorage = false
-            for _, t in ipairs(types) do
-                if t == storagePeripheralType then
-                    isValidStorage = true
-                    break
-                end
-            end
-            
-            if isValidStorage then
-                local dest = inventory.getPeripheral(name)
-                if dest and dest.pullItems then
-                    local entry = {
-                        name = name, 
-                        peripheral = dest,
-                    }
-                    table.insert(storagePeripherals, entry)
-                    storageByName[name] = entry
-                    logger.debug(string.format("clearSlots: validated storage peripheral %s", name))
-                end
-            else
-                logger.warn(string.format("clearSlots: skipping %s - not a valid storage type (types: %s)", 
-                    name, table.concat(types, ", ")))
+            -- storageInvs already contains only storage-type peripherals,
+            -- so we just need to verify the peripheral is still accessible
+            local dest = inventory.getPeripheral(name)
+            if dest and dest.pullItems then
+                local entry = {
+                    name = name, 
+                    peripheral = dest,
+                }
+                table.insert(storagePeripherals, entry)
+                storageByName[name] = entry
             end
         end
     end
@@ -1690,25 +1676,15 @@ function inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
         return 0, "no_storage"
     end
     
-    -- Build a validated list of storage peripherals
+    -- Build a validated list of storage peripherals (using cached types - no peripheral.getType calls)
     local validatedStorage = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
-            -- Double-check this is actually the correct storage type
-            local types = {peripheral.getType(name)}
-            local isValidStorage = false
-            for _, t in ipairs(types) do
-                if t == storagePeripheralType then
-                    isValidStorage = true
-                    break
-                end
-            end
-            
-            if isValidStorage then
-                local dest = inventory.getPeripheral(name)
-                if dest and dest.pullItems then
-                    table.insert(validatedStorage, name)
-                end
+            -- storageInvs already contains only storage-type peripherals,
+            -- so we just need to verify the peripheral is still accessible
+            local dest = inventory.getPeripheral(name)
+            if dest and dest.pullItems then
+                table.insert(validatedStorage, name)
             end
         end
     end
@@ -1808,23 +1784,15 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
         return results, 0
     end
     
-    -- Build validated storage peripheral list
+    -- Build validated storage peripheral list (using cached types - no peripheral.getType calls)
     local validatedStorage = {}
     for _, name in ipairs(storageInvs) do
         if name ~= sourceInv then
-            local types = {peripheral.getType(name)}
-            local isValidStorage = false
-            for _, t in ipairs(types) do
-                if t == storagePeripheralType then
-                    isValidStorage = true
-                    break
-                end
-            end
-            if isValidStorage then
-                local p = inventory.getPeripheral(name)
-                if p and p.pullItems then
-                    table.insert(validatedStorage, {name = name, peripheral = p})
-                end
+            -- storageInvs already contains only storage-type peripherals,
+            -- so we just need to verify the peripheral is still accessible
+            local p = inventory.getPeripheral(name)
+            if p and p.pullItems then
+                table.insert(validatedStorage, {name = name, peripheral = p})
             end
         end
     end

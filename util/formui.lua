@@ -1040,12 +1040,42 @@ function FormUI:run()
                 if keysHeld[keys.leftCtrl] then
                     if self:isValid() then break end
                 else
-                    local result = self:edit(self.selected)
+                    local editResult = self:edit(self.selected)
                     -- Handle button actions
-                    if result == "submit" then
+                    if editResult == "submit" then
                         if self:isValid() then break end
-                    elseif result == "cancel" then
+                    elseif editResult == "cancel" then
                         return nil
+                    elseif editResult then
+                        -- Any other button action - return immediately with action info
+                        -- Build result with all field values plus the action
+                        local result = {}
+                        for _, f in ipairs(self.fields) do
+                            if f.type == "color" then
+                                local colorName = f.options[f.value]
+                                result[f.label] = colorName and COLOR_VALUES[colorName] or colors.white
+                            elseif f.type == "select" or f.type == "peripheral" then
+                                result[f.label] = f.options[f.value]
+                            elseif f.type == "multiselect" then
+                                local selected = {}
+                                for idx, isSelected in pairs(f.value) do
+                                    if isSelected and f.options[idx] then
+                                        table.insert(selected, f.options[idx])
+                                    end
+                                end
+                                result[f.label] = selected
+                            elseif f.type == "button" then
+                                -- Mark pressed button as true, others as false
+                                result[f.label] = (f.action == editResult)
+                            else
+                                result[f.label] = f.value
+                            end
+                        end
+                        result._action = editResult  -- Store the action for easy access
+                        self.result = result
+                        term.clear()
+                        term.setCursorPos(1,1)
+                        return result
                     end
                 end
             elseif k == keys.leftCtrl then

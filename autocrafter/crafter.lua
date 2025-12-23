@@ -824,6 +824,7 @@ local function handleTerminate()
     
     comms.close()
     logger.info("Shutdown complete")
+    logger.flush()
 end
 
 ---Main entry point
@@ -839,4 +840,24 @@ local function main()
     )
 end
 
-main()
+-- Run main with crash protection
+local success, err = pcall(main)
+if not success then
+    -- Log the crash
+    local crashMsg = "Crafter crashed: " .. tostring(err)
+    logger.critical(crashMsg)
+    logger.flush()
+    
+    -- Display crash info
+    term.setTextColor(colors.red)
+    print("")
+    print("=== CRAFTER CRASH ===")
+    print(crashMsg)
+    print("")
+    print("Check log/crash.txt for details.")
+    print("Press any key to exit...")
+    term.setTextColor(colors.white)
+    
+    os.pullEvent("key")
+    error(err)
+end

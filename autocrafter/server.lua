@@ -1771,9 +1771,16 @@ local commands = {
                     form:button("Add Item", "add")
                     if #items > 0 then
                         form:button("Remove Item", "remove")
+                        form:button("Clear All Items", "clearall")
                     end
                     form:button("Change Mode", "mode")
                     form:label("")
+                    form:label("-- Quick Setup --")
+                    form:button("Fill All Slots (same item)", "fillall")
+                    form:button("Multi-Item (one per slot)", "multiitem")
+                    form:button("Split Fill (divide slots)", "splitfill")
+                    form:label("")
+                    form:label("-- Advanced --")
                     form:button("Add Slot Range", "addrange")
                     form:button("Add Vacuum Slots", "addvacuum")
                     form:button("Done", "done")
@@ -1782,14 +1789,8 @@ local commands = {
                     if not result then
                         editing = false
                     else
-                        local action = nil
-                        -- Find which button was pressed
-                        for _, field in ipairs(form.fields) do
-                            if field.type == "button" and result[field.label] then
-                                action = field.action
-                                break
-                            end
-                        end
+                        -- Use _action for easy button detection
+                        local action = result._action
                         
                         if action == "add" then
                             -- Form to add a new item
@@ -1921,6 +1922,139 @@ local commands = {
                                 if toRemove then
                                     exportConfig.removeItem(invName, toRemove.item, toRemove.slot)
                                     -- Refresh items list
+                                    cfg = exportConfig.get(invName)
+                                    items = cfg.slots or {}
+                                end
+                            end
+                            
+                        elseif action == "clearall" then
+                            -- Clear all items from this export inventory
+                            cfg.slots = {}
+                            exportConfig.set(invName, cfg)
+                            items = {}
+                            
+                        elseif action == "fillall" then
+                            -- Fill all slots with the same item
+                            local fillForm = FormUI.new("Fill All Slots")
+                            fillForm:label("Fill entire chest with one item type.")
+                            fillForm:label("Great for bulk export (e.g., wheat chest).")
+                            fillForm:label("")
+                            local itemField = fillForm:text("Item Name", "", nil, false)
+                            local qtyField = fillForm:number("Quantity per slot", cfg.mode == "stock" and 64 or 0)
+                            local startSlot = fillForm:number("Start Slot", 1)
+                            local endSlot = fillForm:number("End Slot", 27)
+                            local vacuumField = fillForm:checkbox("Vacuum (remove non-matching)", true)
+                            fillForm:addSubmitCancel()
+                            
+                            local fillResult = fillForm:run()
+                            if fillResult then
+                                local itemName = itemField()
+                                local qty = qtyField()
+                                local slotStart = startSlot()
+                                local slotEnd = endSlot()
+                                local vacuum = vacuumField()
+                                
+                                if itemName ~= "" and not itemName:find(":") then
+                                    itemName = "minecraft:" .. itemName
+                                end
+                                
+                                if itemName ~= "" and slotStart <= slotEnd then
+                                    exportConfig.addSlotRange(invName, itemName, qty, slotStart, slotEnd, vacuum)
+                                    cfg = exportConfig.get(invName)
+                                    items = cfg.slots or {}
+                                end
+                            end
+                            
+                        elseif action == "multiitem" then
+                            -- Multi-item: different item in each slot
+                            local multiForm = FormUI.new("Multi-Item Fill")
+                            multiForm:label("Put a DIFFERENT item in each slot.")
+                            multiForm:label("Enter items separated by commas.")
+                            multiForm:label("Example: cobblestone,stone,dirt")
+                            multiForm:label("")
+                            local itemsField = multiForm:text("Items (comma-sep)", "", nil, false)
+                            local qtyField = multiForm:number("Quantity per slot", cfg.mode == "stock" and 64 or 0)
+                            local startSlot = multiForm:number("Starting Slot", 1)
+                            local vacuumField = multiForm:checkbox("Vacuum (remove non-matching)", true)
+                            multiForm:addSubmitCancel()
+                            
+                            local multiResult = multiForm:run()
+                            if multiResult then
+                                local itemsStr = itemsField()
+                                local qty = qtyField()
+                                local slotNum = startSlot()
+                                local vacuum = vacuumField()
+                                
+                                -- Parse comma-separated items
+                                for itemName in itemsStr:gmatch("[^,]+") do
+                                    itemName = itemName:match("^%s*(.-)%s*$")  -- Trim whitespace
+                                    if itemName ~= "" then
+                                        if not itemName:find(":") then
+                                            itemName = "minecraft:" .. itemName
+                                        end
+                                        exportConfig.addItem(invName, itemName, qty, slotNum, nil, nil, vacuum)
+                                        slotNum = slotNum + 1
+                                    end
+                                end
+                                
+                                cfg = exportConfig.get(invName)
+                                items = cfg.slots or {}
+                            end
+                            
+                        elseif action == "splitfill" then
+                            -- Split fill: divide slots among multiple items
+                            local splitForm = FormUI.new("Split Fill")
+                            splitForm:label("Divide slots equally among items.")
+                            splitForm:label("Example: 1/3 cobblestone, 1/3 stone, 1/3 dirt")
+                            splitForm:label("Enter items separated by commas.")
+                            splitForm:label("")
+                            local itemsField = splitForm:text("Items (comma-sep)", "", nil, false)
+                            local qtyField = splitForm:number("Quantity per slot", cfg.mode == "stock" and 64 or 0)
+                            local startSlot = splitForm:number("Start Slot", 1)
+                            local endSlot = splitForm:number("End Slot", 27)
+                            local vacuumField = splitForm:checkbox("Vacuum (remove non-matching)", true)
+                            splitForm:addSubmitCancel()
+                            
+                            local splitResult = splitForm:run()
+                            if splitResult then
+                                local itemsStr = itemsField()
+                                local qty = qtyField()
+                                local slotStart = startSlot()
+                                local slotEnd = endSlot()
+                                local vacuum = vacuumField()
+                                
+                                -- Parse items
+                                local itemList = {}
+                                for itemName in itemsStr:gmatch("[^,]+") do
+                                    itemName = itemName:match("^%s*(.-)%s*$")
+                                    if itemName ~= "" then
+                                        if not itemName:find(":") then
+                                            itemName = "minecraft:" .. itemName
+                                        end
+                                        table.insert(itemList, itemName)
+                                    end
+                                end
+                                
+                                if #itemList > 0 and slotStart <= slotEnd then
+                                    local totalSlots = slotEnd - slotStart + 1
+                                    local slotsPerItem = math.floor(totalSlots / #itemList)
+                                    local extraSlots = totalSlots % #itemList
+                                    
+                                    local currentSlot = slotStart
+                                    for i, itemName in ipairs(itemList) do
+                                        local slotsForThis = slotsPerItem
+                                        -- Distribute extra slots to first items
+                                        if i <= extraSlots then
+                                            slotsForThis = slotsForThis + 1
+                                        end
+                                        
+                                        if slotsForThis > 0 then
+                                            local rangeEnd = currentSlot + slotsForThis - 1
+                                            exportConfig.addSlotRange(invName, itemName, qty, currentSlot, rangeEnd, vacuum)
+                                            currentSlot = rangeEnd + 1
+                                        end
+                                    end
+                                    
                                     cfg = exportConfig.get(invName)
                                     items = cfg.slots or {}
                                 end
@@ -3088,4 +3222,24 @@ local function main()
     )
 end
 
-main()
+-- Run main with crash protection
+local success, err = pcall(main)
+if not success then
+    -- Log the crash
+    local crashMsg = "Server crashed: " .. tostring(err)
+    logger.critical(crashMsg)
+    logger.flush()
+    
+    -- Display crash info
+    term.setTextColor(colors.red)
+    print("")
+    print("=== AUTOCRAFTER CRASH ===")
+    print(crashMsg)
+    print("")
+    print("Check log/crash.txt for details.")
+    print("Press any key to exit...")
+    term.setTextColor(colors.white)
+    
+    os.pullEvent("key")
+    error(err)
+end

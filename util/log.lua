@@ -143,6 +143,28 @@ function module.error(msg)
     log("error", msg)
 end
 
+---Log a critical/crash message in red
+---This is always logged both to console and file, and immediately flushed
+---@param msg string The message to log
+function module.critical(msg)
+    -- Critical messages bypass all level filtering
+    term.setTextColor(colors.red)
+    write("[CRITICAL] ")
+    term.setTextColor(colors.white)
+    print(msg)
+    
+    -- Write immediately to log file
+    fs.makeDir("log")
+    local f = fs.open("log/" .. fileDate() .. ".txt", "a")
+    f.writeLine(string.format("%s [CRITICAL]: %s", displayDate(), msg))
+    f.close()
+    
+    -- Also write to dedicated crash log
+    local crashFile = fs.open("log/crash.txt", "a")
+    crashFile.writeLine(string.format("%s [CRITICAL]: %s", displayDate(), msg))
+    crashFile.close()
+end
+
 ---Flush any pending log entries to disk
 function module.flush()
     flushBuffer()
