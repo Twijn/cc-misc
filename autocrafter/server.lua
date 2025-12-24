@@ -124,6 +124,10 @@ local function initialize()
         term.setTextColor(colors.lime)
         print("Manipulator: OK")
         term.setTextColor(colors.white)
+    else
+        term.setTextColor(colors.yellow)
+        print("Manipulator: DISCONNECTED (player inventory transfers disabled)")
+        term.setTextColor(colors.white)
     end
     
     print("")
@@ -1462,14 +1466,18 @@ local commands = {
                         statusText = "DISABLED"
                     end
                     
+                    local dir = task.config and task.config.breakDirection or "front"
+                    
                     p.setTextColor(colors.white)
                     p.write(id .. ": ")
                     p.setTextColor(colors.lightGray)
                     p.write(task.type .. " ")
                     p.setTextColor(colors.cyan)
                     p.write((task.item or "?"):gsub("minecraft:", "") .. " ")
+                    p.setTextColor(colors.yellow)
+                    p.write("[" .. dir .. "] ")
                     p.setTextColor(colors.lightGray)
-                    p.write(string.format("[%d/%d] ", currentStock, task.stockThreshold))
+                    p.write(string.format("%d/%d ", currentStock, task.stockThreshold))
                     p.setTextColor(statusColor)
                     p.print(statusText)
                 end
@@ -1481,20 +1489,29 @@ local commands = {
                 local item = args[3]
                 local threshold = tonumber(args[4])
                 local target = tonumber(args[5])
+                local direction = args[6] or "front"
                 
                 if not taskType then
-                    ctx.err("Usage: workers add <type> <item> [threshold] [target]")
+                    ctx.err("Usage: workers add <type> <item> [threshold] [target] [direction]")
                     print("")
                     print("Task types:")
                     for typeName, typeInfo in pairs(workerConfig.TASK_TYPES) do
                         print("  " .. typeName .. " - " .. typeInfo.description)
                     end
+                    print("")
+                    print("Directions: front, up, down")
                     return
                 end
                 
                 local typeInfo = workerConfig.TASK_TYPES[taskType]
                 if not typeInfo then
                     ctx.err("Unknown task type: " .. taskType)
+                    return
+                end
+                
+                -- Validate direction
+                if direction ~= "front" and direction ~= "up" and direction ~= "down" then
+                    ctx.err("Invalid direction: " .. direction .. " (use: front, up, down)")
                     return
                 end
                 
@@ -1516,7 +1533,7 @@ local commands = {
                     stockThreshold = threshold or typeInfo.defaultThreshold,
                     stockTarget = target or typeInfo.defaultTarget,
                     config = {
-                        breakDirection = "front",
+                        breakDirection = direction,
                     },
                 }
                 
@@ -1526,10 +1543,81 @@ local commands = {
                 end
                 
                 if workerConfig.setTask(taskId, taskType, taskConfig) then
-                    ctx.succ(string.format("Added task %s: %s", taskId, item:gsub("minecraft:", "")))
+                    ctx.succ(string.format("Added task %s: %s (dir: %s)", taskId, item:gsub("minecraft:", ""), direction))
                 else
                     ctx.err("Failed to add task")
                 end
+                
+            elseif subCmd == "edit" then
+                -- Edit an existing task's configuration
+                local taskId = args[2]
+                local field = args[3]
+                local value = args[4]
+                
+                if not taskId then
+                    ctx.err("Usage: workers edit <taskId> <field> <value>")
+                    print("")
+                    print("Fields: direction, threshold, target, item, inputItem")
+                    return
+                end
+                
+                local task = workerConfig.getTask(taskId)
+                if not task then
+                    ctx.err("Unknown task: " .. taskId)
+                    return
+                end
+                
+                if not field then
+                    -- Show current task config
+                    print("")
+                    print("Task: " .. taskId)
+                    print("  Type: " .. task.type)
+                    print("  Item: " .. task.item)
+                    print("  Threshold: " .. task.stockThreshold)
+                    print("  Target: " .. task.stockTarget)
+                    print("  Direction: " .. (task.config.breakDirection or "front"))
+                    if task.config.inputItem then
+                        print("  Input Item: " .. task.config.inputItem)
+                    end
+                    print("")
+                    print("Use: workers edit " .. taskId .. " <field> <value>")
+                    return
+                end
+                
+                if not value then
+                    ctx.err("Value required for field: " .. field)
+                    return
+                end
+                
+                -- Update the field
+                if field == "direction" or field == "dir" then
+                    if value ~= "front" and value ~= "up" and value ~= "down" then
+                        ctx.err("Invalid direction: " .. value .. " (use: front, up, down)")
+                        return
+                    end
+                    task.config.breakDirection = value
+                elseif field == "threshold" then
+                    task.stockThreshold = tonumber(value) or task.stockThreshold
+                elseif field == "target" then
+                    task.stockTarget = tonumber(value) or task.stockTarget
+                elseif field == "item" then
+                    if not value:find(":") then
+                        value = "minecraft:" .. value
+                    end
+                    task.item = value
+                elseif field == "inputItem" or field == "input" then
+                    if not value:find(":") then
+                        value = "minecraft:" .. value
+                    end
+                    task.config.inputItem = value
+                else
+                    ctx.err("Unknown field: " .. field)
+                    print("Fields: direction, threshold, target, item, inputItem")
+                    return
+                end
+                
+                workerConfig.setTask(taskId, task.type, task)
+                ctx.succ("Updated " .. taskId .. ": " .. field .. " = " .. tostring(value))
                 
             elseif subCmd == "remove" then
                 local taskId = args[2]
@@ -1589,14 +1677,14 @@ local commands = {
                 end
                 p.print("")
                 p.setTextColor(colors.lightBlue)
-                p.print("Subcommands: tasks, add, remove, enable, disable")
+                p.print("Subcommands: tasks, add, edit, remove, enable, disable")
                 p.show()
             end
         end,
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"tasks", "add", "remove", "enable", "disable"}
+                local options = {"tasks", "add", "edit", "remove", "enable", "disable"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) == 1 then
@@ -1610,6 +1698,39 @@ local commands = {
                 for typeName, _ in pairs(workerConfig.TASK_TYPES) do
                     if typeName:find(query, 1, true) == 1 then
                         table.insert(matches, typeName)
+                    end
+                end
+                return matches
+            elseif #args == 2 and args[1] == "edit" then
+                -- Complete task IDs
+                local query = (args[2] or ""):lower()
+                local tasks = workerConfig.getAllTasks()
+                local matches = {}
+                for taskId, _ in pairs(tasks) do
+                    if taskId:lower():find(query, 1, true) == 1 then
+                        table.insert(matches, taskId)
+                    end
+                end
+                return matches
+            elseif #args == 3 and args[1] == "edit" then
+                -- Complete field names
+                local query = (args[3] or ""):lower()
+                local fields = {"direction", "threshold", "target", "item", "inputItem"}
+                local matches = {}
+                for _, field in ipairs(fields) do
+                    if field:lower():find(query, 1, true) == 1 then
+                        table.insert(matches, field)
+                    end
+                end
+                return matches
+            elseif #args == 4 and args[1] == "edit" and (args[3] == "direction" or args[3] == "dir") then
+                -- Complete direction values
+                local query = (args[4] or ""):lower()
+                local directions = {"front", "up", "down"}
+                local matches = {}
+                for _, dir in ipairs(directions) do
+                    if dir:find(query, 1, true) == 1 then
+                        table.insert(matches, dir)
                     end
                 end
                 return matches
@@ -1782,17 +1903,6 @@ local commands = {
         execute = function(args, ctx)
             local subCmd = args[1]
             
-            if subCmd == "edit" then
-                -- Interactive FormUI editor for settings using config.showSettingsForm()
-                if config.showSettingsForm() then
-                    ctx.succ("Settings saved!")
-                    print("Restart the server for changes to take effect.")
-                else
-                    ctx.mess("Settings cancelled")
-                end
-                return
-            end
-            
             if subCmd == "reset" then
                 print("")
                 print("Are you sure you want to reset all settings to defaults?")
@@ -1808,7 +1918,7 @@ local commands = {
                 return
             end
             
-            if subCmd == "show" or not subCmd or subCmd == "list" then
+            if subCmd == "show" or subCmd == "list" then
                 -- Show current settings with default comparison
                 local p = ctx.pager("=== Current Settings ===")
                 for key, default in pairs(config.defaults) do
@@ -1830,8 +1940,18 @@ local commands = {
                 p.print("")
                 p.setTextColor(colors.lightBlue)
                 p.print("Green = modified, Gray = default")
-                p.print("Use 'settings edit' to modify interactively")
                 p.show()
+                return
+            end
+            
+            if subCmd == "edit" or not subCmd then
+                -- Interactive FormUI editor for settings using config.showSettingsForm()
+                if config.showSettingsForm() then
+                    ctx.succ("Settings saved!")
+                    print("Restart the server for changes to take effect.")
+                else
+                    ctx.mess("Settings cancelled")
+                end
                 return
             end
             
