@@ -219,6 +219,9 @@ end
 ---@param quantity number How many to generate
 ---@return boolean success
 ---@return number produced Amount produced
+-- How often to deposit items (every N items produced)
+local DEPOSIT_INTERVAL = 32
+
 local function executeCobblestoneTask(task, quantity)
     local direction = task.config.breakDirection or "front"
     local dirOps = DIRECTIONS[direction]
@@ -228,13 +231,15 @@ local function executeCobblestoneTask(task, quantity)
     end
     
     local produced = 0
-    local startSlot = 1
+    local lastDeposit = 0
     
     while produced < quantity and running do
-        -- Check if inventory is getting full
-        if getFreeSlots() < 2 then
+        -- Deposit periodically or when inventory is getting full
+        if (produced - lastDeposit) >= DEPOSIT_INTERVAL or getFreeSlots() < 2 then
             local deposited = depositInventory()
-            if deposited == 0 and isInventoryFull() then
+            if deposited > 0 then
+                lastDeposit = produced
+            elseif isInventoryFull() then
                 logger.warn("Inventory full and cannot deposit, pausing")
                 return true, produced
             end
@@ -289,6 +294,7 @@ local function executeConcreteTask(task, quantity)
     end
     
     local produced = 0
+    local lastDeposit = 0
     
     -- For concrete, we need powder in inventory
     -- Request powder from storage
@@ -298,6 +304,11 @@ local function executeConcreteTask(task, quantity)
     end
     
     while produced < quantity and running do
+        -- Deposit periodically to keep inventory clear
+        if (produced - lastDeposit) >= DEPOSIT_INTERVAL or getFreeSlots() < 2 then
+            depositInventory()
+            lastDeposit = produced
+        end
         -- Check if we have concrete powder
         local hasPowder = false
         local powderSlot = nil
@@ -357,10 +368,6 @@ local function executeConcreteTask(task, quantity)
             end
         end
         
-        -- Deposit full stacks
-        if getFreeSlots() < 2 then
-            depositInventory()
-        end
     end
     
     depositInventory()
