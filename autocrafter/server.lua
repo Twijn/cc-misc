@@ -2942,6 +2942,24 @@ local commands = {
             return {}
         end
     },
+    
+    update = {
+        description = "Update the autocrafter from disk",
+        category = "general",
+        execute = function(args, ctx)
+            ctx.mess("Running update...")
+            shell.run("disk/update")
+            
+            -- Reboot all connected crafters
+            ctx.mess("Rebooting crafters...")
+            comms.broadcast(config.messageTypes.REBOOT, {})
+            sleep(0.5)
+            
+            ctx.succ("Update complete. Restarting server...")
+            sleep(0.5)
+            os.reboot()
+        end
+    },
 }
 
 -- Register log level commands (loglevel, log-level, ll aliases)

@@ -712,6 +712,14 @@ local function messageHandler()
                     label = os.getComputerLabel(),
                 }, message.sender)
                 
+            elseif message.type == config.messageTypes.REBOOT then
+                -- Remote reboot request from server
+                term.setTextColor(colors.yellow)
+                print("Received reboot request from server...")
+                term.setTextColor(colors.white)
+                sleep(0.5)
+                os.reboot()
+                
             elseif message.type == config.messageTypes.CRAFT_REQUEST then
                 -- Received craft request
                 if status == "idle" and message.data.job then

@@ -239,6 +239,9 @@ config.messageTypes = {
     -- Server discovery
     SERVER_ANNOUNCE = "server_announce",
     SERVER_QUERY = "server_query",
+    
+    -- Remote control
+    REBOOT = "reboot",
 }
 
 -- Client roles (static constants)
