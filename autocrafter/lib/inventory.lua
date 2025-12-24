@@ -384,8 +384,8 @@ function inventory.deposit(sourceInv, itemFilter)
     
     local deposited = 0
     
-    -- Build a list of storage inventories sorted by empty slot count (most empty first)
-    -- This uses the cache to prefer less-full storage, reducing failed pull attempts
+    -- Build a list of storage inventories that have empty slots (from cache)
+    -- This avoids trying barrels that we know are full
     local storageWithSpace = {}
     for _, invName in ipairs(storage) do
         local invSlots = slots[invName] or {}
@@ -393,10 +393,21 @@ function inventory.deposit(sourceInv, itemFilter)
         local usedCount = 0
         for _ in pairs(invSlots) do usedCount = usedCount + 1 end
         local emptyCount = size - usedCount
-        storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = emptyCount}
+        -- Only include storage that has at least one empty slot
+        if emptyCount > 0 then
+            storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = emptyCount}
+        end
     end
     -- Sort by empty slots descending (prefer inventories with more space)
     table.sort(storageWithSpace, function(a, b) return a.emptySlots > b.emptySlots end)
+    
+    -- If no storage has space according to cache, fall back to trying all storage
+    if #storageWithSpace == 0 then
+        logger.debug("deposit: cache shows no storage with space, trying all storage")
+        for _, invName in ipairs(storage) do
+            storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = 0}
+        end
+    end
     
     -- Build tasks: each slot tries multiple barrels if first one fails
     local tasks, meta = {}, {}
@@ -411,8 +422,8 @@ function inventory.deposit(sourceInv, itemFilter)
         
         meta[#meta + 1] = {slot = slot}
         tasks[#tasks + 1] = function()
-            -- Try multiple barrels if the first one fails (e.g., is full)
-            local maxAttempts = math.min(10, #capturedStorageList)
+            -- Try ALL barrels with space (not limited to 10)
+            local maxAttempts = #capturedStorageList
             
             for attempt = 0, maxAttempts - 1 do
                 local storageIdx = ((capturedStartIdx - 1 + attempt) % #capturedStorageList) + 1
@@ -466,8 +477,8 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
     local totalPulled = 0
     local results = {}
     
-    -- Build a list of storage inventories sorted by empty slot count (most empty first)
-    -- This uses the cache to prefer less-full storage, reducing failed pull attempts
+    -- Build a list of storage inventories that have empty slots (from cache)
+    -- This avoids trying barrels that we know are full
     local storageWithSpace = {}
     for _, invName in ipairs(storage) do
         local invSlots = slots[invName] or {}
@@ -475,15 +486,27 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
         local usedCount = 0
         for _ in pairs(invSlots) do usedCount = usedCount + 1 end
         local emptyCount = size - usedCount
-        storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = emptyCount}
+        -- Only include storage that has at least one empty slot
+        if emptyCount > 0 then
+            storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = emptyCount}
+        end
     end
     -- Sort by empty slots descending (prefer inventories with more space)
     table.sort(storageWithSpace, function(a, b) return a.emptySlots > b.emptySlots end)
     
+    -- If no storage has space according to cache, fall back to trying all storage
+    -- (cache might be stale)
+    if #storageWithSpace == 0 then
+        logger.debug("pullSlotsBatch: cache shows no storage with space, trying all storage")
+        for _, invName in ipairs(storage) do
+            storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = 0}
+        end
+    end
+    
     -- Build parallel tasks
     local tasks, meta = {}, {}
     
-    logger.debug(string.format("pullSlotsBatch: %d storage containers available", #storage))
+    logger.debug(string.format("pullSlotsBatch: %d storage containers with space", #storageWithSpace))
     
     for i, slotInfo in ipairs(slotContents) do
         if slotInfo.count > 0 then
@@ -497,8 +520,8 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
             local capturedStorageList = storageWithSpace
             
             tasks[#tasks + 1] = function()
-                -- Try multiple barrels if the first one fails (e.g., is full)
-                local maxAttempts = math.min(10, #capturedStorageList)  -- Try up to 10 different barrels
+                -- Try ALL barrels with space (not limited to 10)
+                local maxAttempts = #capturedStorageList
                 
                 for attempt = 0, maxAttempts - 1 do
                     local storageIdx = ((capturedStartIdx - 1 + attempt) % #capturedStorageList) + 1
@@ -519,9 +542,8 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
                     end
                 end
                 
-                -- All attempts failed
-                logger.warn(string.format("pullItems: %s slot %d failed after trying %d barrels", 
-                    sourceInv, capturedSlot, maxAttempts))
+                -- All attempts failed - this is only a problem if we actually had items to pull
+                -- Don't warn here, let the caller decide if it's a problem
                 return 0
             end
         end
@@ -530,7 +552,7 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
     logger.debug(string.format("pullSlotsBatch: created %d tasks", #tasks))
     
     if #tasks == 0 then
-        logger.warn("pullSlotsBatch: no tasks created - check storage availability")
+        logger.debug("pullSlotsBatch: no tasks created - slots may be empty")
         for _, slotInfo in ipairs(slotContents) do
             results[#results + 1] = {
                 slot = slotInfo.slot,

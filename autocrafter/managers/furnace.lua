@@ -697,14 +697,19 @@ function manager.processSmelt(stockLevels)
             goto continue
         end
         
-        -- Fill ALL available furnaces to maximize throughput
-        -- Don't limit by target.needed - we want furnaces running at full capacity
+        -- Only smelt what we actually need to reach the target
+        local toSmelt = math.min(inputAvailable, target.needed)
+        if toSmelt <= 0 then
+            goto continue
+        end
+        
         local smelted = 0
         for _, furnaceInfo in ipairs(furnaces) do
-            -- Stop if we've used all available input materials
-            if inputAvailable <= 0 then break end
+            -- Stop if we've smelted enough or used all available input materials
+            local remaining = toSmelt - smelted
+            if remaining <= 0 then break end
             
-            local perFurnace = math.min(inputAvailable, 64)  -- Max 64 per furnace at a time
+            local perFurnace = math.min(remaining, 64)  -- Max 64 per furnace at a time
             
             local pushed = pushToFurnace(inputItem, perFurnace, furnaceInfo.name)
             if pushed > 0 then
@@ -762,17 +767,17 @@ function manager.processDriedKelpMode(stockLevels)
     
     -- Each dried kelp block requires 9 dried kelp
     local driedKelpNeeded = blocksNeeded * 9
-    local driedKelpToSmelt = driedKelpNeeded - currentDriedKelp
+    local driedKelpToSmelt = math.max(0, driedKelpNeeded - currentDriedKelp)
     
-    -- Fill ALL available furnaces with kelp to maximize throughput
-    -- Don't limit by driedKelpToSmelt - we want all furnaces running at full capacity
-    if currentKelp > 0 then
+    -- Only smelt the kelp we actually need, not all of it
+    if driedKelpToSmelt > 0 and currentKelp > 0 then
         -- Find available furnaces (kelp is food type, can use smoker)
         local furnaces = manager.findAvailableFurnaces("food")
-        local kelpRemaining = currentKelp
+        local kelpToSmelt = math.min(currentKelp, driedKelpToSmelt)
+        local kelpRemaining = kelpToSmelt
         
         for _, furnaceInfo in ipairs(furnaces) do
-            -- Stop if we've used all available kelp
+            -- Stop if we've smelted enough kelp
             if kelpRemaining <= 0 then break end
             
             local perFurnace = math.min(kelpRemaining, 64)
