@@ -159,7 +159,7 @@ function manager.pullSlotsBatch(sourceInv, slotContents)
     logger.debug(string.format("storageManager.pullSlotsBatch: %s, %d slots", 
         sourceInv, #slotContents))
     
-    local totalPulled, results = inventory.pullSlotsBatch(sourceInv, slotContents)
+    local results, totalPulled = inventory.pullSlotsBatch(sourceInv, slotContents)
     
     if totalPulled > 0 then
         logger.debug(string.format("Batch pulled %d items from %d slots in %s", 

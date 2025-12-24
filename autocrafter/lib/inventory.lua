@@ -422,15 +422,15 @@ end
 ---Pull specific slots from source into storage
 ---@param sourceInv string Source inventory
 ---@param slotContents table[] Array of {slot, name, count, nbt?}
----@return number totalPulled
 ---@return table[] results {slot, pulled, error?}
+---@return number totalPulled
 function inventory.pullSlotsBatch(sourceInv, slotContents)
     if #storage == 0 then
         local results = {}
         for _, s in ipairs(slotContents) do
             results[#results + 1] = {slot = s.slot, pulled = 0, error = "no_storage"}
         end
-        return 0, results
+        return results, 0
     end
     
     local totalPulled = 0
@@ -480,7 +480,7 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
                 error = "no_valid_storage"
             }
         end
-        return 0, results
+        return results, 0
     end
     
     local taskResults = parallel_run(tasks)
@@ -508,7 +508,7 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
         inventory.scan()
     end
     
-    return totalPulled, results
+    return results, totalPulled
 end
 
 ---Pull a single slot from source into storage
@@ -520,7 +520,7 @@ end
 ---@return number pulled
 ---@return string? error
 function inventory.pullSlot(sourceInv, slot, itemName, itemCount, itemNbt)
-    local total, results = inventory.pullSlotsBatch(sourceInv, {
+    local results, total = inventory.pullSlotsBatch(sourceInv, {
         {slot = slot, name = itemName, count = itemCount, nbt = itemNbt}
     })
     return total, results[1] and results[1].error or nil
@@ -555,7 +555,7 @@ function inventory.clearSlots(sourceInv, slotsToCheck)
         end
     end
     
-    local total = inventory.pullSlotsBatch(sourceInv, slotContents)
+    local _, total = inventory.pullSlotsBatch(sourceInv, slotContents)
     return total
 end
 
