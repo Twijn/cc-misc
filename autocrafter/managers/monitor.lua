@@ -1,7 +1,7 @@
 --- AutoCrafter Monitor Manager
 --- Manages display output to monitors.
 ---
----@version 2.0.0
+---@version 2.1.0
 
 local logger = require("lib.log")
 
@@ -82,6 +82,60 @@ function manager.header(title)
     monitor.setBackgroundColor(colors.black)
 end
 
+---Shorten item name for display
+---@param item string The full item name
+---@param maxLen number Maximum length
+---@return string shortened The shortened name
+local function shortenName(item, maxLen)
+    local name = item:gsub("minecraft:", ""):gsub("_", " ")
+    if #name > maxLen then
+        name = name:sub(1, maxLen - 2) .. ".."
+    end
+    return name
+end
+
+---Format a number compactly (e.g., 1500 -> 1.5k)
+---@param num number The number to format
+---@return string formatted The formatted number
+local function formatNum(num)
+    if num >= 10000 then
+        return string.format("%.0fk", num / 1000)
+    elseif num >= 1000 then
+        return string.format("%.1fk", num / 1000)
+    else
+        return tostring(num)
+    end
+end
+
+---Draw a compact status bar
+---@param x number X position
+---@param y number Y position
+---@param width number Bar width
+---@param current number Current value
+---@param target number Target value
+local function drawMiniBar(x, y, width, current, target)
+    if not monitor then return end
+    local pct = math.min(1, current / math.max(1, target))
+    local fill = math.floor(width * pct)
+    
+    monitor.setCursorPos(x, y)
+    monitor.setBackgroundColor(colors.gray)
+    monitor.write(string.rep(" ", width))
+    monitor.setCursorPos(x, y)
+    
+    if pct >= 1 then
+        monitor.setBackgroundColor(colors.lime)
+    elseif pct >= 0.5 then
+        monitor.setBackgroundColor(colors.yellow)
+    else
+        monitor.setBackgroundColor(colors.orange)
+    end
+    if fill > 0 then
+        monitor.write(string.rep(" ", fill))
+    end
+    monitor.setBackgroundColor(colors.black)
+end
+
 ---Draw a status display
 ---@param data table Status data to display
 function manager.drawStatus(data)
@@ -90,32 +144,72 @@ function manager.drawStatus(data)
     manager.clear()
     manager.header("AutoCrafter")
     
-    local y = 3
     local w, h = monitor.getSize()
+    local y = 3
     
-    -- Storage stats
-    monitor.setTextColor(colors.yellow)
+    -- Determine layout based on monitor width
+    local isWide = w >= 40
+    local isTall = h >= 30
+    
+    -- === COMPACT STATUS BAR (line 3) ===
+    -- Storage: 85% | Q: 3/2 | C: 4/4
     monitor.setCursorPos(2, y)
-    monitor.write("-- Storage --")
-    y = y + 1
+    monitor.setTextColor(colors.lightGray)
+    monitor.write("Sto:")
     
     if data.storage then
-        monitor.setTextColor(colors.lightGray)
-        monitor.setCursorPos(2, y)
-        monitor.write("Items: ")
-        monitor.setTextColor(colors.white)
-        monitor.write(tostring(data.storage.totalItems or 0))
-        y = y + 1
-        
-        monitor.setTextColor(colors.lightGray)
-        monitor.setCursorPos(2, y)
-        monitor.write("Slots: ")
-        monitor.setTextColor(colors.white)
-        monitor.write(string.format("%d/%d", data.storage.usedSlots or 0, data.storage.totalSlots or 0))
-        y = y + 1
-        
-        -- Draw bar
-        local barWidth = w - 4
+        local pct = data.storage.percentFull or 0
+        if pct > 90 then
+            monitor.setTextColor(colors.red)
+        elseif pct > 70 then
+            monitor.setTextColor(colors.orange)
+        else
+            monitor.setTextColor(colors.lime)
+        end
+        monitor.write(string.format("%d%%", pct))
+    end
+    
+    monitor.setTextColor(colors.gray)
+    monitor.write(" | ")
+    
+    monitor.setTextColor(colors.lightGray)
+    monitor.write("Q:")
+    if data.queue then
+        local pending = data.queue.pending or 0
+        local active = (data.queue.assigned or 0) + (data.queue.crafting or 0)
+        if pending > 0 or active > 0 then
+            monitor.setTextColor(colors.yellow)
+        else
+            monitor.setTextColor(colors.white)
+        end
+        monitor.write(string.format("%d", pending))
+        monitor.setTextColor(colors.lime)
+        monitor.write("/" .. string.format("%d", active))
+    end
+    
+    monitor.setTextColor(colors.gray)
+    monitor.write(" | ")
+    
+    monitor.setTextColor(colors.lightGray)
+    monitor.write("C:")
+    if data.crafters then
+        local online = data.crafters.online or 0
+        local total = data.crafters.total or 0
+        if online == total and total > 0 then
+            monitor.setTextColor(colors.lime)
+        elseif online > 0 then
+            monitor.setTextColor(colors.yellow)
+        else
+            monitor.setTextColor(colors.red)
+        end
+        monitor.write(string.format("%d/%d", online, total))
+    end
+    
+    y = y + 1
+    
+    -- Storage bar (compact)
+    if data.storage then
+        local barWidth = math.min(w - 4, 20)
         local fillPct = (data.storage.percentFull or 0) / 100
         local fill = math.floor(barWidth * fillPct)
         
@@ -131,180 +225,197 @@ function manager.drawStatus(data)
         else
             monitor.setBackgroundColor(colors.lime)
         end
-        monitor.write(string.rep(" ", fill))
+        if fill > 0 then
+            monitor.write(string.rep(" ", fill))
+        end
         monitor.setBackgroundColor(colors.black)
-        y = y + 2
-    end
-    
-    -- Queue stats
-    monitor.setTextColor(colors.yellow)
-    monitor.setCursorPos(2, y)
-    monitor.write("-- Queue --")
-    y = y + 1
-    
-    if data.queue then
-        monitor.setTextColor(colors.lightGray)
-        monitor.setCursorPos(2, y)
-        monitor.write("Pending: ")
-        monitor.setTextColor(colors.white)
-        monitor.write(tostring(data.queue.pending or 0))
-        y = y + 1
         
+        -- Show item count next to bar
         monitor.setTextColor(colors.lightGray)
-        monitor.setCursorPos(2, y)
-        monitor.write("Active: ")
-        monitor.setTextColor(colors.lime)
-        monitor.write(tostring((data.queue.assigned or 0) + (data.queue.crafting or 0)))
-        y = y + 2
+        monitor.setCursorPos(barWidth + 4, y)
+        monitor.write(formatNum(data.storage.totalItems or 0) .. " items")
+    end
+    y = y + 2
+    
+    -- === TARGETS SECTION ===
+    local craftTargets = data.targets or {}
+    local smeltTargets = data.smeltTargets or {}
+    local totalTargets = #craftTargets + #smeltTargets
+    
+    -- Calculate space for targets
+    local targetStartY = y
+    local availableLines = h - y - 3  -- Reserve space for fuel section
+    
+    -- Count satisfied vs needing work
+    local craftSatisfied, craftNeeded = 0, 0
+    local smeltSatisfied, smeltNeeded = 0, 0
+    
+    for _, t in ipairs(craftTargets) do
+        if t.current >= t.target then
+            craftSatisfied = craftSatisfied + 1
+        else
+            craftNeeded = craftNeeded + 1
+        end
+    end
+    for _, t in ipairs(smeltTargets) do
+        if t.current >= t.target then
+            smeltSatisfied = smeltSatisfied + 1
+        else
+            smeltNeeded = smeltNeeded + 1
+        end
     end
     
-    -- Crafter stats
-    monitor.setTextColor(colors.yellow)
-    monitor.setCursorPos(2, y)
-    monitor.write("-- Crafters --")
-    y = y + 1
+    -- Decide on layout
+    local useColumns = isWide and totalTargets > 10
+    local colWidth = useColumns and math.floor((w - 3) / 2) or (w - 4)
     
-    if data.crafters then
-        monitor.setTextColor(colors.lightGray)
-        monitor.setCursorPos(2, y)
-        monitor.write("Online: ")
-        monitor.setTextColor(colors.lime)
-        monitor.write(tostring(data.crafters.online or 0))
-        monitor.setTextColor(colors.gray)
-        monitor.write("/" .. tostring(data.crafters.total or 0))
-        y = y + 1
-        
-        monitor.setTextColor(colors.lightGray)
-        monitor.setCursorPos(2, y)
-        monitor.write("Idle: ")
-        monitor.setTextColor(colors.white)
-        monitor.write(tostring(data.crafters.idle or 0))
-        monitor.setTextColor(colors.lightGray)
-        monitor.write(" Busy: ")
-        monitor.setTextColor(colors.orange)
-        monitor.write(tostring(data.crafters.busy or 0))
-        y = y + 2
-    end
-    
-    -- Craft targets
-    if data.targets and #data.targets > 0 then
+    -- === CRAFT TARGETS ===
+    if #craftTargets > 0 then
         monitor.setTextColor(colors.yellow)
         monitor.setCursorPos(2, y)
-        monitor.write("-- Craft Targets --")
+        local headerText = string.format("Craft [%d/%d]", craftSatisfied, #craftTargets)
+        monitor.write(headerText)
         y = y + 1
         
-        for i, target in ipairs(data.targets) do
-            if y > h - 1 then break end
+        local maxCraftShow = useColumns and math.floor(availableLines * 0.6) or math.floor(availableLines * 0.5)
+        if #smeltTargets == 0 then
+            maxCraftShow = availableLines - 1
+        end
+        
+        -- Sort: show needing work first
+        local sortedCraft = {}
+        for _, t in ipairs(craftTargets) do
+            table.insert(sortedCraft, t)
+        end
+        table.sort(sortedCraft, function(a, b)
+            local aNeed = a.current < a.target
+            local bNeed = b.current < b.target
+            if aNeed ~= bNeed then return aNeed end
+            return (a.target - a.current) > (b.target - b.current)
+        end)
+        
+        local shown = 0
+        for i, target in ipairs(sortedCraft) do
+            if shown >= maxCraftShow then
+                local remaining = #sortedCraft - shown
+                if remaining > 0 then
+                    monitor.setCursorPos(2, y)
+                    monitor.setTextColor(colors.gray)
+                    monitor.write(string.format("... +%d more", remaining))
+                    y = y + 1
+                end
+                break
+            end
             
             monitor.setCursorPos(2, y)
             
             -- Status indicator
             if target.current >= target.target then
                 monitor.setTextColor(colors.lime)
-                monitor.write("+ ")
+                monitor.write("+")
             else
                 monitor.setTextColor(colors.orange)
-                monitor.write("* ")
+                monitor.write("*")
             end
             
-            -- Item name (shortened)
+            -- Item name
             monitor.setTextColor(colors.white)
-            local name = target.item:gsub("minecraft:", "")
-            if #name > w - 12 then
-                name = name:sub(1, w - 15) .. "..."
-            end
+            local nameWidth = colWidth - 10
+            local name = shortenName(target.item, nameWidth)
             monitor.write(name)
             
-            -- Count
-            monitor.setCursorPos(w - 8, y)
+            -- Progress
+            local progX = 2 + nameWidth + 1
+            monitor.setCursorPos(progX, y)
             monitor.setTextColor(colors.lightGray)
-            monitor.write(string.format("%d/%d", target.current, target.target))
+            local prog = string.format("%s/%s", formatNum(target.current), formatNum(target.target))
+            monitor.write(prog)
             
             y = y + 1
+            shown = shown + 1
         end
         y = y + 1
     end
     
-    -- Smelt targets
-    if data.smeltTargets and #data.smeltTargets > 0 then
+    -- === SMELT TARGETS ===
+    if #smeltTargets > 0 then
         monitor.setTextColor(colors.yellow)
         monitor.setCursorPos(2, y)
-        monitor.write("-- Smelt Targets --")
+        local headerText = string.format("Smelt [%d/%d]", smeltSatisfied, #smeltTargets)
+        monitor.write(headerText)
         y = y + 1
         
-        for i, target in ipairs(data.smeltTargets) do
-            if y > h - 1 then break end
+        local remainingLines = h - y - 4
+        local maxSmeltShow = math.max(3, remainingLines)
+        
+        -- Sort: show needing work first
+        local sortedSmelt = {}
+        for _, t in ipairs(smeltTargets) do
+            table.insert(sortedSmelt, t)
+        end
+        table.sort(sortedSmelt, function(a, b)
+            local aNeed = a.current < a.target
+            local bNeed = b.current < b.target
+            if aNeed ~= bNeed then return aNeed end
+            return (a.target - a.current) > (b.target - b.current)
+        end)
+        
+        local shown = 0
+        for i, target in ipairs(sortedSmelt) do
+            if shown >= maxSmeltShow then
+                local remaining = #sortedSmelt - shown
+                if remaining > 0 then
+                    monitor.setCursorPos(2, y)
+                    monitor.setTextColor(colors.gray)
+                    monitor.write(string.format("... +%d more", remaining))
+                    y = y + 1
+                end
+                break
+            end
             
             monitor.setCursorPos(2, y)
             
             -- Status indicator
             if target.current >= target.target then
                 monitor.setTextColor(colors.lime)
-                monitor.write("+ ")
+                monitor.write("+")
             else
                 monitor.setTextColor(colors.red)
-                monitor.write("~ ")
+                monitor.write("~")
             end
             
-            -- Item name (shortened)
+            -- Item name
             monitor.setTextColor(colors.white)
-            local name = target.item:gsub("minecraft:", "")
-            if #name > w - 12 then
-                name = name:sub(1, w - 15) .. "..."
-            end
+            local nameWidth = colWidth - 10
+            local name = shortenName(target.item, nameWidth)
             monitor.write(name)
             
-            -- Count
-            monitor.setCursorPos(w - 8, y)
+            -- Progress
+            local progX = 2 + nameWidth + 1
+            monitor.setCursorPos(progX, y)
             monitor.setTextColor(colors.lightGray)
-            monitor.write(string.format("%d/%d", target.current, target.target))
+            local prog = string.format("%s/%s", formatNum(target.current), formatNum(target.target))
+            monitor.write(prog)
             
             y = y + 1
+            shown = shown + 1
         end
-        y = y + 1
     end
     
-    -- Fuel summary (compact)
+    -- === FUEL SECTION (bottom) ===
     if data.fuelSummary and data.fuelSummary.fuelStock then
+        y = h - 2
+        
         monitor.setTextColor(colors.yellow)
         monitor.setCursorPos(2, y)
-        monitor.write("-- Fuel --")
-        y = y + 1
-        
-        -- Show top 3 fuels in compact form
-        local fuelList = {}
-        for i, fuel in ipairs(data.fuelSummary.fuelStock) do
-            if i > 3 then break end
-            local name = fuel.item:gsub("minecraft:", "")
-            -- Shorten common fuel names
-            name = name:gsub("_bucket", "")
-            name = name:gsub("_block", "B")
-            name = name:gsub("charcoal", "char")
-            if #name > 8 then name = name:sub(1, 6) .. ".." end
-            
-            local stockColor = fuel.stock > 0 and colors.lime or colors.red
-            table.insert(fuelList, {name = name, stock = fuel.stock, color = stockColor})
-        end
-        
-        monitor.setCursorPos(2, y)
-        for i, fuel in ipairs(fuelList) do
-            monitor.setTextColor(colors.white)
-            monitor.write(fuel.name .. ":")
-            monitor.setTextColor(fuel.color)
-            monitor.write(tostring(fuel.stock))
-            if i < #fuelList then
-                monitor.setTextColor(colors.gray)
-                monitor.write(" ")
-            end
-        end
-        y = y + 1
+        monitor.write("Fuel: ")
         
         -- Total smelt capacity
-        monitor.setCursorPos(2, y)
-        monitor.setTextColor(colors.lightGray)
-        monitor.write("Cap: ")
         local cap = data.fuelSummary.totalSmeltCapacity or 0
-        if cap >= 1000 then
+        if cap >= 10000 then
+            monitor.setTextColor(colors.lime)
+            monitor.write(string.format("%.1fk", cap / 1000))
+        elseif cap >= 1000 then
             monitor.setTextColor(colors.lime)
             monitor.write(string.format("%.1fk", cap / 1000))
         elseif cap > 0 then
@@ -315,7 +426,21 @@ function manager.drawStatus(data)
             monitor.write("0")
         end
         monitor.setTextColor(colors.lightGray)
-        monitor.write(" items")
+        monitor.write(" smelts")
+        
+        -- Show top fuels compactly
+        y = y + 1
+        monitor.setCursorPos(2, y)
+        local fuelParts = {}
+        for i, fuel in ipairs(data.fuelSummary.fuelStock) do
+            if i > 3 then break end
+            if fuel.stock > 0 then
+                local name = fuel.item:gsub("minecraft:", ""):gsub("_bucket", ""):gsub("_block", "B"):sub(1, 6)
+                table.insert(fuelParts, name .. ":" .. formatNum(fuel.stock))
+            end
+        end
+        monitor.setTextColor(colors.gray)
+        monitor.write(table.concat(fuelParts, " "))
     end
     
     lastRefresh = os.clock()

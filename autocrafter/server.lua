@@ -839,6 +839,198 @@ local commands = {
         end
     },
     
+    diagnose = {
+        description = "Diagnose why targets are not being crafted/smelted",
+        category = "queue",
+        aliases = {"why", "diag"},
+        execute = function(args, ctx)
+            local stock = storageManager.getAllStock()
+            local craftTargets = targets.getNeeded(stock)
+            local smeltTargets = furnaceConfig.getNeededSmelt(stock)
+            local craftingLib = require("lib.crafting")
+            
+            -- Get current job queue to check if items are already queued
+            local allJobs = queueManager.getJobs()
+            local queuedByItem = {}
+            for _, job in ipairs(allJobs) do
+                if job.recipe and job.recipe.output then
+                    if job.status == "pending" or job.status == "assigned" or job.status == "crafting" then
+                        local output = job.recipe.output
+                        queuedByItem[output] = (queuedByItem[output] or 0) + (job.expectedOutput or 0)
+                    end
+                end
+            end
+            
+            if #craftTargets == 0 and #smeltTargets == 0 then
+                ctx.succ("All targets are satisfied!")
+                return
+            end
+            
+            local p = ctx.pager("=== Target Diagnostics ===")
+            
+            -- Analyze craft targets
+            if #craftTargets > 0 then
+                p.setTextColor(colors.cyan)
+                p.print("-- Craft Target Issues --")
+                p.print("")
+                
+                for _, target in ipairs(craftTargets) do
+                    local item = target.item
+                    local displayName = item:gsub("minecraft:", "")
+                    local queued = queuedByItem[item] or 0
+                    local stillNeeded = target.needed - queued
+                    
+                    p.setTextColor(colors.yellow)
+                    p.print(displayName .. ":")
+                    p.setTextColor(colors.lightGray)
+                    p.print(string.format("  Target: %d | Have: %d | Need: %d", 
+                        target.target, target.current, target.needed))
+                    
+                    if queued > 0 then
+                        p.setTextColor(colors.lime)
+                        p.print(string.format("  Queued: %d items in job queue", queued))
+                        if stillNeeded <= 0 then
+                            p.setTextColor(colors.green)
+                            p.print("  Status: Sufficient jobs queued")
+                            p.print("")
+                            goto nextCraftTarget
+                        end
+                    end
+                    
+                    -- Check if recipe exists
+                    local recipe = recipes.getRecipeFor(item)
+                    if not recipe then
+                        p.setTextColor(colors.red)
+                        p.print("  ERROR: No recipe found!")
+                        p.setTextColor(colors.gray)
+                        p.print("  Use 'recipe " .. displayName .. "' to check recipe status")
+                        p.print("")
+                        goto nextCraftTarget
+                    end
+                    
+                    -- Check materials
+                    local hasAll, missing = craftingLib.hasMaterials(recipe, stock, stillNeeded)
+                    if hasAll then
+                        -- Check if crafters are available
+                        local crafterStats = crafterManager.getStats()
+                        if crafterStats.online == 0 then
+                            p.setTextColor(colors.orange)
+                            p.print("  BLOCKED: No crafters online!")
+                        elseif crafterStats.idle == 0 then
+                            p.setTextColor(colors.orange)
+                            p.print("  WAITING: All crafters busy")
+                        else
+                            p.setTextColor(colors.lime)
+                            p.print("  READY: Materials available, should craft soon")
+                        end
+                    else
+                        p.setTextColor(colors.red)
+                        p.print("  MISSING MATERIALS:")
+                        for _, m in ipairs(missing) do
+                            local matName = m.item:gsub("minecraft:", "")
+                            p.setTextColor(colors.orange)
+                            p.write("    - " .. matName .. ": ")
+                            p.setTextColor(colors.white)
+                            p.print(string.format("need %d, have %d (short %d)", 
+                                m.needed, m.have, m.short))
+                            
+                            -- Check if the missing material can be crafted
+                            local matRecipe = recipes.getRecipeFor(m.item)
+                            if matRecipe then
+                                p.setTextColor(colors.gray)
+                                p.print("      (can be crafted - add as target?)")
+                            elseif furnaceManager.getSmeltInput(m.item) then
+                                p.setTextColor(colors.gray)
+                                p.print("      (can be smelted - add as smelt target?)")
+                            end
+                        end
+                    end
+                    p.print("")
+                    
+                    ::nextCraftTarget::
+                end
+            end
+            
+            -- Analyze smelt targets
+            if #smeltTargets > 0 then
+                if #craftTargets > 0 then
+                    p.print("")
+                end
+                p.setTextColor(colors.cyan)
+                p.print("-- Smelt Target Issues --")
+                p.print("")
+                
+                local enabledFurnaces = furnaceConfig.getEnabled()
+                local fuelStock = furnaceManager.getFuelSummary(stock)
+                
+                for _, target in ipairs(smeltTargets) do
+                    local item = target.item
+                    local displayName = item:gsub("minecraft:", "")
+                    
+                    p.setTextColor(colors.yellow)
+                    p.print(displayName .. ":")
+                    p.setTextColor(colors.lightGray)
+                    p.print(string.format("  Target: %d | Have: %d | Need: %d", 
+                        target.target, target.current, target.needed))
+                    
+                    -- Check furnaces
+                    if #enabledFurnaces == 0 then
+                        p.setTextColor(colors.red)
+                        p.print("  ERROR: No furnaces configured!")
+                        p.setTextColor(colors.gray)
+                        p.print("  Use 'furnaces add' to add furnaces")
+                        p.print("")
+                        goto nextSmeltTarget
+                    end
+                    
+                    -- Check input material
+                    local input = furnaceManager.getSmeltInput(item)
+                    if not input then
+                        p.setTextColor(colors.red)
+                        p.print("  ERROR: No smelting recipe found!")
+                        p.print("")
+                        goto nextSmeltTarget
+                    end
+                    
+                    local inputStock = stock[input] or 0
+                    local inputName = input:gsub("minecraft:", "")
+                    if inputStock < target.needed then
+                        p.setTextColor(colors.red)
+                        p.print("  MISSING INPUT:")
+                        p.setTextColor(colors.orange)
+                        p.print(string.format("    - %s: need %d, have %d", 
+                            inputName, target.needed, inputStock))
+                        
+                        -- Check if input can be crafted/smelted
+                        local inputRecipe = recipes.getRecipeFor(input)
+                        if inputRecipe then
+                            p.setTextColor(colors.gray)
+                            p.print("      (can be crafted - add as craft target?)")
+                        end
+                    else
+                        p.setTextColor(colors.lime)
+                        p.print(string.format("  Input OK: %s (%d available)", inputName, inputStock))
+                    end
+                    
+                    -- Check fuel
+                    if fuelStock.totalSmeltCapacity < target.needed then
+                        p.setTextColor(colors.orange)
+                        p.print(string.format("  LOW FUEL: Can smelt %d items, need %d", 
+                            fuelStock.totalSmeltCapacity, target.needed))
+                    else
+                        p.setTextColor(colors.lime)
+                        p.print(string.format("  Fuel OK: Can smelt %d items", fuelStock.totalSmeltCapacity))
+                    end
+                    p.print("")
+                    
+                    ::nextSmeltTarget::
+                end
+            end
+            
+            p.show()
+        end
+    },
+    
     scan = {
         description = "Force inventory rescan",
         category = "storage",
