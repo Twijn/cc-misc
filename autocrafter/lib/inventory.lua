@@ -351,6 +351,7 @@ end
 
 ---Deposit items from source into storage
 ---Storage pulls from source (works with turtles)
+---Uses cache to prefer storage inventories with empty slots
 ---@param sourceInv string Source inventory name
 ---@param itemFilter? string Optional item ID to filter (only deposit this item)
 ---@return number deposited
@@ -383,24 +384,39 @@ function inventory.deposit(sourceInv, itemFilter)
     
     local deposited = 0
     
+    -- Build a list of storage inventories sorted by empty slot count (most empty first)
+    -- This uses the cache to prefer less-full storage, reducing failed pull attempts
+    local storageWithSpace = {}
+    for _, invName in ipairs(storage) do
+        local invSlots = slots[invName] or {}
+        local size = sizes[invName] or 0
+        local usedCount = 0
+        for _ in pairs(invSlots) do usedCount = usedCount + 1 end
+        local emptyCount = size - usedCount
+        storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = emptyCount}
+    end
+    -- Sort by empty slots descending (prefer inventories with more space)
+    table.sort(storageWithSpace, function(a, b) return a.emptySlots > b.emptySlots end)
+    
     -- Build tasks: each slot tries multiple barrels if first one fails
     local tasks, meta = {}, {}
     local slotList = {}
     for slot in pairs(sourceSlots) do slotList[#slotList + 1] = slot end
     
     for i, slot in ipairs(slotList) do
-        local startIdx = ((i - 1) % #storage) + 1
+        local startIdx = ((i - 1) % #storageWithSpace) + 1
         local capturedSlot = slot
         local capturedStartIdx = startIdx
+        local capturedStorageList = storageWithSpace
         
         meta[#meta + 1] = {slot = slot}
         tasks[#tasks + 1] = function()
             -- Try multiple barrels if the first one fails (e.g., is full)
-            local maxAttempts = math.min(10, #storage)
+            local maxAttempts = math.min(10, #capturedStorageList)
             
             for attempt = 0, maxAttempts - 1 do
-                local storageIdx = ((capturedStartIdx - 1 + attempt) % #storage) + 1
-                local storageName = storage[storageIdx]
+                local storageIdx = ((capturedStartIdx - 1 + attempt) % #capturedStorageList) + 1
+                local storageName = capturedStorageList[storageIdx].name
                 local p = wrap(storageName)
                 
                 if p and p.pullItems then
@@ -433,6 +449,7 @@ function inventory.deposit(sourceInv, itemFilter)
 end
 
 ---Pull specific slots from source into storage
+---Uses cache to prefer storage inventories with empty slots
 ---@param sourceInv string Source inventory
 ---@param slotContents table[] Array of {slot, name, count, nbt?}
 ---@return table[] results {slot, pulled, error?}
@@ -449,6 +466,20 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
     local totalPulled = 0
     local results = {}
     
+    -- Build a list of storage inventories sorted by empty slot count (most empty first)
+    -- This uses the cache to prefer less-full storage, reducing failed pull attempts
+    local storageWithSpace = {}
+    for _, invName in ipairs(storage) do
+        local invSlots = slots[invName] or {}
+        local size = sizes[invName] or 0
+        local usedCount = 0
+        for _ in pairs(invSlots) do usedCount = usedCount + 1 end
+        local emptyCount = size - usedCount
+        storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = emptyCount}
+    end
+    -- Sort by empty slots descending (prefer inventories with more space)
+    table.sort(storageWithSpace, function(a, b) return a.emptySlots > b.emptySlots end)
+    
     -- Build parallel tasks
     local tasks, meta = {}, {}
     
@@ -456,21 +487,22 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
     
     for i, slotInfo in ipairs(slotContents) do
         if slotInfo.count > 0 then
-            -- Start with a round-robin index but will try other barrels if first fails
-            local startIdx = ((i - 1) % #storage) + 1
+            -- Start with storage that has most empty slots, but distribute across inventories
+            local startIdx = ((i - 1) % #storageWithSpace) + 1
             
             meta[#meta + 1] = {index = i, slot = slotInfo.slot}
             local capturedSlot = slotInfo.slot
             local capturedCount = slotInfo.count
             local capturedStartIdx = startIdx
+            local capturedStorageList = storageWithSpace
             
             tasks[#tasks + 1] = function()
                 -- Try multiple barrels if the first one fails (e.g., is full)
-                local maxAttempts = math.min(10, #storage)  -- Try up to 10 different barrels
+                local maxAttempts = math.min(10, #capturedStorageList)  -- Try up to 10 different barrels
                 
                 for attempt = 0, maxAttempts - 1 do
-                    local storageIdx = ((capturedStartIdx - 1 + attempt) % #storage) + 1
-                    local storageName = storage[storageIdx]
+                    local storageIdx = ((capturedStartIdx - 1 + attempt) % #capturedStorageList) + 1
+                    local storageName = capturedStorageList[storageIdx].name
                     local p = wrap(storageName)
                     
                     if p and p.pullItems then
@@ -679,6 +711,107 @@ function inventory.getItemDetail(invName, slot)
         return details
     end
     return nil
+end
+
+---Get slot contents from cache (no peripheral call)
+---@param invName string Inventory name
+---@param slot number Slot number
+---@return table|nil slotData {name, count, nbt?} or nil if empty
+function inventory.getSlotContents(invName, slot)
+    if not slots[invName] then return nil end
+    return slots[invName][slot]
+end
+
+---Get all slots for an inventory from cache (no peripheral call)
+---@param invName string Inventory name
+---@return table slotData {slot -> {name, count, nbt?}}
+function inventory.getAllSlots(invName)
+    return slots[invName] or {}
+end
+
+---Find an empty slot in storage inventories (uses cache)
+---@param preferredInv? string Optional preferred inventory to check first
+---@return string|nil invName Inventory with empty slot
+---@return number|nil slot Empty slot number
+function inventory.findEmptySlot(preferredInv)
+    -- Check preferred inventory first
+    if preferredInv and slots[preferredInv] and sizes[preferredInv] then
+        local invSlots = slots[preferredInv]
+        local size = sizes[preferredInv]
+        for s = 1, size do
+            if not invSlots[s] then
+                return preferredInv, s
+            end
+        end
+    end
+    
+    -- Search all storage inventories
+    for _, invName in ipairs(storage) do
+        if invName ~= preferredInv then
+            local invSlots = slots[invName] or {}
+            local size = sizes[invName] or 0
+            for s = 1, size do
+                if not invSlots[s] then
+                    return invName, s
+                end
+            end
+        end
+    end
+    
+    return nil, nil
+end
+
+---Find multiple empty slots in storage inventories (uses cache)
+---@param count number Number of empty slots needed
+---@param preferredInv? string Optional preferred inventory to check first
+---@return table emptySlots Array of {inv, slot}
+function inventory.findEmptySlots(count, preferredInv)
+    local emptySlots = {}
+    local found = 0
+    
+    -- Helper to check an inventory
+    local function checkInv(invName)
+        if found >= count then return end
+        local invSlots = slots[invName] or {}
+        local size = sizes[invName] or 0
+        for s = 1, size do
+            if not invSlots[s] then
+                emptySlots[#emptySlots + 1] = {inv = invName, slot = s}
+                found = found + 1
+                if found >= count then return end
+            end
+        end
+    end
+    
+    -- Check preferred inventory first
+    if preferredInv then
+        checkInv(preferredInv)
+    end
+    
+    -- Search all storage inventories
+    for _, invName in ipairs(storage) do
+        if invName ~= preferredInv then
+            checkInv(invName)
+        end
+    end
+    
+    return emptySlots
+end
+
+---Count empty slots in storage (uses cache)
+---@return number emptyCount Number of empty slots in storage
+function inventory.countEmptySlots()
+    local empty = 0
+    for _, invName in ipairs(storage) do
+        local invSlots = slots[invName] or {}
+        local size = sizes[invName] or 0
+        for s = 1, size do
+            if not invSlots[s] then
+                empty = empty + 1
+            end
+        end
+    end
+    return empty
 end
 
 ---Get slot counts
