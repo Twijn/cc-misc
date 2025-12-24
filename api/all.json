@@ -925,7 +925,7 @@
           ],
           "returns": "",
           "description": "Log a debug message in gray (only to file, not console by default)",
-          "line": 136
+          "line": 143
         },
         {
           "name": "module.info",
@@ -938,7 +938,7 @@
           ],
           "returns": "",
           "description": "Log an informational message in blue",
-          "line": 142
+          "line": 149
         },
         {
           "name": "module.warn",
@@ -951,7 +951,7 @@
           ],
           "returns": "",
           "description": "Log a warning message in yellow",
-          "line": 148
+          "line": 155
         },
         {
           "name": "module.error",
@@ -964,7 +964,7 @@
           ],
           "returns": "",
           "description": "Log an error message in red",
-          "line": 154
+          "line": 161
         },
         {
           "name": "module.critical",
@@ -977,14 +977,14 @@
           ],
           "returns": "",
           "description": "Log a critical/crash message in red This is always logged both to console and file, and immediately flushed",
-          "line": 160
+          "line": 167
         },
         {
           "name": "module.flush",
           "params": [],
           "returns": "",
           "description": "Flush any pending log entries to disk",
-          "line": 187
+          "line": 194
         },
         {
           "name": "module.setLevel",
@@ -997,21 +997,21 @@
           ],
           "returns": "string? error Error message if failed",
           "description": "Set the current log level Messages with levels more verbose than this will only be written to file, not console",
-          "line": 192
+          "line": 199
         },
         {
           "name": "module.getLevel",
           "params": [],
           "returns": "string levelName The current log level name",
           "description": "Get the current log level name",
-          "line": 222
+          "line": 229
         },
         {
           "name": "module.getLevels",
           "params": [],
           "returns": "table levels Table with level names as keys and numbers as values",
           "description": "Get all available log levels",
-          "line": 233
+          "line": 240
         },
         {
           "name": "module.registerCommands",
@@ -1024,7 +1024,7 @@
           ],
           "returns": "table commands The modified commands table (also modifies in place)",
           "description": "Register log level commands with a cmd command table This adds \"loglevel\" command with aliases \"log-level\" and \"ll\"",
-          "line": 244
+          "line": 251
         }
       ],
       "classes": []
@@ -1939,5 +1939,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-23T04:22:00Z"
+  "updated": "2025-12-24T01:15:25Z"
 }
