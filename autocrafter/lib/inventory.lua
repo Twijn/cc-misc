@@ -383,22 +383,35 @@ function inventory.deposit(sourceInv, itemFilter)
     
     local deposited = 0
     
-    -- Build tasks: each storage pulls from each source slot
+    -- Build tasks: each slot tries multiple barrels if first one fails
     local tasks, meta = {}, {}
     local slotList = {}
     for slot in pairs(sourceSlots) do slotList[#slotList + 1] = slot end
     
     for i, slot in ipairs(slotList) do
-        local storageIdx = ((i - 1) % #storage) + 1
-        local storageName = storage[storageIdx]
-        local p = wrap(storageName)
+        local startIdx = ((i - 1) % #storage) + 1
+        local capturedSlot = slot
+        local capturedStartIdx = startIdx
         
-        if p and p.pullItems then
-            meta[#meta + 1] = {storage = storageName, slot = slot}
-            tasks[#tasks + 1] = function()
-                local ok, pulled = pcall(p.pullItems, sourceInv, slot)
-                return ok and pulled or 0
+        meta[#meta + 1] = {slot = slot}
+        tasks[#tasks + 1] = function()
+            -- Try multiple barrels if the first one fails (e.g., is full)
+            local maxAttempts = math.min(10, #storage)
+            
+            for attempt = 0, maxAttempts - 1 do
+                local storageIdx = ((capturedStartIdx - 1 + attempt) % #storage) + 1
+                local storageName = storage[storageIdx]
+                local p = wrap(storageName)
+                
+                if p and p.pullItems then
+                    local ok, pulled = pcall(p.pullItems, sourceInv, capturedSlot)
+                    if ok and pulled and pulled > 0 then
+                        return pulled
+                    end
+                    -- pulled == 0 or error means try next barrel
+                end
             end
+            return 0
         end
     end
     
@@ -443,28 +456,41 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
     
     for i, slotInfo in ipairs(slotContents) do
         if slotInfo.count > 0 then
-            local storageIdx = ((i - 1) % #storage) + 1
-            local storageName = storage[storageIdx]
-            local p = wrap(storageName)
+            -- Start with a round-robin index but will try other barrels if first fails
+            local startIdx = ((i - 1) % #storage) + 1
             
-            if p and p.pullItems then
-                meta[#meta + 1] = {index = i, slot = slotInfo.slot, storage = storageName}
-                local capturedSlot = slotInfo.slot
-                local capturedCount = slotInfo.count
-                local capturedStorage = storageName
-                tasks[#tasks + 1] = function()
-                    local ok, pulled = pcall(p.pullItems, sourceInv, capturedSlot, capturedCount)
-                    if not ok then
-                        logger.error(string.format("pullItems failed: %s -> %s slot %d: %s", 
-                            sourceInv, capturedStorage, capturedSlot, tostring(pulled)))
-                        return 0, tostring(pulled)
+            meta[#meta + 1] = {index = i, slot = slotInfo.slot}
+            local capturedSlot = slotInfo.slot
+            local capturedCount = slotInfo.count
+            local capturedStartIdx = startIdx
+            
+            tasks[#tasks + 1] = function()
+                -- Try multiple barrels if the first one fails (e.g., is full)
+                local maxAttempts = math.min(10, #storage)  -- Try up to 10 different barrels
+                
+                for attempt = 0, maxAttempts - 1 do
+                    local storageIdx = ((capturedStartIdx - 1 + attempt) % #storage) + 1
+                    local storageName = storage[storageIdx]
+                    local p = wrap(storageName)
+                    
+                    if p and p.pullItems then
+                        local ok, pulled = pcall(p.pullItems, sourceInv, capturedSlot, capturedCount)
+                        if ok and pulled and pulled > 0 then
+                            logger.debug(string.format("pullItems: %s slot %d -> %s = %d", 
+                                sourceInv, capturedSlot, storageName, pulled))
+                            return pulled
+                        elseif not ok then
+                            logger.debug(string.format("pullItems error: %s slot %d -> %s: %s", 
+                                sourceInv, capturedSlot, storageName, tostring(pulled)))
+                        end
+                        -- pulled == 0 means barrel might be full or slot empty, try next barrel
                     end
-                    logger.debug(string.format("pullItems: %s slot %d -> %s = %d", 
-                        sourceInv, capturedSlot, capturedStorage, pulled or 0))
-                    return pulled or 0
                 end
-            else
-                logger.warn(string.format("No valid peripheral for storage %s", storageName))
+                
+                -- All attempts failed
+                logger.warn(string.format("pullItems: %s slot %d failed after trying %d barrels", 
+                    sourceInv, capturedSlot, maxAttempts))
+                return 0
             end
         end
     end
