@@ -1346,121 +1346,119 @@ local commands = {
     },
     
     settings = {
-        description = "View/edit settings",
+        description = "View/edit server settings",
         category = "config",
-        aliases = {"config", "cfg"},
+        aliases = {"cfg", "options"},
         execute = function(args, ctx)
             local subCmd = args[1]
             
             if subCmd == "edit" then
-                -- Interactive FormUI editor for settings
-                local all = settings.getAll()
-                
-                local form = FormUI.new("Edit Settings")
-                
-                -- Create fields for each setting type
-                local fields = {}
-                local settingsList = {
-                    { key = "modemChannel", label = "Modem Channel", type = "number" },
-                    { key = "scanInterval", label = "Scan Interval (sec)", type = "number" },
-                    { key = "craftCheckInterval", label = "Craft Check Interval (sec)", type = "number" },
-                    { key = "maxBatchSize", label = "Max Batch Size", type = "number" },
-                    { key = "serverLabel", label = "Server Label", type = "text" },
-                    { key = "crafterTimeout", label = "Crafter Timeout (sec)", type = "number" },
-                    { key = "parallelTransferThreads", label = "Transfer Threads", type = "number" },
-                    { key = "parallelScanThreads", label = "Scan Threads", type = "number" },
-                    { key = "parallelBatchSize", label = "Parallel Batch Size", type = "number" },
-                    { key = "parallelEnabled", label = "Parallel Enabled", type = "checkbox" },
-                }
-                
-                for _, setting in ipairs(settingsList) do
-                    local currentValue = settings.get(setting.key)
-                    if setting.type == "number" then
-                        fields[setting.key] = form:number(setting.label, currentValue or 0)
-                    elseif setting.type == "text" then
-                        fields[setting.key] = form:text(setting.label, currentValue or "", nil, true)
-                    elseif setting.type == "checkbox" then
-                        fields[setting.key] = form:checkbox(setting.label, currentValue == true)
+                -- Interactive FormUI editor for settings using config.showSettingsForm()
+                if config.showSettingsForm() then
+                    ctx.succ("Settings saved!")
+                    print("Restart the server for changes to take effect.")
+                else
+                    ctx.mess("Settings cancelled")
+                end
+                return
+            end
+            
+            if subCmd == "reset" then
+                print("")
+                print("Are you sure you want to reset all settings to defaults?")
+                print("Type 'yes' to confirm:")
+                local confirm = read()
+                if confirm == "yes" then
+                    config.reset()
+                    ctx.succ("Settings reset to defaults")
+                    print("Restart the server for changes to take effect.")
+                else
+                    ctx.mess("Reset cancelled")
+                end
+                return
+            end
+            
+            if subCmd == "show" or not subCmd or subCmd == "list" then
+                -- Show current settings with default comparison
+                local p = ctx.pager("=== Current Settings ===")
+                for key, default in pairs(config.defaults) do
+                    local current = config.get(key)
+                    local isDefault = (current == default)
+                    p.setTextColor(colors.white)
+                    p.write(key .. ": ")
+                    if isDefault then
+                        p.setTextColor(colors.gray)
+                    else
+                        p.setTextColor(colors.lime)
+                    end
+                    if type(current) == "table" then
+                        p.print(textutils.serialize(current, {compact = true}))
+                    else
+                        p.print(tostring(current))
                     end
                 end
-                
-                form:addSubmitCancel()
-                
-                local result = form:run()
-                if not result then
-                    ctx.mess("Cancelled")
+                p.print("")
+                p.setTextColor(colors.lightBlue)
+                p.print("Green = modified, Gray = default")
+                p.print("Use 'settings edit' to modify interactively")
+                p.show()
+                return
+            end
+            
+            if subCmd == "get" then
+                local key = args[2]
+                if not key then
+                    ctx.err("Usage: settings get <key>")
                     return
                 end
-                
-                -- Apply changes
-                local changed = 0
-                for _, setting in ipairs(settingsList) do
-                    local newValue = fields[setting.key]()
-                    local oldValue = settings.get(setting.key)
-                    if newValue ~= oldValue then
-                        settings.set(setting.key, newValue)
-                        changed = changed + 1
-                    end
-                end
-                
-                if changed > 0 then
-                    ctx.succ(string.format("Updated %d setting(s)", changed))
+                local value = config.get(key)
+                if value == nil then
+                    ctx.err("Unknown setting: " .. key)
                 else
-                    ctx.mess("No changes made")
+                    print(key .. " = " .. tostring(value))
                 end
                 return
             end
             
-            if not subCmd or subCmd == "list" then
-                -- Show current settings
-                local all = settings.getAll()
-                print("")
-                ctx.mess("=== Settings ===")
-                for key, value in pairs(all) do
-                    term.setTextColor(colors.lightGray)
-                    write("  " .. key .. ": ")
-                    term.setTextColor(colors.white)
-                    print(tostring(value))
+            if subCmd == "set" then
+                local key = args[2]
+                local value = args[3]
+                if not key or not value then
+                    ctx.err("Usage: settings set <key> <value>")
+                    return
                 end
-                print("")
-                ctx.mess("Use 'settings edit' to modify interactively")
-                ctx.mess("Use 'settings <key> <value>' to set directly")
+                -- Parse value
+                if value == "true" then value = true
+                elseif value == "false" then value = false
+                elseif tonumber(value) then value = tonumber(value)
+                end
+                config.set(key, value)
+                ctx.succ("Set " .. key .. " = " .. tostring(value))
+                print("Restart the server for changes to take effect.")
                 return
             end
             
-            -- Set a setting directly: settings <key> <value>
-            if #args < 2 then
-                ctx.err("Usage: settings <key> <value>")
-                ctx.mess("Or use: settings edit (interactive mode)")
-                return
-            end
-            
-            local key = args[1]
-            local value = args[2]
-            
-            -- Try to parse as number
-            local numValue = tonumber(value)
-            if numValue then
-                value = numValue
-            elseif value == "true" then
-                value = true
-            elseif value == "false" then
-                value = false
-            end
-            
-            settings.set(key, value)
-            ctx.succ(string.format("Set %s = %s", key, tostring(value)))
+            -- Unknown subcommand, show help
+            ctx.err("Unknown subcommand: " .. subCmd)
+            print("Available: show, edit, get, set, reset")
         end,
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"edit", "list", "modemChannel", "scanInterval", "craftCheckInterval", 
-                    "maxBatchSize", "serverLabel", "crafterTimeout", "parallelTransferThreads",
-                    "parallelScanThreads", "parallelBatchSize", "parallelEnabled"}
+                local options = {"show", "edit", "get", "set", "reset"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:lower():find(query, 1, true) then
                         table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and (args[1] == "get" or args[1] == "set") then
+                local query = (args[2] or ""):lower()
+                local matches = {}
+                for key, _ in pairs(config.defaults) do
+                    if key:lower():find(query, 1, true) then
+                        table.insert(matches, key)
                     end
                 end
                 return matches

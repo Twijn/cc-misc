@@ -570,10 +570,40 @@ function inventory.getPeripheral(name)
     return wrap(name)
 end
 
----Get storage inventory list
+---Get storage inventory list (ONLY returns verified storage-type inventories)
+---This function ensures only proper storage peripherals (e.g., diamond barrels) are returned,
+---never ender storage or other chest types.
 ---@return string[]
 function inventory.getStorageInventories()
-    if #storage == 0 then inventory.discover() end
+    if #storage == 0 then 
+        inventory.discover() 
+    end
+    
+    -- Validate that all items in storage are still valid storage-type peripherals
+    -- This catches any corruption or edge cases
+    local validated = {}
+    for _, name in ipairs(storage) do
+        local types = {peripheral.getType(name)}
+        local isValid = false
+        for _, t in ipairs(types) do
+            if t == storageType then
+                isValid = true
+                break
+            end
+        end
+        if isValid then
+            validated[#validated + 1] = name
+        else
+            logger.warn(string.format("getStorageInventories: Removing invalid entry %s (type: %s, expected: %s)",
+                name, table.concat(types, ","), storageType))
+        end
+    end
+    
+    -- Update storage if we filtered anything out
+    if #validated ~= #storage then
+        storage = validated
+    end
+    
     return storage
 end
 

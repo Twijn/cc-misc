@@ -1,30 +1,9 @@
 --- AutoCrafter Settings Configuration
---- Manages server settings.
+--- Manages server settings via config.lua (CC settings integration).
 ---
----@version 1.1.0
+---@version 2.0.0
 
-local persist = require("lib.persist")
 local config = require("config")
-
-local settings = persist("settings.json")
-
--- Get parallelism defaults from config
-local defaultParallelism = config.parallelism or {}
-
--- Set defaults from config
-settings.setDefault("modemChannel", config.modemChannel)
-settings.setDefault("scanInterval", config.scanInterval)
-settings.setDefault("craftCheckInterval", config.craftCheckInterval)
-settings.setDefault("maxBatchSize", config.maxBatchSize)
-settings.setDefault("serverLabel", config.serverLabel)
-settings.setDefault("crafterTimeout", config.crafterTimeout)
-settings.setDefault("cachePath", config.cachePath)
-
--- Parallelism settings
-settings.setDefault("parallelTransferThreads", defaultParallelism.transferThreads or 4)
-settings.setDefault("parallelScanThreads", defaultParallelism.scanThreads or 16)
-settings.setDefault("parallelBatchSize", defaultParallelism.batchSize or 8)
-settings.setDefault("parallelEnabled", defaultParallelism.enabled ~= false)
 
 local module = {}
 
@@ -32,14 +11,14 @@ local module = {}
 ---@param key string The setting key
 ---@return any value The setting value
 function module.get(key)
-    return settings.get(key)
+    return config.get(key)
 end
 
 ---Set a setting value
 ---@param key string The setting key
 ---@param value any The setting value
 function module.set(key, value)
-    settings.set(key, value)
+    config.set(key, value)
     
     -- If parallelism setting changed, update inventory library
     if key:find("^parallel") then
@@ -50,17 +29,21 @@ end
 ---Get all settings
 ---@return table settings All settings
 function module.getAll()
-    return settings.getAll()
+    local all = {}
+    for key, _ in pairs(config.defaults) do
+        all[key] = config.get(key)
+    end
+    return all
 end
 
 ---Get parallelism configuration table
 ---@return table parallelism Current parallelism settings
 function module.getParallelism()
     return {
-        transferThreads = settings.get("parallelTransferThreads"),
-        scanThreads = settings.get("parallelScanThreads"),
-        batchSize = settings.get("parallelBatchSize"),
-        enabled = settings.get("parallelEnabled"),
+        transferThreads = config.get("parallelTransferThreads"),
+        scanThreads = config.get("parallelScanThreads"),
+        batchSize = config.get("parallelBatchSize"),
+        enabled = config.get("parallelEnabled"),
     }
 end
 
@@ -109,7 +92,7 @@ local defaultDepositExcludes = {
 ---Get deposit excludes list
 ---@return table excludes Array of item IDs to exclude from deposit
 function module.getDepositExcludes()
-    local excludes = settings.get("depositExcludes")
+    local excludes = settings.get("ac.depositExcludes")
     if excludes then
         return excludes
     end
@@ -119,7 +102,8 @@ end
 ---Set deposit excludes list
 ---@param excludes table Array of item IDs to exclude
 function module.setDepositExcludes(excludes)
-    settings.set("depositExcludes", excludes)
+    settings.set("ac.depositExcludes", excludes)
+    settings.save()
 end
 
 ---Add item to deposit excludes
@@ -131,7 +115,8 @@ function module.addDepositExclude(item)
         if ex == item then return end
     end
     table.insert(excludes, item)
-    settings.set("depositExcludes", excludes)
+    settings.set("ac.depositExcludes", excludes)
+    settings.save()
 end
 
 ---Remove item from deposit excludes
@@ -141,7 +126,8 @@ function module.removeDepositExclude(item)
     for i, ex in ipairs(excludes) do
         if ex == item then
             table.remove(excludes, i)
-            settings.set("depositExcludes", excludes)
+            settings.set("ac.depositExcludes", excludes)
+            settings.save()
             return
         end
     end
@@ -162,18 +148,7 @@ end
 
 ---Reset settings to defaults
 function module.reset()
-    settings.setAll({})
-    settings.setDefault("modemChannel", config.modemChannel)
-    settings.setDefault("scanInterval", config.scanInterval)
-    settings.setDefault("craftCheckInterval", config.craftCheckInterval)
-    settings.setDefault("maxBatchSize", config.maxBatchSize)
-    settings.setDefault("serverLabel", config.serverLabel)
-    settings.setDefault("crafterTimeout", config.crafterTimeout)
-    settings.setDefault("cachePath", config.cachePath)
-    settings.setDefault("parallelTransferThreads", defaultParallelism.transferThreads or 4)
-    settings.setDefault("parallelScanThreads", defaultParallelism.scanThreads or 16)
-    settings.setDefault("parallelBatchSize", defaultParallelism.batchSize or 8)
-    settings.setDefault("parallelEnabled", defaultParallelism.enabled ~= false)
+    config.reset()
 end
 
 return module

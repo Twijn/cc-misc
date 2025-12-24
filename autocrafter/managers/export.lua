@@ -116,14 +116,23 @@ local function getInventoryItemCount(inv, item)
     return total, slots
 end
 
----Push items to an export inventory
----@param item string The item ID
+---Push items to an export inventory (only for explicitly configured exports)
+---Items are ONLY taken from storage inventories, never from other exports or random chests.
+---@param item string The item ID - must be explicitly configured for this export
 ---@param count number Amount to push
----@param destInv string Destination inventory name
+---@param destInv string Destination inventory name - must be a configured export
 ---@param destSlot? number Optional destination slot
 ---@return number pushed Amount actually pushed
 ---@return table sources Array of {inventory, count} pairs indicating where items came from
 local function pushToExport(item, count, destInv, destSlot)
+    -- CRITICAL: Verify this destination is actually a configured export inventory
+    -- This prevents accidentally pushing items to random ender storages
+    local exportCfg = exportConfig.get(destInv)
+    if not exportCfg then
+        logger.error(string.format("pushToExport: BLOCKED - %s is not a configured export inventory", destInv))
+        return 0, {}
+    end
+    
     -- Find item in storage only (not in other export inventories)
     local locations = inventory.findItem(item, true)
     if #locations == 0 then return 0, {} end
@@ -139,6 +148,12 @@ local function pushToExport(item, count, destInv, destSlot)
         
         -- Skip if the source is the same as the destination
         if loc.inv == destInv then
+            goto continue
+        end
+        
+        -- Verify the source is a storage inventory (not an export)
+        if not inventory.isStorageInventory(loc.inv) then
+            logger.warn(string.format("pushToExport: Skipping non-storage source: %s", loc.inv))
             goto continue
         end
         

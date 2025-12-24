@@ -530,8 +530,9 @@ local function pushToFurnace(item, count, furnaceName)
     return pushed
 end
 
----Pull output items from a furnace to storage
+---Pull output items from a furnace to storage ONLY
 ---Uses direct peripheral calls to avoid cache overhead for non-storage inventories.
+---IMPORTANT: Only pulls to verified storage inventories, never to exports or other chests.
 ---@param furnaceName string The furnace peripheral name
 ---@return number pulled Amount pulled from output slot
 ---@return string|nil destName Name of storage inventory that received items (for cache update)
@@ -549,17 +550,43 @@ local function pullFromFurnace(furnaceName)
     local pulled = 0
     local lastDestName = nil
     
-    -- Get storage inventories
+    -- Get storage inventories - these are ONLY the configured storage type (e.g., diamond barrels)
     local storageInvs = inventory.getStorageInventories()
     if #storageInvs == 0 then
         logger.warn("pullFromFurnace: No storage inventories available")
         return 0, nil
     end
     
-    -- Try to pull from furnace output slot (slot 3) to storage
+    -- Get the expected storage type for validation
+    local expectedStorageType = inventory.getStorageType()
+    
+    -- Try to pull from furnace output slot (slot 3) to storage ONLY
     -- Use direct peripheral calls since furnaces aren't in our cache
     for _, destName in ipairs(storageInvs) do
         if remaining <= 0 then break end
+        
+        -- CRITICAL: Double-check that this destination is actually a storage inventory
+        -- This prevents accidentally putting smelted items in ender storage or other chests
+        if not inventory.isStorageInventory(destName) then
+            logger.warn(string.format("pullFromFurnace: Skipping non-storage destination: %s", destName))
+            goto continue
+        end
+        
+        -- Additional validation: verify peripheral type matches expected storage type
+        local destTypes = {peripheral.getType(destName)}
+        local isValidStorage = false
+        for _, t in ipairs(destTypes) do
+            if t == expectedStorageType then
+                isValidStorage = true
+                break
+            end
+        end
+        
+        if not isValidStorage then
+            logger.error(string.format("pullFromFurnace: BLOCKED - %s is not a valid storage type (expected %s, got %s)", 
+                destName, expectedStorageType, table.concat(destTypes, ", ")))
+            goto continue
+        end
         
         local dest = inventory.getPeripheral(destName)
         if dest and dest.pullItems then
@@ -576,10 +603,12 @@ local function pullFromFurnace(furnaceName)
                     transferred, furnaceName, destName))
             end
         end
+        
+        ::continue::
     end
     
     if pulled > 0 then
-        logger.info(string.format("pullFromFurnace: pulled %d %s from %s", 
+        logger.info(string.format("pullFromFurnace: pulled %d %s from %s to storage", 
             pulled, outputItem.name, furnaceName))
     end
     

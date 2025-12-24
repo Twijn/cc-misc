@@ -113,8 +113,11 @@ local function log(level, msg)
     -- Check if this level should be shown based on current log level setting
     local levelNum = LEVELS[level] or LEVELS.info
     if levelNum > currentLevel then
-        -- Still write to file, but don't show in console
-        writeLog(level, msg)
+        -- Debug messages are never written to file (too verbose)
+        -- Other levels below threshold are still written to file
+        if level ~= "debug" then
+            writeLog(level, msg)
+        end
         return
     end
     
@@ -130,7 +133,11 @@ local function log(level, msg)
     write("["..level.."] ")
     term.setTextColor(colors.white)
     print(msg)
-    writeLog(level, msg)
+    
+    -- Never write debug messages to file (too verbose, console-only)
+    if level ~= "debug" then
+        writeLog(level, msg)
+    end
 end
 
 ---Log a debug message in gray (only to file, not console by default)
