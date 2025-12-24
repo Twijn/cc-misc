@@ -56,7 +56,11 @@ end
 ---@param key string The setting key
 ---@param value any The value to set
 local function set(key, value)
-    settings.set("ac." .. key, value)
+    if value == nil then
+        settings.unset("ac." .. key)
+    else
+        settings.set("ac." .. key, value)
+    end
     settings.save()
 end
 
