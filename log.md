@@ -1,6 +1,6 @@
 # log
 
-A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, and configurable log levels.
+A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, configurable log levels, and automatic cleanup of old log files when disk space is low.
 
 ## Examples
 
@@ -91,4 +91,28 @@ Register log level commands with a cmd command table This adds "loglevel" comman
 - `commands` (table): The commands table to add the log level command to
 
 **Returns:** table commands The modified commands table (also modifies in place)
+
+### `module.configureDiskManagement(settings)`
+
+Configure disk space management settings - minFreeSpace: Minimum free bytes before cleanup (default: 10000) - maxLogAgeDays: Delete logs older than this (default: 30) - checkInterval: Seconds between disk space checks (default: 60)
+
+**Parameters:**
+
+- `settings` (table): Configuration table with optional fields:
+
+### `module.getDiskStats()`
+
+Get disk space statistics for the log directory
+
+**Returns:** table stats Statistics about log storage
+
+### `module.cleanupOldLogs(maxAgeDays?)`
+
+Manually trigger cleanup of old log files
+
+**Parameters:**
+
+- `maxAgeDays?` (number): Optional max age in days (default: use configured value)
+
+**Returns:** number deleted Number of files deleted
 

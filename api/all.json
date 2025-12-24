@@ -908,8 +908,8 @@
     },
     "log": {
       "name": "log",
-      "version": "1.4.1",
-      "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, and configurable log levels.",
+      "version": "1.5.0",
+      "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, configurable log levels, and automatic cleanup of old log files when disk space is low.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/log.lua",
       "documentation_url": "https://ccmisc.twijn.dev/log.html",
@@ -925,7 +925,7 @@
           ],
           "returns": "",
           "description": "Log a debug message in gray (only to file, not console by default)",
-          "line": 143
+          "line": 281
         },
         {
           "name": "module.info",
@@ -938,7 +938,7 @@
           ],
           "returns": "",
           "description": "Log an informational message in blue",
-          "line": 149
+          "line": 287
         },
         {
           "name": "module.warn",
@@ -951,7 +951,7 @@
           ],
           "returns": "",
           "description": "Log a warning message in yellow",
-          "line": 155
+          "line": 293
         },
         {
           "name": "module.error",
@@ -964,7 +964,7 @@
           ],
           "returns": "",
           "description": "Log an error message in red",
-          "line": 161
+          "line": 299
         },
         {
           "name": "module.critical",
@@ -977,14 +977,14 @@
           ],
           "returns": "",
           "description": "Log a critical/crash message in red This is always logged both to console and file, and immediately flushed",
-          "line": 167
+          "line": 305
         },
         {
           "name": "module.flush",
           "params": [],
           "returns": "",
           "description": "Flush any pending log entries to disk",
-          "line": 194
+          "line": 332
         },
         {
           "name": "module.setLevel",
@@ -997,21 +997,21 @@
           ],
           "returns": "string? error Error message if failed",
           "description": "Set the current log level Messages with levels more verbose than this will only be written to file, not console",
-          "line": 199
+          "line": 337
         },
         {
           "name": "module.getLevel",
           "params": [],
           "returns": "string levelName The current log level name",
           "description": "Get the current log level name",
-          "line": 229
+          "line": 367
         },
         {
           "name": "module.getLevels",
           "params": [],
           "returns": "table levels Table with level names as keys and numbers as values",
           "description": "Get all available log levels",
-          "line": 240
+          "line": 378
         },
         {
           "name": "module.registerCommands",
@@ -1024,7 +1024,40 @@
           ],
           "returns": "table commands The modified commands table (also modifies in place)",
           "description": "Register log level commands with a cmd command table This adds \"loglevel\" command with aliases \"log-level\" and \"ll\"",
-          "line": 251
+          "line": 389
+        },
+        {
+          "name": "module.configureDiskManagement",
+          "params": [
+            {
+              "name": "settings",
+              "type": "table",
+              "description": "Configuration table with optional fields:"
+            }
+          ],
+          "returns": "",
+          "description": "Configure disk space management settings - minFreeSpace: Minimum free bytes before cleanup (default: 10000) - maxLogAgeDays: Delete logs older than this (default: 30) - checkInterval: Seconds between disk space checks (default: 60)",
+          "line": 448
+        },
+        {
+          "name": "module.getDiskStats",
+          "params": [],
+          "returns": "table stats Statistics about log storage",
+          "description": "Get disk space statistics for the log directory",
+          "line": 465
+        },
+        {
+          "name": "module.cleanupOldLogs",
+          "params": [
+            {
+              "name": "maxAgeDays?",
+              "type": "number",
+              "description": "Optional max age in days (default: use configured value)"
+            }
+          ],
+          "returns": "number deleted Number of files deleted",
+          "description": "Manually trigger cleanup of old log files",
+          "line": 489
         }
       ],
       "classes": []
@@ -1939,5 +1972,5 @@
       "classes": []
     }
   },
-  "updated": "2025-12-24T01:15:25Z"
+  "updated": "2025-12-24T03:00:31Z"
 }

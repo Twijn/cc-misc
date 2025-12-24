@@ -1,7 +1,7 @@
 {
   "name": "log",
-  "version": "1.4.1",
-  "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, and configurable log levels.",
+  "version": "1.5.0",
+  "description": "A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, configurable log levels, and automatic cleanup of old log files when disk space is low.",
   "dependencies": [],
   "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/log.lua",
   "documentation_url": "https://ccmisc.twijn.dev/log.html",
@@ -15,7 +15,10 @@
     "module.setLevel",
     "module.getLevel",
     "module.getLevels",
-    "module.registerCommands"
+    "module.registerCommands",
+    "module.configureDiskManagement",
+    "module.getDiskStats",
+    "module.cleanupOldLogs"
   ],
   "classes": []
 }
