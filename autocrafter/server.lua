@@ -1,9 +1,9 @@
 --- AutoCrafter Server
 --- Main server component for automated crafting and storage management.
 ---
----@version 1.3.0
+---@version 1.4.0
 
-local VERSION = "1.3.0"
+local VERSION = "1.4.0"
 
 -- Setup package path
 local diskPrefix = fs.exists("disk/lib") and "disk/" or ""
@@ -25,12 +25,14 @@ local crafterManager = require("managers.crafter")
 local monitorManager = require("managers.monitor")
 local exportManager = require("managers.export")
 local furnaceManager = require("managers.furnace")
+local workerManager = require("managers.worker")
 
 -- Load config modules
 local settings = require("config.settings")
 local targets = require("config.targets")
 local exportConfig = require("config.exports")
 local furnaceConfig = require("config.furnaces")
+local workerConfig = require("config.workers")
 local config = require("config")
 
 local running = true
@@ -93,13 +95,14 @@ local function initialize()
     monitorManager.init(config.monitorRefreshInterval)
     exportManager.init()
     furnaceManager.init()
+    workerManager.init()
     
     -- Show summary stats
     local storageStats = storageManager.getStats()
     print(string.format("Storage: %d items, %d/%d slots (%d%%)",
         storageStats.totalItems, storageStats.usedSlots, storageStats.totalSlots, storageStats.percentFull))
-    print(string.format("Recipes: %d | Targets: %d | Exports: %d | Furnaces: %d",
-        recipeCount, targets.count(), exportConfig.count(), furnaceConfig.count()))
+    print(string.format("Recipes: %d | Targets: %d | Exports: %d | Furnaces: %d | Workers: %d",
+        recipeCount, targets.count(), exportConfig.count(), furnaceConfig.count(), workerConfig.countWorkers()))
     
     -- Initialize chatbox for in-game commands
     if config.chatboxEnabled and chatbox then
@@ -226,6 +229,7 @@ local function messageHandler()
     while running do
         local message = comms.receive(1)
         if message then
+            -- Handle crafter messages
             local result = crafterManager.handleMessage(message)
             
             if result then
@@ -246,7 +250,25 @@ local function messageHandler()
                 end
             end
             
-            -- Handle inventory requests from crafters
+            -- Handle worker messages
+            local workerResult = workerManager.handleMessage(message)
+            
+            if workerResult then
+                if workerResult.type == "work_complete" then
+                    logger.info(string.format("Worker %d completed task %s: produced %d",
+                        workerResult.workerId, workerResult.taskId or "?", workerResult.produced or 0))
+                    storageManager.invalidateCache()
+                elseif workerResult.type == "work_failed" then
+                    logger.warn(string.format("Worker %d failed task %s: %s",
+                        workerResult.workerId, workerResult.taskId or "?", workerResult.reason or "unknown"))
+                elseif workerResult.type == "worker_idle" then
+                    -- Worker just became idle, check if there's work to dispatch
+                    local stock = storageManager.getAllStock()
+                    workerManager.dispatchWork(stock)
+                end
+            end
+            
+            -- Handle inventory requests from crafters/workers
             local msgType = message.type
             local sender = message.sender
             local data = message.data or {}
@@ -370,6 +392,29 @@ local function crafterPingLoop()
     while running do
         crafterManager.pingAll()
         sleep(pingInterval)
+    end
+end
+
+--- Worker ping and dispatch loop
+local function workerProcessLoop()
+    local pingInterval = config.pingInterval or 30
+    local checkInterval = 5  -- Check for work every 5 seconds
+    local lastPing = 0
+    
+    while running do
+        local now = os.clock()
+        
+        -- Ping workers periodically
+        if now - lastPing >= pingInterval then
+            workerManager.pingAll()
+            lastPing = now
+        end
+        
+        -- Dispatch work to idle workers
+        local stock = storageManager.getAllStock()
+        workerManager.dispatchWork(stock)
+        
+        sleep(checkInterval)
     end
 end
 
@@ -1377,6 +1422,199 @@ local commands = {
                 p.print("[" .. crafter.status .. "]")
             end
             p.show()
+        end
+    },
+    
+    workers = {
+        description = "List and manage worker turtles",
+        category = "workers",
+        execute = function(args, ctx)
+            local subCmd = args[1]
+            
+            if subCmd == "tasks" then
+                -- List all worker tasks
+                local tasks = workerConfig.getAllTasks()
+                local taskCount = 0
+                for _ in pairs(tasks) do taskCount = taskCount + 1 end
+                
+                if taskCount == 0 then
+                    ctx.mess("No worker tasks configured")
+                    print("")
+                    ctx.mess("Use 'workers add <type> <item> [threshold] [target]' to add a task")
+                    return
+                end
+                
+                local stock = storageManager.getAllStock()
+                local p = ctx.pager("=== Worker Tasks (" .. taskCount .. ") ===")
+                
+                for id, task in pairs(tasks) do
+                    local currentStock = stock[task.item] or 0
+                    local statusColor = colors.lime
+                    local statusText = "OK"
+                    
+                    if currentStock < task.stockThreshold then
+                        statusColor = colors.orange
+                        statusText = "NEEDS WORK"
+                    end
+                    
+                    if not task.enabled then
+                        statusColor = colors.gray
+                        statusText = "DISABLED"
+                    end
+                    
+                    p.setTextColor(colors.white)
+                    p.write(id .. ": ")
+                    p.setTextColor(colors.lightGray)
+                    p.write(task.type .. " ")
+                    p.setTextColor(colors.cyan)
+                    p.write((task.item or "?"):gsub("minecraft:", "") .. " ")
+                    p.setTextColor(colors.lightGray)
+                    p.write(string.format("[%d/%d] ", currentStock, task.stockThreshold))
+                    p.setTextColor(statusColor)
+                    p.print(statusText)
+                end
+                p.show()
+                
+            elseif subCmd == "add" then
+                -- Add a new worker task
+                local taskType = args[2]
+                local item = args[3]
+                local threshold = tonumber(args[4])
+                local target = tonumber(args[5])
+                
+                if not taskType then
+                    ctx.err("Usage: workers add <type> <item> [threshold] [target]")
+                    print("")
+                    print("Task types:")
+                    for typeName, typeInfo in pairs(workerConfig.TASK_TYPES) do
+                        print("  " .. typeName .. " - " .. typeInfo.description)
+                    end
+                    return
+                end
+                
+                local typeInfo = workerConfig.TASK_TYPES[taskType]
+                if not typeInfo then
+                    ctx.err("Unknown task type: " .. taskType)
+                    return
+                end
+                
+                -- For cobblestone, item is preset
+                if taskType == "cobblestone" then
+                    item = "minecraft:cobblestone"
+                elseif not item then
+                    ctx.err("Item required for task type: " .. taskType)
+                    return
+                end
+                
+                if not item:find(":") then
+                    item = "minecraft:" .. item
+                end
+                
+                local taskId = taskType .. "_" .. os.epoch("utc")
+                local taskConfig = {
+                    item = item,
+                    stockThreshold = threshold or typeInfo.defaultThreshold,
+                    stockTarget = target or typeInfo.defaultTarget,
+                    config = {
+                        breakDirection = "front",
+                    },
+                }
+                
+                -- For concrete, set the input item
+                if taskType == "concrete" then
+                    taskConfig.config.inputItem = item:gsub("_concrete$", "_concrete_powder")
+                end
+                
+                if workerConfig.setTask(taskId, taskType, taskConfig) then
+                    ctx.succ(string.format("Added task %s: %s", taskId, item:gsub("minecraft:", "")))
+                else
+                    ctx.err("Failed to add task")
+                end
+                
+            elseif subCmd == "remove" then
+                local taskId = args[2]
+                if not taskId then
+                    ctx.err("Usage: workers remove <taskId>")
+                    return
+                end
+                
+                workerConfig.removeTask(taskId)
+                ctx.succ("Removed task: " .. taskId)
+                
+            elseif subCmd == "enable" or subCmd == "disable" then
+                local taskId = args[2]
+                if not taskId then
+                    ctx.err("Usage: workers " .. subCmd .. " <taskId>")
+                    return
+                end
+                
+                workerConfig.setTaskEnabled(taskId, subCmd == "enable")
+                ctx.succ((subCmd == "enable" and "Enabled" or "Disabled") .. " task: " .. taskId)
+                
+            else
+                -- Default: list workers
+                local allWorkers = workerManager.getWorkers()
+                
+                if #allWorkers == 0 then
+                    ctx.mess("No workers registered")
+                    print("")
+                    ctx.mess("Workers will auto-register when they connect.")
+                    ctx.mess("Use 'workers tasks' to view/manage worker tasks.")
+                    return
+                end
+                
+                local p = ctx.pager("=== Workers (" .. #allWorkers .. ") ===")
+                for _, worker in ipairs(allWorkers) do
+                    local statusColor = colors.red
+                    if worker.isOnline then
+                        if worker.status == "idle" then
+                            statusColor = colors.lime
+                        else
+                            statusColor = colors.orange
+                        end
+                    end
+                    
+                    p.setTextColor(colors.lightGray)
+                    p.write(string.format("#%d ", worker.id))
+                    p.setTextColor(colors.white)
+                    p.write(worker.label .. " ")
+                    p.setTextColor(statusColor)
+                    p.write("[" .. worker.status .. "]")
+                    
+                    if worker.taskId then
+                        p.setTextColor(colors.cyan)
+                        p.write(" (" .. worker.taskId .. ")")
+                    end
+                    p.print("")
+                end
+                p.print("")
+                p.setTextColor(colors.lightBlue)
+                p.print("Subcommands: tasks, add, remove, enable, disable")
+                p.show()
+            end
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"tasks", "add", "remove", "enable", "disable"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) == 1 then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 2 and args[1] == "add" then
+                local query = (args[2] or ""):lower()
+                local matches = {}
+                for typeName, _ in pairs(workerConfig.TASK_TYPES) do
+                    if typeName:find(query, 1, true) == 1 then
+                        table.insert(matches, typeName)
+                    end
+                end
+                return matches
+            end
+            return {}
         end
     },
     
@@ -3418,6 +3656,7 @@ local function main()
         storageScanLoop,
         craftTargetLoop,
         crafterPingLoop,
+        workerProcessLoop,
         serverAnnounceLoop,
         staleJobCleanupLoop,
         monitorRefreshLoop,

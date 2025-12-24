@@ -3,7 +3,8 @@
 ---
 --- Features: Color-coded console output (red for errors, yellow for warnings, blue for info),
 --- automatic daily log file creation and rotation, persistent log storage in log/ directory,
---- timestamped log entries, buffered writes for performance, and configurable log levels.
+--- timestamped log entries, buffered writes for performance, configurable log levels,
+--- and automatic cleanup of old log files when disk space is low.
 ---
 ---@usage
 ---local log = require("log")
@@ -16,10 +17,10 @@
 ---log.setLevel("debug")  -- Show all messages including debug
 ---log.setLevel("warn")   -- Show only warnings and errors
 ---
----@version 1.4.1
+---@version 1.5.0
 -- @module log
 
-local VERSION = "1.4.1"
+local VERSION = "1.5.0"
 
 local module = {}
 
@@ -49,6 +50,12 @@ local maxBufferSize = 10  -- Flush after this many entries
 local lastFlush = os.clock()
 local flushInterval = 5   -- Flush at least every 5 seconds
 
+-- Disk space management
+local minFreeSpace = 10000  -- Minimum free bytes before cleanup (10KB)
+local lastDiskCheck = 0
+local diskCheckInterval = 60  -- Check disk space every 60 seconds
+local maxLogAgeDays = 30  -- Delete logs older than 30 days
+
 ---Generate a file-safe date string for log filenames
 ---@return string # Date string in YYYY/MM/DD format
 local function fileDate()
@@ -73,9 +80,140 @@ local function getLogPath()
     return path
 end
 
+---Get all log files recursively from a directory
+---@param dir string The directory to scan
+---@param files? table The accumulator table for files (optional)
+---@return table files Array of {path, size} tables
+local function getLogFiles(dir, files)
+    files = files or {}
+    
+    if not fs.exists(dir) or not fs.isDir(dir) then
+        return files
+    end
+    
+    for _, name in ipairs(fs.list(dir)) do
+        local path = dir .. "/" .. name
+        if fs.isDir(path) then
+            getLogFiles(path, files)
+        elseif name:match("%.txt$") then
+            local size = fs.getSize(path)
+            table.insert(files, {path = path, size = size})
+        end
+    end
+    
+    return files
+end
+
+---Parse date from log file path (log/YYYY/MM/DD.txt)
+---@param path string The log file path
+---@return number|nil timestamp Unix timestamp or nil if can't parse
+local function getLogFileDate(path)
+    local year, month, day = path:match("log/(%d%d%d%d)/(%d%d)/(%d%d)%.txt$")
+    if year and month and day then
+        -- Create approximate timestamp (days since epoch for comparison)
+        return tonumber(year) * 10000 + tonumber(month) * 100 + tonumber(day)
+    end
+    return nil
+end
+
+---Get current date as comparable number (YYYYMMDD)
+---@return number date Current date as number
+local function getCurrentDateNumber()
+    local year, month, day = os.date("%Y"), os.date("%m"), os.date("%d")
+    return tonumber(year) * 10000 + tonumber(month) * 100 + tonumber(day)
+end
+
+---Check if disk space is low and clean up old logs if needed
+---@return boolean cleaned Whether any cleanup was performed
+local function checkAndCleanupDiskSpace()
+    local now = os.clock()
+    
+    -- Don't check too frequently
+    if now - lastDiskCheck < diskCheckInterval then
+        return false
+    end
+    lastDiskCheck = now
+    
+    -- Get free space
+    local freeSpace = fs.getFreeSpace("/")
+    
+    -- If we have enough space, no cleanup needed
+    if freeSpace > minFreeSpace then
+        return false
+    end
+    
+    -- Get all log files
+    local logFiles = getLogFiles("log")
+    
+    if #logFiles == 0 then
+        return false
+    end
+    
+    -- Sort by date (oldest first)
+    table.sort(logFiles, function(a, b)
+        local dateA = getLogFileDate(a.path) or 0
+        local dateB = getLogFileDate(b.path) or 0
+        return dateA < dateB
+    end)
+    
+    local currentDate = getCurrentDateNumber()
+    local cleaned = false
+    
+    -- Delete old logs until we have enough space
+    for _, file in ipairs(logFiles) do
+        local fileDate = getLogFileDate(file.path)
+        
+        -- Don't delete today's log
+        if fileDate and fileDate < currentDate then
+            -- Calculate approximate age in days
+            local ageDays = (currentDate - fileDate)
+            -- This is a rough calculation - exact would need proper date math
+            -- For YYYYMMDD format, this gives a reasonable approximation
+            if currentDate % 100 < fileDate % 100 then
+                -- Month wrap
+                ageDays = ageDays - 70  -- Adjust for month encoding
+            end
+            
+            -- Delete if old or if we really need space
+            if ageDays > maxLogAgeDays or freeSpace < minFreeSpace / 2 then
+                fs.delete(file.path)
+                cleaned = true
+                
+                -- Check if parent directories are now empty and remove them
+                local parentDir = file.path:match("(.+)/[^/]+$")
+                if parentDir and fs.exists(parentDir) and fs.isDir(parentDir) then
+                    local contents = fs.list(parentDir)
+                    if #contents == 0 then
+                        fs.delete(parentDir)
+                        -- Check grandparent too
+                        local grandParent = parentDir:match("(.+)/[^/]+$")
+                        if grandParent and fs.exists(grandParent) and fs.isDir(grandParent) then
+                            contents = fs.list(grandParent)
+                            if #contents == 0 then
+                                fs.delete(grandParent)
+                            end
+                        end
+                    end
+                end
+                
+                -- Recheck free space
+                freeSpace = fs.getFreeSpace("/")
+                if freeSpace > minFreeSpace then
+                    break
+                end
+            end
+        end
+    end
+    
+    return cleaned
+end
+
 ---Flush the log buffer to disk
 local function flushBuffer()
     if logBufferSize == 0 then return end
+    
+    -- Check disk space before writing and clean up if needed
+    checkAndCleanupDiskSpace()
     
     local path = getLogPath()
     local f = fs.open(path, "a")
@@ -305,6 +443,99 @@ function module.registerCommands(commands)
     commands["loglevel"] = logLevelCommand
     
     return commands
+end
+
+---Configure disk space management settings
+---@param settings table Configuration table with optional fields:
+---  - minFreeSpace: Minimum free bytes before cleanup (default: 10000)
+---  - maxLogAgeDays: Delete logs older than this (default: 30)
+---  - checkInterval: Seconds between disk space checks (default: 60)
+function module.configureDiskManagement(settings)
+    if settings.minFreeSpace then
+        minFreeSpace = settings.minFreeSpace
+    end
+    if settings.maxLogAgeDays then
+        maxLogAgeDays = settings.maxLogAgeDays
+    end
+    if settings.checkInterval then
+        diskCheckInterval = settings.checkInterval
+    end
+end
+
+---Get disk space statistics for the log directory
+---@return table stats Statistics about log storage
+function module.getDiskStats()
+    local logFiles = getLogFiles("log")
+    local totalSize = 0
+    local fileCount = 0
+    
+    for _, file in ipairs(logFiles) do
+        totalSize = totalSize + file.size
+        fileCount = fileCount + 1
+    end
+    
+    local freeSpace = fs.getFreeSpace("/")
+    
+    return {
+        logFileCount = fileCount,
+        totalLogSize = totalSize,
+        freeSpace = freeSpace,
+        minFreeSpace = minFreeSpace,
+        maxLogAgeDays = maxLogAgeDays,
+        isLowSpace = freeSpace < minFreeSpace,
+    }
+end
+
+---Manually trigger cleanup of old log files
+---@param maxAgeDays? number Optional max age in days (default: use configured value)
+---@return number deleted Number of files deleted
+function module.cleanupOldLogs(maxAgeDays)
+    maxAgeDays = maxAgeDays or maxLogAgeDays
+    
+    local logFiles = getLogFiles("log")
+    local currentDate = getCurrentDateNumber()
+    local deleted = 0
+    
+    -- Sort by date (oldest first)
+    table.sort(logFiles, function(a, b)
+        local dateA = getLogFileDate(a.path) or 0
+        local dateB = getLogFileDate(b.path) or 0
+        return dateA < dateB
+    end)
+    
+    for _, file in ipairs(logFiles) do
+        local fileDate = getLogFileDate(file.path)
+        
+        if fileDate and fileDate < currentDate then
+            local ageDays = currentDate - fileDate
+            if currentDate % 100 < fileDate % 100 then
+                ageDays = ageDays - 70
+            end
+            
+            if ageDays > maxAgeDays then
+                fs.delete(file.path)
+                deleted = deleted + 1
+                
+                -- Clean up empty parent directories
+                local parentDir = file.path:match("(.+)/[^/]+$")
+                if parentDir and fs.exists(parentDir) and fs.isDir(parentDir) then
+                    local contents = fs.list(parentDir)
+                    if #contents == 0 then
+                        fs.delete(parentDir)
+                        local grandParent = parentDir:match("(.+)/[^/]+$")
+                        if grandParent and fs.exists(grandParent) and fs.isDir(grandParent) then
+                            contents = fs.list(grandParent)
+                            if #contents == 0 then
+                                fs.delete(grandParent)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    
+    return deleted
 end
 
 module.VERSION = VERSION

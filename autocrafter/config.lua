@@ -215,6 +215,14 @@ config.messageTypes = {
     CRAFT_COMPLETE = "craft_complete",
     CRAFT_FAILED = "craft_failed",
     
+    -- Worker messages
+    WORKER_PING = "worker_ping",
+    WORKER_PONG = "worker_pong",
+    WORKER_STATUS = "worker_status",
+    WORK_REQUEST = "work_request",
+    WORK_COMPLETE = "work_complete",
+    WORK_FAILED = "work_failed",
+    
     -- Inventory messages (server -> crafter responses)
     INVENTORY_UPDATE = "inventory_update",
     
@@ -248,6 +256,7 @@ config.messageTypes = {
 config.roles = {
     SERVER = "server",
     CRAFTER = "crafter",
+    WORKER = "worker",
     UNKNOWN = "unknown",
 }
 

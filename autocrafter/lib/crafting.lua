@@ -1,9 +1,9 @@
 --- AutoCrafter Crafting Library
 --- Handles crafting logic and job preparation.
 ---
----@version 1.1.0
+---@version 1.2.0
 
-local VERSION = "1.1.0"
+local VERSION = "1.2.0"
 
 local crafting = {}
 
@@ -78,6 +78,43 @@ function crafting.hasMaterials(recipe, stockLevels, quantity)
     return hasAll, missing
 end
 
+---Calculate the maximum items of any single ingredient per grid slot for a recipe
+---For shapeless recipes, each ingredient is spread across separate slots (1 per slot per craft)
+---For shaped recipes, we need to check the pattern for max items per slot
+---@param recipe table The recipe to analyze
+---@return table slotMaxCounts Map of item -> max count per slot per craft
+local function getMaxItemsPerSlot(recipe)
+    local slotMaxCounts = {}
+    
+    if recipe.type == "shaped" then
+        -- For shaped recipes, check pattern to find max items of same type in any slot
+        -- Usually 1, but count occurrences per slot position
+        local slotItems = {}
+        for row = 1, #recipe.pattern do
+            local line = recipe.pattern[row]
+            for col = 1, #line do
+                local char = line:sub(col, col)
+                local slot = (row - 1) * 3 + col
+                if char ~= " " and recipe.key[char] then
+                    slotItems[slot] = recipe.key[char]
+                end
+            end
+        end
+        -- Each slot can only have 1 item per craft in shaped recipes
+        for _, item in pairs(slotItems) do
+            slotMaxCounts[item] = 1
+        end
+    else
+        -- For shapeless recipes, items are spread across slots
+        -- Each slot gets 1 item per craft (spread evenly)
+        for _, ingredient in ipairs(recipe.ingredients) do
+            slotMaxCounts[ingredient.item] = 1
+        end
+    end
+    
+    return slotMaxCounts
+end
+
 ---Calculate maximum crafts possible based on material availability and stack limits
 ---@param recipe table The recipe to craft
 ---@param stockLevels table Current stock levels
@@ -85,14 +122,19 @@ end
 function crafting.calculateMaxCrafts(recipe, stockLevels)
     local maxCrafts = math.huge
     
+    -- Get the actual per-slot counts for stack limit calculation
+    local slotMaxCounts = getMaxItemsPerSlot(recipe)
+    
     for _, ingredient in ipairs(recipe.ingredients) do
         local available = stockLevels[ingredient.item] or 0
         local possible = math.floor(available / ingredient.count)
         maxCrafts = math.min(maxCrafts, possible)
         
-        -- Also limit by stack size per slot (each slot can hold max 64 typically)
+        -- Limit by stack size per slot based on actual items per slot
+        -- Each slot can hold max 64 items (or less for certain items)
         local stackLimit = crafting.getMaxStackSize(ingredient.item)
-        local maxPerSlot = math.floor(stackLimit / ingredient.count)
+        local itemsPerSlot = slotMaxCounts[ingredient.item] or 1
+        local maxPerSlot = math.floor(stackLimit / itemsPerSlot)
         maxCrafts = math.min(maxCrafts, maxPerSlot)
     end
     

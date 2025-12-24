@@ -150,16 +150,19 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/managers/monitor.lua", path = diskPrefix .. "managers/monitor.lua"},
     {url = BASE_URL .. "/autocrafter/managers/export.lua", path = diskPrefix .. "managers/export.lua"},
     {url = BASE_URL .. "/autocrafter/managers/furnace.lua", path = diskPrefix .. "managers/furnace.lua"},
+    {url = BASE_URL .. "/autocrafter/managers/worker.lua", path = diskPrefix .. "managers/worker.lua"},
     {url = BASE_URL .. "/autocrafter/config/settings.lua", path = diskPrefix .. "config/settings.lua"},
     {url = BASE_URL .. "/autocrafter/config/targets.lua", path = diskPrefix .. "config/targets.lua"},
     {url = BASE_URL .. "/autocrafter/config/exports.lua", path = diskPrefix .. "config/exports.lua"},
     {url = BASE_URL .. "/autocrafter/config/recipes.lua", path = diskPrefix .. "config/recipes.lua"},
     {url = BASE_URL .. "/autocrafter/config/recipeprefs.lua", path = diskPrefix .. "config/recipeprefs.lua"},
     {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = diskPrefix .. "config/furnaces.lua"},
+    {url = BASE_URL .. "/autocrafter/config/workers.lua", path = diskPrefix .. "config/workers.lua"},
 }
 
 local crafterFiles = {
     {url = BASE_URL .. "/autocrafter/crafter.lua", path = diskPrefix .. "crafter.lua"},
+    {url = BASE_URL .. "/autocrafter/worker.lua", path = diskPrefix .. "worker.lua"},
 }
 
 -- Collect files to download

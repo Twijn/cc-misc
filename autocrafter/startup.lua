@@ -129,8 +129,9 @@ local function showSetupMenu()
     
     if isTurtle then
         print("[1] Set up as Crafter Turtle")
-        print("[2] Exit")
-        print("[3] Exit and don't show again")
+        print("[2] Set up as Worker Turtle")
+        print("[3] Exit")
+        print("[4] Exit and don't show again")
     else
         print("[1] Set up as Server")
         print("[2] Set up as Crafter (computer-based)")
@@ -148,8 +149,10 @@ local function showSetupMenu()
         if choice == 1 then
             return "crafter"
         elseif choice == 2 then
-            return "exit"
+            return "worker"
         elseif choice == 3 then
+            return "exit"
+        elseif choice == 4 then
             return "exit_hide"
         end
     else
@@ -183,6 +186,8 @@ local function main()
         role = nil
     elseif role == "crafter" and not fs.exists(diskPrefix .. "crafter.lua") then
         role = nil
+    elseif role == "worker" and not fs.exists(diskPrefix .. "worker.lua") then
+        role = nil
     end
     
     -- Execute based on role
@@ -209,6 +214,11 @@ local function main()
         -- Crafter: run crafter program (no local startup.lua)
         print("Starting AutoCrafter Crafter...")
         shell.run(diskPrefix .. "crafter")
+        
+    elseif role == "worker" then
+        -- Worker: run worker program (no local startup.lua)
+        print("Starting AutoCrafter Worker...")
+        shell.run(diskPrefix .. "worker")
         
     else
         -- Unknown role - need to configure
@@ -238,6 +248,14 @@ local function main()
             saveConfig(clientConfig)
             print("")
             print("Configured as crafter. Rebooting...")
+            sleep(1)
+            os.reboot()
+            
+        elseif choice == "worker" then
+            clientConfig.role = "worker"
+            saveConfig(clientConfig)
+            print("")
+            print("Configured as worker. Rebooting...")
             sleep(1)
             os.reboot()
             
