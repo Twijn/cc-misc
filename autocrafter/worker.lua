@@ -20,7 +20,7 @@ local running = true
 local currentTask = nil
 local status = "idle"
 local lastStatusUpdate = 0
-local STATUS_UPDATE_INTERVAL = 30
+local STATUS_UPDATE_INTERVAL = 10  -- Reduced from 30 for better monitoring
 
 -- Statistics
 local stats = {
@@ -280,6 +280,11 @@ local function executeCobblestoneTask(task, quantity)
             produced = produced + 1
             progress.current = produced
             
+            -- Update stats incrementally so monitoring shows real-time progress
+            stats.lastProduced = produced
+            stats.sessionProduced = stats.sessionProduced + 1
+            stats.totalProduced = stats.totalProduced + 1
+            
             -- Send progress update periodically
             if produced - lastProgressUpdate >= PROGRESS_UPDATE_INTERVAL then
                 sendStatus()
@@ -375,6 +380,12 @@ local function executeConcreteTask(task, quantity)
             local ok = dirOps.dig()
             if ok then
                 produced = produced + 1
+                progress.current = produced
+                
+                -- Update stats incrementally so monitoring shows real-time progress
+                stats.lastProduced = produced
+                stats.sessionProduced = stats.sessionProduced + 1
+                stats.totalProduced = stats.totalProduced + 1
             end
         else
             -- Might already have a block there, try to dig it
@@ -382,6 +393,12 @@ local function executeConcreteTask(task, quantity)
             if ok and data.name == outputItem then
                 dirOps.dig()
                 produced = produced + 1
+                progress.current = produced
+                
+                -- Update stats incrementally
+                stats.lastProduced = produced
+                stats.sessionProduced = stats.sessionProduced + 1
+                stats.totalProduced = stats.totalProduced + 1
             else
                 sleep(0.2)
             end
@@ -433,9 +450,9 @@ local function executeTask(task, quantity)
         return false, 0
     end
     
+    -- Stats are now updated incrementally during task execution
+    -- Just ensure lastProduced reflects the final batch count
     stats.lastProduced = produced
-    stats.sessionProduced = stats.sessionProduced + produced
-    stats.totalProduced = stats.totalProduced + produced
     
     -- Clear progress tracking
     progress.current = 0

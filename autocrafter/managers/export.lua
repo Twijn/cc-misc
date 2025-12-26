@@ -42,6 +42,9 @@ local function getExportPeripheral(name)
     local p = peripheral.wrap(name)
     if p then
         exportPeripherals[name] = p
+        logger.debug(string.format("Wrapped export peripheral: %s", name))
+    else
+        logger.debug(string.format("Failed to wrap export peripheral: %s (not found)", name))
     end
     
     return p
@@ -136,7 +139,12 @@ local function pushToExport(item, count, destInv, destSlot)
     
     -- Find item in storage only (not in other export inventories)
     local locations = inventory.findItem(item, true)
-    if #locations == 0 then return 0, {} end
+    if #locations == 0 then 
+        logger.debug(string.format("pushToExport: No %s found in storage for export to %s", item, destInv))
+        return 0, {} 
+    end
+    
+    logger.debug(string.format("pushToExport: Found %d location(s) for %s, need %d", #locations, item, count))
     
     -- Sort by count (largest first) for efficiency
     table.sort(locations, function(a, b) return a.count > b.count end)
@@ -179,7 +187,10 @@ local function pushToExport(item, count, destInv, destSlot)
     for _, loc in ipairs(locations) do
         if remaining <= 0 then break end
         if loc.inv == destInv then goto continue end
-        if not inventory.isStorageInventory(loc.inv) then goto continue end
+        if not inventory.isStorageInventory(loc.inv) then 
+            logger.debug(string.format("pushToExport: Skipping non-storage inventory %s", loc.inv))
+            goto continue 
+        end
         
         local source = inventory.getPeripheral(loc.inv)
         if source then
@@ -189,16 +200,30 @@ local function pushToExport(item, count, destInv, destSlot)
             local capturedInv = loc.inv
             local capturedSlot = loc.slot
             local capturedAmount = toPush
+            local capturedDestInv = destInv  -- Capture destInv in closure
             
             meta[#meta + 1] = {inv = capturedInv}
             tasks[#tasks + 1] = function()
-                return source.pushItems(destInv, capturedSlot, capturedAmount) or 0
+                local ok, transferred = pcall(source.pushItems, capturedDestInv, capturedSlot, capturedAmount)
+                if not ok then
+                    logger.debug(string.format("pushToExport: pushItems failed from %s slot %d to %s: %s", 
+                        capturedInv, capturedSlot, capturedDestInv, tostring(transferred)))
+                    return 0
+                end
+                return transferred or 0
             end
+        else
+            logger.debug(string.format("pushToExport: Failed to get peripheral for %s", loc.inv))
         end
         ::continue::
     end
     
-    if #tasks == 0 then return 0, {} end
+    if #tasks == 0 then 
+        logger.debug(string.format("pushToExport: No valid tasks created for %s -> %s", item, destInv))
+        return 0, {} 
+    end
+    
+    logger.debug(string.format("pushToExport: Executing %d parallel tasks for %s -> %s", #tasks, item, destInv))
     
     -- Execute in parallel batches
     local results = {}
@@ -231,6 +256,9 @@ local function pushToExport(item, count, destInv, destSlot)
         end
     end
     
+    logger.debug(string.format("pushToExport: Completed - pushed %d of %d requested for %s -> %s", 
+        pushed, count, item, destInv))
+    
     -- Convert sources to array format for return
     local sourceList = {}
     for inv, cnt in pairs(sources) do
@@ -249,10 +277,16 @@ end
 ---@return number pulled Amount actually pulled
 local function pullFromExport(item, count, sourceInv, sourceSlot)
     local source = getExportPeripheral(sourceInv)
-    if not source then return 0 end
+    if not source then 
+        logger.debug(string.format("pullFromExport: Source %s not available", sourceInv))
+        return 0 
+    end
     
     local storageInvs = inventory.getStorageInventories()
-    if #storageInvs == 0 then return 0 end
+    if #storageInvs == 0 then 
+        logger.debug("pullFromExport: No storage inventories available")
+        return 0 
+    end
     
     -- If specific slot, just pull from that
     if sourceSlot then
@@ -611,8 +645,12 @@ local function processExportInventory(name, config)
                 currentCount = getInventoryItemCount(inv, item)
             end
             
+            logger.debug(string.format("Stock check for %s in %s: current=%d, target=%d", 
+                item, name, currentCount, targetQty))
+            
             if currentCount < targetQty then
                 local needed = targetQty - currentCount
+                logger.debug(string.format("Need to push %d %s to %s", needed, item, name))
                 local pushed, sources = pushToExport(item, needed, name, specificSlot)
                 result.pushed = result.pushed + pushed
                 
@@ -624,6 +662,8 @@ local function processExportInventory(name, config)
                     end
                     local sourceDesc = #sourceStrs > 0 and table.concat(sourceStrs, ", ") or "unknown"
                     logger.debug(string.format("Stocked %d %s to %s from %s", pushed, item, name, sourceDesc))
+                elseif needed > 0 then
+                    logger.debug(string.format("Failed to stock %s to %s: 0 pushed of %d needed", item, name, needed))
                 end
             end
             
@@ -673,17 +713,39 @@ function manager.processExports()
         errors = 0,
     }
     
+    local invCount = 0
+    for _ in pairs(inventories) do invCount = invCount + 1 end
+    
+    if invCount == 0 then
+        return stats
+    end
+    
+    logger.debug(string.format("processExports: Processing %d export inventories", invCount))
+    
     for name, config in pairs(inventories) do
+        logger.debug(string.format("processExports: Processing %s (mode=%s, slots=%d)", 
+            name, config.mode or "?", #(config.slots or {})))
+        
         local ok, result = pcall(processExportInventory, name, config)
         
         if ok then
             stats.inventoriesProcessed = stats.inventoriesProcessed + 1
             stats.totalPushed = stats.totalPushed + result.pushed
             stats.totalPulled = stats.totalPulled + result.pulled
+            
+            if result.pushed > 0 or result.pulled > 0 then
+                logger.debug(string.format("processExports: %s - pushed=%d, pulled=%d", 
+                    name, result.pushed, result.pulled))
+            end
         else
             stats.errors = stats.errors + 1
             logger.warn(string.format("Error processing export %s: %s", name, tostring(result)))
         end
+    end
+    
+    if stats.totalPushed > 0 or stats.totalPulled > 0 then
+        logger.debug(string.format("processExports: Total pushed=%d, pulled=%d", 
+            stats.totalPushed, stats.totalPulled))
     end
     
     return stats
