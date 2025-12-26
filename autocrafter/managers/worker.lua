@@ -182,7 +182,6 @@ function manager.handleMessage(message)
         if newStatus == "idle" and not wasIdle then
             return { type = "worker_idle", workerId = workerId }
         end
-        end
         
     elseif message.type == config.messageTypes.WORK_COMPLETE then
         -- Work completed
