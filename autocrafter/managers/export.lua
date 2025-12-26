@@ -118,6 +118,7 @@ end
 
 ---Push items to an export inventory (only for explicitly configured exports)
 ---Items are ONLY taken from storage inventories, never from other exports or random chests.
+---Uses parallel transfers for speed
 ---@param item string The item ID - must be explicitly configured for this export
 ---@param count number Amount to push
 ---@param destInv string Destination inventory name - must be a configured export
@@ -140,47 +141,94 @@ local function pushToExport(item, count, destInv, destSlot)
     -- Sort by count (largest first) for efficiency
     table.sort(locations, function(a, b) return a.count > b.count end)
     
-    local pushed = 0
-    local sources = {}  -- Track which inventories we pulled from
+    -- If specific slot, must do sequential
+    if destSlot then
+        local pushed = 0
+        local sources = {}
+        
+        for _, loc in ipairs(locations) do
+            if pushed >= count then break end
+            if loc.inv == destInv then goto continue end
+            if not inventory.isStorageInventory(loc.inv) then goto continue end
+            
+            local source = inventory.getPeripheral(loc.inv)
+            if source then
+                local toPush = math.min(count - pushed, loc.count)
+                local transferred = source.pushItems(destInv, loc.slot, toPush, destSlot) or 0
+                pushed = pushed + transferred
+                
+                if transferred > 0 then
+                    sources[loc.inv] = (sources[loc.inv] or 0) + transferred
+                end
+            end
+            ::continue::
+        end
+        
+        local sourceList = {}
+        for inv, cnt in pairs(sources) do
+            table.insert(sourceList, {inventory = inv, count = cnt})
+        end
+        return pushed, sourceList
+    end
+    
+    -- Build parallel tasks for each source location
+    local tasks = {}
+    local meta = {}
+    local remaining = count
     
     for _, loc in ipairs(locations) do
-        if pushed >= count then break end
-        
-        -- Skip if the source is the same as the destination
-        if loc.inv == destInv then
-            goto continue
-        end
-        
-        -- Verify the source is a storage inventory (not an export)
-        if not inventory.isStorageInventory(loc.inv) then
-            logger.warn(string.format("pushToExport: Skipping non-storage source: %s", loc.inv))
-            goto continue
-        end
+        if remaining <= 0 then break end
+        if loc.inv == destInv then goto continue end
+        if not inventory.isStorageInventory(loc.inv) then goto continue end
         
         local source = inventory.getPeripheral(loc.inv)
         if source then
-            local toPush = math.min(count - pushed, loc.count)
-            local transferred = source.pushItems(destInv, loc.slot, toPush, destSlot) or 0
-            pushed = pushed + transferred
+            local toPush = math.min(remaining, loc.count)
+            remaining = remaining - toPush
             
-            if transferred > 0 then
-                -- Track this source
-                if sources[loc.inv] then
-                    sources[loc.inv] = sources[loc.inv] + transferred
-                else
-                    sources[loc.inv] = transferred
-                end
-                -- Update cache for source inventory
-                inventory.scanSingle(loc.inv, true)
+            local capturedInv = loc.inv
+            local capturedSlot = loc.slot
+            local capturedAmount = toPush
+            
+            meta[#meta + 1] = {inv = capturedInv}
+            tasks[#tasks + 1] = function()
+                return source.pushItems(destInv, capturedSlot, capturedAmount) or 0
             end
         end
-        
         ::continue::
     end
     
-    -- Rebuild cache if we pushed anything
-    if pushed > 0 then
-        inventory.rebuildFromCache()
+    if #tasks == 0 then return 0, {} end
+    
+    -- Execute in parallel batches
+    local results = {}
+    local taskFns = {}
+    for i, task in ipairs(tasks) do
+        local idx = i
+        taskFns[#taskFns + 1] = function()
+            results[idx] = task()
+        end
+    end
+    
+    local batchSize = 8
+    for batch = 1, #taskFns, batchSize do
+        local batchEnd = math.min(batch + batchSize - 1, #taskFns)
+        local batchFns = {}
+        for i = batch, batchEnd do
+            batchFns[#batchFns + 1] = taskFns[i]
+        end
+        parallel.waitForAll(table.unpack(batchFns))
+    end
+    
+    -- Sum results and build sources
+    local pushed = 0
+    local sources = {}
+    for i, result in ipairs(results) do
+        local transferred = result or 0
+        if transferred > 0 then
+            pushed = pushed + transferred
+            sources[meta[i].inv] = (sources[meta[i].inv] or 0) + transferred
+        end
     end
     
     -- Convert sources to array format for return
@@ -193,6 +241,7 @@ local function pushToExport(item, count, destInv, destSlot)
 end
 
 ---Pull items from an export inventory back to storage
+---Uses parallel transfers for speed
 ---@param item string The item ID
 ---@param count number Amount to pull
 ---@param sourceInv string Source export inventory name
@@ -202,99 +251,190 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
     local source = getExportPeripheral(sourceInv)
     if not source then return 0 end
     
-    local pulled = 0
     local storageInvs = inventory.getStorageInventories()
-    
     if #storageInvs == 0 then return 0 end
     
     -- If specific slot, just pull from that
     if sourceSlot then
-        for _, destName in ipairs(storageInvs) do
+        -- Try parallel pulls to multiple storage inventories
+        local tasks = {}
+        for i, destName in ipairs(storageInvs) do
             local dest = inventory.getPeripheral(destName)
             if dest and dest.pullItems then
-                local transferred = dest.pullItems(sourceInv, sourceSlot, count) or 0
-                if transferred > 0 then
-                    pulled = pulled + transferred
-                    inventory.scanSingle(destName, true)
-                    break
+                tasks[#tasks + 1] = function()
+                    local ok, transferred = pcall(dest.pullItems, sourceInv, sourceSlot, count)
+                    return ok and transferred or 0
                 end
             end
         end
-    else
-        -- Pull from any slot containing the item
-        local _, slots = getInventoryItemCount(source, item)
-        for _, slotInfo in ipairs(slots) do
-            if pulled >= count then break end
-            
-            for _, destName in ipairs(storageInvs) do
-                local dest = inventory.getPeripheral(destName)
-                if dest and dest.pullItems then
-                    local toPull = math.min(count - pulled, slotInfo.count)
-                    local transferred = dest.pullItems(sourceInv, slotInfo.slot, toPull) or 0
-                    if transferred > 0 then
-                        pulled = pulled + transferred
-                        inventory.scanSingle(destName, true)
-                        break
+        
+        -- Run first batch - usually first one succeeds
+        if #tasks > 0 then
+            local result = tasks[1]()
+            if result > 0 then
+                return result
+            end
+            -- If first failed, try rest in parallel
+            local pulled = 0
+            for i = 2, #tasks do
+                local result = tasks[i]()
+                if result > 0 then
+                    pulled = pulled + result
+                    break
+                end
+            end
+            return pulled
+        end
+        return 0
+    end
+    
+    -- Pull from any slot containing the item
+    local _, slots = getInventoryItemCount(source, item)
+    if #slots == 0 then return 0 end
+    
+    local pulled = 0
+    
+    -- Build parallel tasks for each slot
+    local tasks = {}
+    local meta = {}
+    
+    for _, slotInfo in ipairs(slots) do
+        if pulled >= count then break end
+        local capturedSlot = slotInfo.slot
+        local capturedCount = math.min(count - pulled, slotInfo.count)
+        pulled = pulled + capturedCount  -- Optimistic accounting
+        
+        -- Distribute across storage inventories
+        local storageIdx = (#tasks % #storageInvs) + 1
+        local destName = storageInvs[storageIdx]
+        local dest = inventory.getPeripheral(destName)
+        
+        if dest and dest.pullItems then
+            meta[#meta + 1] = {slot = capturedSlot, expected = capturedCount, destName = destName}
+            tasks[#tasks + 1] = function()
+                -- Try multiple storage inventories if first fails
+                for attempt = 0, math.min(#storageInvs - 1, 3) do
+                    local tryIdx = ((storageIdx - 1 + attempt) % #storageInvs) + 1
+                    local tryDest = inventory.getPeripheral(storageInvs[tryIdx])
+                    if tryDest and tryDest.pullItems then
+                        local ok, transferred = pcall(tryDest.pullItems, sourceInv, capturedSlot, capturedCount)
+                        if ok and transferred and transferred > 0 then
+                            return transferred
+                        end
                     end
                 end
+                return 0
             end
         end
     end
     
-    -- Rebuild cache if we pulled anything
-    if pulled > 0 then
-        inventory.rebuildFromCache()
+    -- Execute in parallel
+    if #tasks > 0 then
+        local results = {}
+        local taskFns = {}
+        for i, task in ipairs(tasks) do
+            local idx = i
+            taskFns[#taskFns + 1] = function()
+                results[idx] = task()
+            end
+        end
+        parallel.waitForAll(table.unpack(taskFns))
+        
+        -- Sum actual results
+        pulled = 0
+        for _, result in ipairs(results) do
+            pulled = pulled + (result or 0)
+        end
     end
     
     return pulled
 end
 
 ---Pull all items from an export inventory back to storage
+---Uses parallel transfers for speed
 ---@param sourceInv string Source export inventory name
 ---@return number pulled Total amount of items pulled
 local function pullAllFromExport(sourceInv)
     local source = getExportPeripheral(sourceInv)
     if not source then return 0 end
     
-    local pulled = 0
     local storageInvs = inventory.getStorageInventories()
-    
     if #storageInvs == 0 then return 0 end
     
     -- Get all items in the export inventory
     local list = source.list()
     if not list then return 0 end
     
-    -- Pull each slot
+    -- Build list of slots to pull
+    local slotList = {}
     for slot, slotItem in pairs(list) do
-        for _, destName in ipairs(storageInvs) do
-            local dest = inventory.getPeripheral(destName)
-            if dest and dest.pullItems then
-                local transferred = dest.pullItems(sourceInv, slot) or 0
-                if transferred > 0 then
-                    pulled = pulled + transferred
-                    inventory.scanSingle(destName, true)
-                    break
+        slotList[#slotList + 1] = {slot = slot, count = slotItem.count}
+    end
+    
+    if #slotList == 0 then return 0 end
+    
+    -- Build parallel tasks
+    local tasks = {}
+    local results = {}
+    
+    for i, slotInfo in ipairs(slotList) do
+        local capturedSlot = slotInfo.slot
+        local capturedCount = slotInfo.count
+        -- Distribute across storage inventories
+        local storageIdx = ((i - 1) % #storageInvs) + 1
+        
+        tasks[#tasks + 1] = function()
+            -- Try multiple storage inventories if first fails
+            for attempt = 0, math.min(#storageInvs - 1, 5) do
+                local tryIdx = ((storageIdx - 1 + attempt) % #storageInvs) + 1
+                local tryDest = inventory.getPeripheral(storageInvs[tryIdx])
+                if tryDest and tryDest.pullItems then
+                    local ok, transferred = pcall(tryDest.pullItems, sourceInv, capturedSlot, capturedCount)
+                    if ok and transferred and transferred > 0 then
+                        return transferred
+                    end
                 end
             end
+            return 0
         end
     end
     
-    -- Rebuild cache if we pulled anything
-    if pulled > 0 then
-        inventory.rebuildFromCache()
+    -- Execute in parallel batches
+    local taskFns = {}
+    for i, task in ipairs(tasks) do
+        local idx = i
+        taskFns[#taskFns + 1] = function()
+            results[idx] = task()
+        end
+    end
+    
+    -- Run in batches of 8
+    local batchSize = 8
+    for batch = 1, #taskFns, batchSize do
+        local batchEnd = math.min(batch + batchSize - 1, #taskFns)
+        local batchFns = {}
+        for i = batch, batchEnd do
+            batchFns[#batchFns + 1] = taskFns[i]
+        end
+        parallel.waitForAll(table.unpack(batchFns))
+    end
+    
+    -- Sum results
+    local pulled = 0
+    for _, result in ipairs(results) do
+        pulled = pulled + (result or 0)
     end
     
     return pulled
 end
 
 ---Process vacuum slots (remove items that don't match expected item in slot range)
+---Uses parallel transfers for speed
 ---@param name string The peripheral name
 ---@param inv table The wrapped peripheral
 ---@param slotConfig table The slot configuration
 ---@return number pulled Amount of non-matching items pulled to storage
 local function processVacuumSlots(name, inv, slotConfig)
-    local pulled = 0
     local expectedItem = slotConfig.item
     local storageInvs = inventory.getStorageInventories()
     
@@ -316,6 +456,8 @@ local function processVacuumSlots(name, inv, slotConfig)
     local list = inv.list()
     if not list then return 0 end
     
+    -- Build list of slots that need vacuuming
+    local slotsToPull = {}
     for _, slot in ipairs(slotsToCheck) do
         local slotItem = list[slot]
         if slotItem then
@@ -330,24 +472,60 @@ local function processVacuumSlots(name, inv, slotConfig)
             end
             
             if shouldPull then
-                -- Pull to storage
-                for _, destName in ipairs(storageInvs) do
-                    local dest = inventory.getPeripheral(destName)
-                    if dest and dest.pullItems then
-                        local transferred = dest.pullItems(name, slot) or 0
-                        if transferred > 0 then
-                            pulled = pulled + transferred
-                            inventory.scanSingle(destName, true)
-                            break
-                        end
-                    end
-                end
+                slotsToPull[#slotsToPull + 1] = {slot = slot, count = slotItem.count}
             end
         end
     end
     
-    if pulled > 0 then
-        inventory.rebuildFromCache()
+    if #slotsToPull == 0 then return 0 end
+    
+    -- Build parallel tasks
+    local tasks = {}
+    local results = {}
+    
+    for i, slotInfo in ipairs(slotsToPull) do
+        local capturedSlot = slotInfo.slot
+        local capturedCount = slotInfo.count
+        local storageIdx = ((i - 1) % #storageInvs) + 1
+        
+        tasks[#tasks + 1] = function()
+            for attempt = 0, math.min(#storageInvs - 1, 5) do
+                local tryIdx = ((storageIdx - 1 + attempt) % #storageInvs) + 1
+                local tryDest = inventory.getPeripheral(storageInvs[tryIdx])
+                if tryDest and tryDest.pullItems then
+                    local ok, transferred = pcall(tryDest.pullItems, name, capturedSlot, capturedCount)
+                    if ok and transferred and transferred > 0 then
+                        return transferred
+                    end
+                end
+            end
+            return 0
+        end
+    end
+    
+    -- Execute in parallel batches
+    local taskFns = {}
+    for i, task in ipairs(tasks) do
+        local idx = i
+        taskFns[#taskFns + 1] = function()
+            results[idx] = task()
+        end
+    end
+    
+    local batchSize = 8
+    for batch = 1, #taskFns, batchSize do
+        local batchEnd = math.min(batch + batchSize - 1, #taskFns)
+        local batchFns = {}
+        for i = batch, batchEnd do
+            batchFns[#batchFns + 1] = taskFns[i]
+        end
+        parallel.waitForAll(table.unpack(batchFns))
+    end
+    
+    -- Sum results
+    local pulled = 0
+    for _, result in ipairs(results) do
+        pulled = pulled + (result or 0)
     end
     
     return pulled

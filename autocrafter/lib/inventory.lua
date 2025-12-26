@@ -1080,6 +1080,7 @@ function inventory.hasManipulator()
 end
 
 ---Withdraw items to player inventory
+---Uses parallel transfers for speed
 ---@param item string Item ID
 ---@param count number Amount
 ---@param playerName string Player name (unused, uses manipulator target)
@@ -1095,14 +1096,58 @@ function inventory.withdrawToPlayer(item, count, playerName)
     local locs = inventory.findItem(item, true)
     if #locs == 0 then return 0, "Item not found" end
     
-    local withdrawn = 0
+    -- Sort by count descending
+    table.sort(locs, function(a, b) return a.count > b.count end)
+    
+    -- Build parallel tasks
+    local tasks = {}
+    local meta = {}
+    local remaining = count
+    
     for _, loc in ipairs(locs) do
-        if withdrawn >= count then break end
+        if remaining <= 0 then break end
         
-        local ok2, xfer = pcall(playerInv.pullItems, loc.inv, loc.slot, count - withdrawn)
-        if ok2 and xfer and xfer > 0 then
+        local capturedInv = loc.inv
+        local capturedSlot = loc.slot
+        local capturedAmount = math.min(remaining, loc.count)
+        remaining = remaining - capturedAmount
+        
+        meta[#meta + 1] = {inv = capturedInv, slot = capturedSlot, amount = capturedAmount}
+        tasks[#tasks + 1] = function()
+            local ok2, xfer = pcall(playerInv.pullItems, capturedInv, capturedSlot, capturedAmount)
+            return ok2 and xfer or 0
+        end
+    end
+    
+    if #tasks == 0 then return 0, "Item not found" end
+    
+    -- Execute in parallel batches
+    local results = {}
+    local taskFns = {}
+    for i, task in ipairs(tasks) do
+        local idx = i
+        taskFns[#taskFns + 1] = function()
+            results[idx] = task()
+        end
+    end
+    
+    local batchSize = 8
+    for batch = 1, #taskFns, batchSize do
+        local batchEnd = math.min(batch + batchSize - 1, #taskFns)
+        local batchFns = {}
+        for i = batch, batchEnd do
+            batchFns[#batchFns + 1] = taskFns[i]
+        end
+        parallel.waitForAll(table.unpack(batchFns))
+    end
+    
+    -- Sum results and update cache
+    local withdrawn = 0
+    for i, result in ipairs(results) do
+        local xfer = result or 0
+        if xfer > 0 then
             withdrawn = withdrawn + xfer
-            cacheRemove(loc.inv, loc.slot, item, xfer)
+            cacheRemove(meta[i].inv, meta[i].slot, item, xfer)
         end
     end
     
@@ -1110,6 +1155,7 @@ function inventory.withdrawToPlayer(item, count, playerName)
 end
 
 ---Deposit items from player inventory
+---Uses parallel transfers for speed
 ---@param playerName string Player name (unused)
 ---@param itemFilter? string|string[] Item filter
 ---@param maxCount? number Max items
@@ -1141,27 +1187,71 @@ function inventory.depositFromPlayer(playerName, itemFilter, maxCount, excludes)
         for _, e in ipairs(excludes) do excludeSet[e] = true end
     end
     
-    local deposited = 0
-    local remaining = maxCount
+    -- Build list of slots to deposit
+    local slotsToDeposit = {}
+    local totalToDeposit = 0
     
     for slot, item in pairs(playerItems) do
-        if remaining and remaining <= 0 then break end
+        if maxCount and totalToDeposit >= maxCount then break end
         if excludeSet[item.name] then goto continue end
         
         local matches = not filterSet or filterSet[item.name]
         if matches then
-            local toXfer = remaining and math.min(item.count, remaining) or item.count
-            
-            for _, storageName in ipairs(storage) do
-                local ok3, xfer = pcall(playerInv.pushItems, storageName, slot, toXfer)
-                if ok3 and xfer and xfer > 0 then
-                    deposited = deposited + xfer
-                    if remaining then remaining = remaining - xfer end
-                    break
-                end
-            end
+            local toXfer = maxCount and math.min(item.count, maxCount - totalToDeposit) or item.count
+            slotsToDeposit[#slotsToDeposit + 1] = {slot = slot, count = toXfer}
+            totalToDeposit = totalToDeposit + toXfer
         end
         ::continue::
+    end
+    
+    if #slotsToDeposit == 0 then return 0, "No items to deposit" end
+    
+    -- Build parallel tasks - distribute across storage
+    local tasks = {}
+    local results = {}
+    
+    for i, slotInfo in ipairs(slotsToDeposit) do
+        local capturedSlot = slotInfo.slot
+        local capturedCount = slotInfo.count
+        local storageIdx = ((i - 1) % #storage) + 1
+        
+        tasks[#tasks + 1] = function()
+            -- Try multiple storage inventories if first fails
+            for attempt = 0, math.min(#storage - 1, 5) do
+                local tryIdx = ((storageIdx - 1 + attempt) % #storage) + 1
+                local storageName = storage[tryIdx]
+                local ok3, xfer = pcall(playerInv.pushItems, storageName, capturedSlot, capturedCount)
+                if ok3 and xfer and xfer > 0 then
+                    return xfer
+                end
+            end
+            return 0
+        end
+    end
+    
+    -- Execute in parallel batches
+    local taskFns = {}
+    for i, task in ipairs(tasks) do
+        local idx = i
+        taskFns[#taskFns + 1] = function()
+            results[idx] = task()
+        end
+    end
+    
+    local batchSize = 8
+    for batch = 1, #taskFns, batchSize do
+        local batchEnd = math.min(batch + batchSize - 1, #taskFns)
+        local batchFns = {}
+        for i = batch, batchEnd do
+            batchFns[#batchFns + 1] = taskFns[i]
+        end
+        parallel.waitForAll(table.unpack(batchFns))
+    end
+    
+    -- Sum results
+    local deposited = 0
+    for _, result in ipairs(results) do
+        deposited = deposited + (result or 0)
     end
     
     if deposited > 0 then inventory.scan() end
