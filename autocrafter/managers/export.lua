@@ -15,7 +15,6 @@ local manager = {}
 local exportPeripherals = {}
 local lastExportCheck = 0
 local exportCheckInterval = 5  -- Seconds between export checks
-local exportRunCount = 0  -- Track how many times exports have been processed
 
 -- Default search type for export inventories
 local DEFAULT_SEARCH_TYPE = "ender_storage"
@@ -301,7 +300,7 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
                 tasks[#tasks + 1] = function()
                     local ok, transferred = pcall(dest.pullItems, sourceInv, sourceSlot, count)
                     if not ok then
-                        logger.debug(string.format("pullFromExport: pullItems failed from %s slot %d to %s: %s", 
+                        logger.warn(string.format("pullFromExport: pullItems failed from %s slot %d to %s: %s", 
                             sourceInv, sourceSlot, capturedDestName, tostring(transferred)))
                     end
                     return ok and transferred or 0
@@ -328,7 +327,7 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
             if pulled > 0 then
                 logger.debug(string.format("pullFromExport: Pulled %d from slot %d of %s (retry)", pulled, sourceSlot, sourceInv))
             else
-                logger.debug(string.format("pullFromExport: Failed to pull from slot %d of %s", sourceSlot, sourceInv))
+                logger.warn(string.format("pullFromExport: Failed to pull from slot %d of %s", sourceSlot, sourceInv))
             end
             return pulled
         end
@@ -806,11 +805,6 @@ function manager.processExports()
         return stats
     end
     
-    -- Log heartbeat every 12 runs (~1 minute at 5s interval) to confirm exports are running
-    if exportRunCount % 12 == 1 then
-        logger.info(string.format("Export check #%d: monitoring %d inventories", exportRunCount, invCount))
-    end
-    
     logger.debug(string.format("processExports: Processing %d export inventories", invCount))
     
     for name, config in pairs(inventories) do
@@ -835,7 +829,7 @@ function manager.processExports()
     end
     
     if stats.totalPushed > 0 or stats.totalPulled > 0 then
-        logger.info(string.format("Exports: pushed=%d, pulled=%d from %d inventories", 
+        logger.debug(string.format("Exports: pushed=%d, pulled=%d from %d inventories", 
             stats.totalPushed, stats.totalPulled, stats.inventoriesProcessed))
     end
     

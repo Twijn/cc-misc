@@ -259,7 +259,7 @@ local function messageHandler()
             
             if workerResult then
                 if workerResult.type == "work_complete" then
-                    logger.info(string.format("Worker %d completed task %s: produced %d",
+                    logger.debug(string.format("Worker %d completed task %s: produced %d",
                         workerResult.workerId, workerResult.taskId or "?", workerResult.produced or 0))
                     storageManager.invalidateCache()
                 elseif workerResult.type == "work_failed" then
