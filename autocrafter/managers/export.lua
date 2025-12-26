@@ -290,13 +290,19 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
     
     -- If specific slot, just pull from that
     if sourceSlot then
+        logger.debug(string.format("pullFromExport: Pulling from specific slot %d of %s", sourceSlot, sourceInv))
         -- Try parallel pulls to multiple storage inventories
         local tasks = {}
         for i, destName in ipairs(storageInvs) do
             local dest = inventory.getPeripheral(destName)
             if dest and dest.pullItems then
+                local capturedDestName = destName
                 tasks[#tasks + 1] = function()
                     local ok, transferred = pcall(dest.pullItems, sourceInv, sourceSlot, count)
+                    if not ok then
+                        logger.debug(string.format("pullFromExport: pullItems failed from %s slot %d to %s: %s", 
+                            sourceInv, sourceSlot, capturedDestName, tostring(transferred)))
+                    end
                     return ok and transferred or 0
                 end
             end
@@ -306,6 +312,7 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
         if #tasks > 0 then
             local result = tasks[1]()
             if result > 0 then
+                logger.debug(string.format("pullFromExport: Pulled %d from slot %d of %s", result, sourceSlot, sourceInv))
                 return result
             end
             -- If first failed, try rest in parallel
@@ -317,14 +324,25 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
                     break
                 end
             end
+            if pulled > 0 then
+                logger.debug(string.format("pullFromExport: Pulled %d from slot %d of %s (retry)", pulled, sourceSlot, sourceInv))
+            else
+                logger.debug(string.format("pullFromExport: Failed to pull from slot %d of %s", sourceSlot, sourceInv))
+            end
             return pulled
         end
+        logger.debug(string.format("pullFromExport: No storage tasks created for slot %d of %s", sourceSlot, sourceInv))
         return 0
     end
     
     -- Pull from any slot containing the item
     local _, slots = getInventoryItemCount(source, item)
-    if #slots == 0 then return 0 end
+    if #slots == 0 then 
+        logger.debug(string.format("pullFromExport: Item %s not found in %s", item, sourceInv))
+        return 0 
+    end
+    
+    logger.debug(string.format("pullFromExport: Found %s in %d slots of %s, need %d", item, #slots, sourceInv, count))
     
     local pulled = 0
     
@@ -379,6 +397,10 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
         for _, result in ipairs(results) do
             pulled = pulled + (result or 0)
         end
+        
+        logger.debug(string.format("pullFromExport: Pulled %d %s from %s", pulled, item, sourceInv))
+    else
+        logger.debug(string.format("pullFromExport: No tasks created for %s from %s", item, sourceInv))
     end
     
     return pulled
@@ -390,22 +412,36 @@ end
 ---@return number pulled Total amount of items pulled
 local function pullAllFromExport(sourceInv)
     local source = getExportPeripheral(sourceInv)
-    if not source then return 0 end
+    if not source then 
+        logger.debug(string.format("pullAllFromExport: Source peripheral %s not available", sourceInv))
+        return 0 
+    end
     
     local storageInvs = inventory.getStorageInventories()
-    if #storageInvs == 0 then return 0 end
+    if #storageInvs == 0 then 
+        logger.debug("pullAllFromExport: No storage inventories available")
+        return 0 
+    end
     
     -- Get all items in the export inventory
     local list = source.list()
-    if not list then return 0 end
+    if not list then 
+        logger.debug(string.format("pullAllFromExport: Failed to list items in %s", sourceInv))
+        return 0 
+    end
     
     -- Build list of slots to pull
     local slotList = {}
     for slot, slotItem in pairs(list) do
-        slotList[#slotList + 1] = {slot = slot, count = slotItem.count}
+        slotList[#slotList + 1] = {slot = slot, count = slotItem.count, name = slotItem.name}
     end
     
-    if #slotList == 0 then return 0 end
+    if #slotList == 0 then 
+        logger.debug(string.format("pullAllFromExport: No items found in %s", sourceInv))
+        return 0 
+    end
+    
+    logger.debug(string.format("pullAllFromExport: Found %d slots with items in %s", #slotList, sourceInv))
     
     -- Build parallel tasks
     local tasks = {}
@@ -414,6 +450,8 @@ local function pullAllFromExport(sourceInv)
     for i, slotInfo in ipairs(slotList) do
         local capturedSlot = slotInfo.slot
         local capturedCount = slotInfo.count
+        local capturedName = slotInfo.name
+        local capturedSourceInv = sourceInv  -- Capture in closure
         -- Distribute across storage inventories
         local storageIdx = ((i - 1) % #storageInvs) + 1
         
@@ -423,9 +461,12 @@ local function pullAllFromExport(sourceInv)
                 local tryIdx = ((storageIdx - 1 + attempt) % #storageInvs) + 1
                 local tryDest = inventory.getPeripheral(storageInvs[tryIdx])
                 if tryDest and tryDest.pullItems then
-                    local ok, transferred = pcall(tryDest.pullItems, sourceInv, capturedSlot, capturedCount)
+                    local ok, transferred = pcall(tryDest.pullItems, capturedSourceInv, capturedSlot, capturedCount)
                     if ok and transferred and transferred > 0 then
                         return transferred
+                    elseif not ok then
+                        logger.debug(string.format("pullAllFromExport: pullItems error for slot %d (%s): %s", 
+                            capturedSlot, capturedName, tostring(transferred)))
                     end
                 end
             end
@@ -458,6 +499,8 @@ local function pullAllFromExport(sourceInv)
     for _, result in ipairs(results) do
         pulled = pulled + (result or 0)
     end
+    
+    logger.debug(string.format("pullAllFromExport: Completed - pulled %d items from %s", pulled, sourceInv))
     
     return pulled
 end
@@ -576,12 +619,37 @@ local function processExportInventory(name, config)
     
     local slots = config.slots or {}
     
+    -- Debug: show what's actually in the export inventory
+    local list = inv.list()
+    if list then
+        local itemCount = 0
+        local itemSummary = {}
+        for slot, slotItem in pairs(list) do
+            itemCount = itemCount + 1
+            local shortName = slotItem.name:gsub("minecraft:", "")
+            itemSummary[shortName] = (itemSummary[shortName] or 0) + slotItem.count
+        end
+        if itemCount > 0 then
+            local summaryParts = {}
+            for itemName, count in pairs(itemSummary) do
+                table.insert(summaryParts, string.format("%s:%d", itemName, count))
+            end
+            logger.debug(string.format("processExportInventory: %s contains: %s", 
+                name, table.concat(summaryParts, ", ")))
+        else
+            logger.debug(string.format("processExportInventory: %s is empty", name))
+        end
+    end
+    
     -- Special case: empty mode with no items configured = pull ALL items
     if config.mode == "empty" and #slots == 0 then
+        logger.debug(string.format("processExportInventory: %s is in empty mode with no slots, pulling ALL items", name))
         local pulled = pullAllFromExport(name)
         result.pulled = result.pulled + pulled
         if pulled > 0 then
             logger.debug(string.format("Emptied all: %d items from %s", pulled, name))
+        else
+            logger.debug(string.format("Empty mode: nothing to pull from %s (may already be empty)", name))
         end
         return result
     end
@@ -624,6 +692,8 @@ local function processExportInventory(name, config)
                     end
                 elseif config.mode == "empty" then
                     local currentCount = getSlotCount(inv, slot, item)
+                    logger.debug(string.format("Empty slot range: slot %d of %s, item=%s, current=%d, targetQty=%d", 
+                        slot, name, item, currentCount, targetQty))
                     if currentCount > 0 then
                         local toPull = currentCount
                         if targetQty > 0 then
@@ -632,6 +702,10 @@ local function processExportInventory(name, config)
                         if toPull > 0 then
                             local pulled = pullFromExport(item, toPull, name, slot)
                             result.pulled = result.pulled + pulled
+                            if pulled > 0 then
+                                logger.debug(string.format("Empty slot range: pulled %d %s from slot %d of %s", 
+                                    pulled, item, slot, name))
+                            end
                         end
                     end
                 end
@@ -676,6 +750,9 @@ local function processExportInventory(name, config)
                 currentCount, itemSlots = getInventoryItemCount(inv, item)
             end
             
+            logger.debug(string.format("Empty check for %s in %s: current=%d, targetQty=%d, slot=%s", 
+                item, name, currentCount, targetQty, specificSlot and tostring(specificSlot) or "any"))
+            
             if currentCount > 0 then
                 local toPull = currentCount
                 if targetQty > 0 then
@@ -683,14 +760,21 @@ local function processExportInventory(name, config)
                     toPull = math.max(0, currentCount - targetQty)
                 end
                 
+                logger.debug(string.format("Empty mode: will try to pull %d of %d %s from %s", 
+                    toPull, currentCount, item, name))
+                
                 if toPull > 0 then
                     local pulled = pullFromExport(item, toPull, name, specificSlot)
                     result.pulled = result.pulled + pulled
                     
                     if pulled > 0 then
                         logger.debug(string.format("Emptied %d %s from %s", pulled, item, name))
+                    else
+                        logger.debug(string.format("Empty mode: pullFromExport returned 0 for %s from %s", item, name))
                     end
                 end
+            else
+                logger.debug(string.format("Empty mode: item %s not found in %s", item, name))
             end
         end
         
