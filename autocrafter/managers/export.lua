@@ -15,6 +15,7 @@ local manager = {}
 local exportPeripherals = {}
 local lastExportCheck = 0
 local exportCheckInterval = 5  -- Seconds between export checks
+local exportRunCount = 0  -- Track how many times exports have been processed
 
 -- Default search type for export inventories
 local DEFAULT_SEARCH_TYPE = "ender_storage"
@@ -788,6 +789,7 @@ end
 ---@return table stats Processing statistics
 function manager.processExports()
     lastExportCheck = os.clock()
+    exportRunCount = exportRunCount + 1
     
     local inventories = exportConfig.getAll()
     local stats = {
@@ -802,6 +804,11 @@ function manager.processExports()
     
     if invCount == 0 then
         return stats
+    end
+    
+    -- Log heartbeat every 12 runs (~1 minute at 5s interval) to confirm exports are running
+    if exportRunCount % 12 == 1 then
+        logger.info(string.format("Export check #%d: monitoring %d inventories", exportRunCount, invCount))
     end
     
     logger.debug(string.format("processExports: Processing %d export inventories", invCount))
@@ -828,8 +835,8 @@ function manager.processExports()
     end
     
     if stats.totalPushed > 0 or stats.totalPulled > 0 then
-        logger.debug(string.format("processExports: Total pushed=%d, pulled=%d", 
-            stats.totalPushed, stats.totalPulled))
+        logger.info(string.format("Exports: pushed=%d, pulled=%d from %d inventories", 
+            stats.totalPushed, stats.totalPulled, stats.inventoriesProcessed))
     end
     
     return stats
