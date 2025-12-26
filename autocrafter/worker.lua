@@ -44,6 +44,9 @@ local cachedTurtleName = nil
 -- Task configuration (loaded from server or local)
 local assignedTask = nil
 
+-- Forward declaration
+local sendStatus
+
 ---Direction mappings for turtle operations
 local DIRECTIONS = {
     front = {
@@ -444,7 +447,7 @@ local function executeTask(task, quantity)
 end
 
 ---Send status update to server
-local function sendStatus()
+sendStatus = function()
     comms.broadcast(config.messageTypes.WORKER_STATUS, {
         status = status,
         taskId = assignedTask and assignedTask.id or nil,
