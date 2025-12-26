@@ -40,12 +40,18 @@ end
 ---@param workerId number Worker's computer ID
 ---@param status string The new status (idle, working, offline)
 ---@param stats? table Optional statistics from worker
-function manager.updateStatus(workerId, status, stats)
+---@param progress? table Optional progress info from worker
+function manager.updateStatus(workerId, status, stats, progress)
     if workers[workerId] then
         workers[workerId].status = status
         workers[workerId].lastSeen = os.epoch("utc")
         if stats then
             workers[workerId].stats = stats
+        end
+        if progress then
+            workers[workerId].progress = progress
+        else
+            workers[workerId].progress = nil
         end
     else
         -- Auto-register unknown workers
@@ -57,6 +63,7 @@ function manager.updateStatus(workerId, status, stats)
             status = status,
             lastSeen = os.epoch("utc"),
             stats = stats or {},
+            progress = progress,
         }
     end
 end
@@ -99,6 +106,7 @@ function manager.getWorkers()
             status = status,
             lastSeen = worker.lastSeen,
             stats = worker.stats,
+            progress = worker.progress,
             isOnline = age < workerTimeout,
         })
     end
@@ -153,7 +161,7 @@ function manager.handleMessage(message)
         -- Worker responding to ping
         local newStatus = data.status or "idle"
         local wasIdle = workers[workerId] and workers[workerId].status == "idle"
-        manager.updateStatus(workerId, newStatus, data.stats)
+        manager.updateStatus(workerId, newStatus, data.stats, data.progress)
         
         -- Update task assignment if provided
         if data.taskId and workers[workerId] then
@@ -169,10 +177,11 @@ function manager.handleMessage(message)
         -- Status update from worker
         local newStatus = data.status or "idle"
         local wasIdle = workers[workerId] and workers[workerId].status == "idle"
-        manager.updateStatus(workerId, newStatus, data.stats)
+        manager.updateStatus(workerId, newStatus, data.stats, data.progress)
         
         if newStatus == "idle" and not wasIdle then
             return { type = "worker_idle", workerId = workerId }
+        end
         end
         
     elseif message.type == config.messageTypes.WORK_COMPLETE then

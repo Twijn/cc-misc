@@ -29,6 +29,13 @@ local stats = {
     lastProduced = 0,
 }
 
+-- Progress tracking for current work
+local progress = {
+    current = 0,
+    target = 0,
+    startTime = 0,
+}
+
 -- Cached peripherals
 local cachedModem = nil
 local cachedModemName = nil
@@ -232,6 +239,8 @@ local function executeCobblestoneTask(task, quantity)
     
     local produced = 0
     local lastDeposit = 0
+    local lastProgressUpdate = 0
+    local PROGRESS_UPDATE_INTERVAL = 5  -- Send progress every 5 items
     
     while produced < quantity and running do
         -- Deposit periodically or when inventory is getting full
@@ -266,6 +275,13 @@ local function executeCobblestoneTask(task, quantity)
         local ok, reason = dirOps.dig()
         if ok then
             produced = produced + 1
+            progress.current = produced
+            
+            -- Send progress update periodically
+            if produced - lastProgressUpdate >= PROGRESS_UPDATE_INTERVAL then
+                sendStatus()
+                lastProgressUpdate = produced
+            end
         else
             logger.debug("Failed to dig: " .. tostring(reason))
             sleep(0.1)
@@ -393,7 +409,13 @@ local function executeTask(task, quantity)
     logger.debug(string.format("Executing task %s: %s (qty: %d)", 
         task.id, task.type, quantity))
     
+    -- Initialize progress tracking
+    progress.current = 0
+    progress.target = quantity
+    progress.startTime = os.epoch("utc")
+    
     status = "working"
+    sendStatus()  -- Send initial working status
     
     local success, produced
     
@@ -412,6 +434,11 @@ local function executeTask(task, quantity)
     stats.sessionProduced = stats.sessionProduced + produced
     stats.totalProduced = stats.totalProduced + produced
     
+    -- Clear progress tracking
+    progress.current = 0
+    progress.target = 0
+    progress.startTime = 0
+    
     status = "idle"
     return success, produced
 end
@@ -422,6 +449,7 @@ local function sendStatus()
         status = status,
         taskId = assignedTask and assignedTask.id or nil,
         stats = stats,
+        progress = status == "working" and progress or nil,
         label = os.getComputerLabel(),
     })
 end
@@ -438,6 +466,7 @@ local function messageHandler()
                     status = status,
                     taskId = assignedTask and assignedTask.id or nil,
                     stats = stats,
+                    progress = status == "working" and progress or nil,
                     label = os.getComputerLabel(),
                 }, message.sender)
                 

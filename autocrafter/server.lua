@@ -1652,6 +1652,8 @@ local commands = {
                 end
                 
                 local p = ctx.pager("=== Workers (" .. #allWorkers .. ") ===")
+                local now = os.epoch("utc")
+                
                 for _, worker in ipairs(allWorkers) do
                     local statusColor = colors.red
                     if worker.isOnline then
@@ -1662,6 +1664,7 @@ local commands = {
                         end
                     end
                     
+                    -- First line: ID, label, status
                     p.setTextColor(colors.lightGray)
                     p.write(string.format("#%d ", worker.id))
                     p.setTextColor(colors.white)
@@ -1674,6 +1677,53 @@ local commands = {
                         p.write(" (" .. worker.taskId .. ")")
                     end
                     p.print("")
+                    
+                    -- Second line: Progress (if working) or stats
+                    p.setTextColor(colors.gray)
+                    if worker.status == "working" and worker.progress then
+                        local prog = worker.progress
+                        local percent = prog.target > 0 and math.floor((prog.current / prog.target) * 100) or 0
+                        local elapsed = prog.startTime > 0 and ((now - prog.startTime) / 1000) or 0
+                        local rate = elapsed > 0 and (prog.current / elapsed) or 0
+                        local eta = rate > 0 and ((prog.target - prog.current) / rate) or 0
+                        
+                        p.write("     Progress: ")
+                        p.setTextColor(colors.yellow)
+                        p.write(string.format("%d/%d (%d%%)", prog.current, prog.target, percent))
+                        if rate > 0 then
+                            p.setTextColor(colors.gray)
+                            p.write(string.format(" | %.1f/s", rate))
+                            if eta > 0 and eta < 3600 then
+                                p.write(string.format(" | ETA: %ds", math.ceil(eta)))
+                            end
+                        end
+                        p.print("")
+                    elseif worker.stats then
+                        local st = worker.stats
+                        if st.sessionProduced and st.sessionProduced > 0 then
+                            p.write("     Session: ")
+                            p.setTextColor(colors.lightGray)
+                            p.write(tostring(st.sessionProduced))
+                            if st.lastProduced and st.lastProduced > 0 then
+                                p.setTextColor(colors.gray)
+                                p.write(" (last batch: " .. st.lastProduced .. ")")
+                            end
+                            p.print("")
+                        end
+                    end
+                    
+                    -- Show last seen for offline workers
+                    if not worker.isOnline and worker.lastSeen > 0 then
+                        local age = (now - worker.lastSeen) / 1000
+                        p.setTextColor(colors.gray)
+                        if age < 60 then
+                            p.print(string.format("     Last seen: %ds ago", math.floor(age)))
+                        elseif age < 3600 then
+                            p.print(string.format("     Last seen: %dm ago", math.floor(age / 60)))
+                        else
+                            p.print(string.format("     Last seen: %.1fh ago", age / 3600))
+                        end
+                    end
                 end
                 p.print("")
                 p.setTextColor(colors.lightBlue)
@@ -2030,13 +2080,88 @@ local commands = {
                 return
             end
             
+            -- Get target information
+            local craftTargets = targets.getAll()
+            local smeltTargets = furnaceConfig.getAllSmeltTargets()
+            local workerTasks = workerConfig.getAllTasks()
+            
+            -- Build worker target lookup by item
+            local workerTargetsByItem = {}
+            for taskId, task in pairs(workerTasks) do
+                if task.item and task.enabled then
+                    workerTargetsByItem[task.item] = task.stockTarget
+                end
+            end
+            
+            -- Get active jobs to show what's being crafted
+            local allJobs = queueManager.getJobs()
+            local jobsByItem = {}
+            for _, job in ipairs(allJobs) do
+                if job.recipe and job.recipe.output then
+                    local output = job.recipe.output
+                    if not jobsByItem[output] then
+                        jobsByItem[output] = { count = 0, pending = 0, crafting = 0 }
+                    end
+                    jobsByItem[output].count = jobsByItem[output].count + (job.expectedOutput or 0)
+                    if job.status == "pending" or job.status == "assigned" then
+                        jobsByItem[output].pending = jobsByItem[output].pending + (job.expectedOutput or 0)
+                    elseif job.status == "crafting" then
+                        jobsByItem[output].crafting = jobsByItem[output].crafting + (job.expectedOutput or 0)
+                    end
+                end
+            end
+            
             local p = ctx.pager("=== Stock (" .. #results .. " items) ===")
             for _, item in ipairs(results) do
-                local name = item.item:gsub("minecraft:", "")
+                local itemId = item.item
+                local name = itemId:gsub("minecraft:", "")
+                
+                -- Get target info
+                local craftTarget = craftTargets[itemId]
+                local smeltTarget = smeltTargets[itemId]
+                local workerTarget = workerTargetsByItem[itemId]
+                local jobInfo = jobsByItem[itemId]
+                
+                -- Build target string
+                local targetParts = {}
+                if craftTarget then
+                    table.insert(targetParts, "craft:" .. craftTarget)
+                end
+                if smeltTarget then
+                    table.insert(targetParts, "smelt:" .. smeltTarget)
+                end
+                if workerTarget then
+                    table.insert(targetParts, "worker:" .. workerTarget)
+                end
+                
+                -- First line: item name and count
                 p.setTextColor(colors.white)
                 p.write("  " .. name .. " ")
                 p.setTextColor(colors.lightGray)
-                p.print("x" .. item.count)
+                p.write("x" .. item.count)
+                
+                -- Show target if any
+                if #targetParts > 0 then
+                    p.setTextColor(colors.gray)
+                    p.write(" (")
+                    p.setTextColor(colors.yellow)
+                    p.write(table.concat(targetParts, ", "))
+                    p.setTextColor(colors.gray)
+                    p.write(")")
+                end
+                
+                -- Show job status if any
+                if jobInfo then
+                    p.write(" ")
+                    p.setTextColor(colors.cyan)
+                    if jobInfo.crafting > 0 then
+                        p.write("[crafting " .. jobInfo.crafting .. "]")
+                    elseif jobInfo.pending > 0 then
+                        p.write("[queued " .. jobInfo.pending .. "]")
+                    end
+                end
+                
+                p.print("")
             end
             p.show()
         end
