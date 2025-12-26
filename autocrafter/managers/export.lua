@@ -15,6 +15,7 @@ local manager = {}
 local exportPeripherals = {}
 local lastExportCheck = 0
 local exportCheckInterval = 5  -- Seconds between export checks
+local exportRunCount = 0  -- Track how many times exports have been processed
 
 -- Default search type for export inventories
 local DEFAULT_SEARCH_TYPE = "ender_storage"
