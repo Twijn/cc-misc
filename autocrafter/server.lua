@@ -26,6 +26,7 @@ local monitorManager = require("managers.monitor")
 local exportManager = require("managers.export")
 local furnaceManager = require("managers.furnace")
 local workerManager = require("managers.worker")
+local requestManager = require("managers.request")
 
 -- Load config modules
 local settings = require("config.settings")
@@ -38,6 +39,22 @@ local config = require("config")
 local running = true
 local shuttingDown = false
 local chatboxAvailable = false  -- Whether chatbox API is available with required capabilities
+
+--- Send a message to a player via chatbox
+---@param user string The username to send to
+---@param message string The message to send
+---@param isError? boolean Whether this is an error message
+local function chatTell(user, message, isError)
+    if not chatbox or not chatbox.hasCapability or not chatbox.hasCapability("tell") then
+        return
+    end
+    
+    local mode = "format"
+    local prefix = isError and "&c" or "&a"
+    local formattedMessage = prefix .. message
+    
+    pcall(chatbox.tell, user, formattedMessage, config.chatboxName, mode)
+end
 
 ---Get the server version
 function _G.acVersion()
@@ -96,6 +113,7 @@ local function initialize()
     exportManager.init()
     furnaceManager.init()
     workerManager.init()
+    requestManager.init()
     
     -- Show summary stats
     local storageStats = storageManager.getStats()
@@ -523,6 +541,226 @@ local function monitorRefreshLoop()
     end
 end
 
+--- Request processing loop
+--- Monitors active requests, queues jobs, and delivers completed items
+local function requestProcessLoop()
+    local checkInterval = 2  -- Check every 2 seconds
+    local reportInterval = 15000  -- Report status every 15 seconds (in ms)
+    
+    while running do
+        local requests = requestManager.getActiveRequests()
+        
+        for _, req in ipairs(requests) do
+            local stock = storageManager.getAllStock()
+            local currentStock = stock[req.item] or 0
+            
+            -- Check request status and progress
+            if req.status == requestManager.STATES.PENDING then
+                -- Queue jobs for this request
+                local needed = req.quantity - (req.produced or 0)
+                if needed > 0 then
+                    if req.isSmelt then
+                        -- For smelt requests, we add a temporary smelt target
+                        -- The furnace manager will handle the smelting
+                        local input = furnaceConfig.getSmeltInput(req.item)
+                        if input then
+                            local inputStock = stock[input] or 0
+                            if inputStock >= needed then
+                                -- Mark as smelting - furnace manager will pick it up
+                                requestManager.updateRequest(req.id, requestManager.STATES.SMELTING)
+                                logger.debug(string.format("Request #%d: starting smelt of %dx %s", 
+                                    req.id, needed, req.item))
+                            else
+                                -- Not enough input material
+                                requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                                    failReason = string.format("Missing %dx %s", needed - inputStock, input)
+                                })
+                            end
+                        else
+                            requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                                failReason = "No smelt recipe found"
+                            })
+                        end
+                    else
+                        -- For craft requests, queue jobs
+                        local job, err = queueManager.addJob(req.item, needed, stock)
+                        if job then
+                            requestManager.addJobToRequest(req.id, job.id)
+                            requestManager.updateRequest(req.id, requestManager.STATES.QUEUED)
+                            logger.debug(string.format("Request #%d: queued job #%d for %dx %s", 
+                                req.id, job.id, job.expectedOutput, req.item))
+                        else
+                            -- Check if we already have enough in stock
+                            if currentStock >= req.quantity then
+                                requestManager.updateRequest(req.id, requestManager.STATES.READY, {
+                                    produced = req.quantity
+                                })
+                            else
+                                requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                                    failReason = err or "Cannot queue job"
+                                })
+                            end
+                        end
+                    end
+                else
+                    -- Already have enough
+                    requestManager.updateRequest(req.id, requestManager.STATES.READY, {
+                        produced = req.quantity
+                    })
+                end
+                
+            elseif req.status == requestManager.STATES.QUEUED or 
+                   req.status == requestManager.STATES.CRAFTING then
+                -- Check if jobs are complete
+                local allComplete = true
+                local anyFailed = false
+                local totalProduced = 0
+                
+                for _, jobId in ipairs(req.jobIds or {}) do
+                    local job = queueManager.getJob(jobId)
+                    if job then
+                        if job.status == queueManager.STATES.PENDING or 
+                           job.status == queueManager.STATES.ASSIGNED or
+                           job.status == queueManager.STATES.CRAFTING then
+                            allComplete = false
+                            -- Update to crafting status if jobs are being worked on
+                            if req.status == requestManager.STATES.QUEUED and 
+                               (job.status == queueManager.STATES.ASSIGNED or 
+                                job.status == queueManager.STATES.CRAFTING) then
+                                requestManager.updateRequest(req.id, requestManager.STATES.CRAFTING)
+                            end
+                        end
+                    else
+                        -- Job not in queue, check history
+                        local history = queueManager.getHistory()
+                        for _, cJob in ipairs(history.completed or {}) do
+                            if cJob.id == jobId then
+                                totalProduced = totalProduced + (cJob.actualOutput or 0)
+                                break
+                            end
+                        end
+                        for _, fJob in ipairs(history.failed or {}) do
+                            if fJob.id == jobId then
+                                anyFailed = true
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                -- Update produced count
+                if totalProduced > 0 then
+                    requestManager.updateRequest(req.id, req.status, { produced = totalProduced })
+                end
+                
+                -- Check if we have enough stock now
+                if currentStock >= req.quantity then
+                    requestManager.updateRequest(req.id, requestManager.STATES.READY, {
+                        produced = req.quantity
+                    })
+                elseif allComplete and (anyFailed or currentStock < req.quantity) then
+                    -- All jobs done but not enough items - may need to queue more or fail
+                    local stillNeeded = req.quantity - currentStock
+                    if stillNeeded > 0 and not anyFailed then
+                        -- Try to queue more
+                        local job, err = queueManager.addJob(req.item, stillNeeded, stock)
+                        if job then
+                            requestManager.addJobToRequest(req.id, job.id)
+                            logger.debug(string.format("Request #%d: queued additional job #%d", req.id, job.id))
+                        end
+                    elseif anyFailed then
+                        requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                            failReason = "Some crafting jobs failed"
+                        })
+                    end
+                end
+                
+            elseif req.status == requestManager.STATES.SMELTING then
+                -- Check smelting progress
+                if currentStock >= req.quantity then
+                    requestManager.updateRequest(req.id, requestManager.STATES.READY, {
+                        produced = req.quantity
+                    })
+                end
+                -- Update produced count based on current stock
+                if currentStock > (req.produced or 0) then
+                    requestManager.updateRequest(req.id, requestManager.STATES.SMELTING, {
+                        produced = currentStock
+                    })
+                end
+                
+            elseif req.status == requestManager.STATES.READY then
+                -- Deliver items
+                local toDeliver = math.min(req.quantity - (req.delivered or 0), currentStock)
+                
+                if toDeliver > 0 then
+                    local delivered = 0
+                    
+                    if req.deliverTo == "storage" then
+                        -- Items are already in storage, just mark as delivered
+                        delivered = toDeliver
+                    else
+                        -- Deliver to player
+                        if storageManager.hasManipulator() then
+                            delivered = storageManager.withdrawToPlayer(req.item, toDeliver, req.deliverTo)
+                            if delivered > 0 then
+                                logger.info(string.format("Request #%d: delivered %dx %s to %s",
+                                    req.id, delivered, req.item, req.deliverTo))
+                            end
+                        else
+                            -- No manipulator, items stay in storage
+                            logger.warn(string.format("Request #%d: no manipulator, items left in storage", req.id))
+                            delivered = toDeliver
+                        end
+                    end
+                    
+                    if delivered > 0 then
+                        requestManager.recordDelivered(req.id, delivered)
+                        
+                        -- Check if fully delivered
+                        local totalDelivered = (req.delivered or 0) + delivered
+                        if totalDelivered >= req.quantity then
+                            requestManager.updateRequest(req.id, requestManager.STATES.DELIVERED)
+                            logger.info(string.format("Request #%d completed: %dx %s", 
+                                req.id, totalDelivered, req.item))
+                            
+                            -- Send completion message
+                            if req.deliverTo ~= "storage" and chatboxAvailable then
+                                chatTell(req.deliverTo, string.format("Request complete: %dx %s delivered!", 
+                                    totalDelivered, req.item:gsub("minecraft:", "")))
+                            end
+                        end
+                    end
+                elseif (req.delivered or 0) >= req.quantity then
+                    -- Already fully delivered
+                    requestManager.updateRequest(req.id, requestManager.STATES.DELIVERED)
+                end
+            end
+            
+            -- Send periodic status reports for active requests
+            if req.status ~= requestManager.STATES.DELIVERED and
+               req.status ~= requestManager.STATES.FAILED and
+               req.status ~= requestManager.STATES.CANCELLED then
+                
+                if requestManager.needsReport(req, reportInterval) then
+                    local statusStr = requestManager.getStatusString(req)
+                    logger.debug(string.format("Request #%d status: %s", req.id, statusStr))
+                    
+                    -- Send chatbox update for player requests
+                    if req.deliverTo ~= "storage" and chatboxAvailable then
+                        chatTell(req.deliverTo, string.format("Request #%d: %s - %s", 
+                            req.id, req.item:gsub("minecraft:", ""), statusStr))
+                    end
+                    
+                    requestManager.markReported(req.id)
+                end
+            end
+        end
+        
+        sleep(checkInterval)
+    end
+end
+
 --- Command definitions
 local commands = {
     status = {
@@ -885,6 +1123,215 @@ local commands = {
                 end
             end
             p.show()
+        end
+    },
+    
+    request = {
+        description = "Request a one-time craft/smelt (results go to storage)",
+        category = "queue",
+        aliases = {"req"},
+        execute = function(args, ctx)
+            local subCmd = args[1]
+            
+            -- Handle subcommands
+            if subCmd == "list" or subCmd == "ls" then
+                local requests = requestManager.getAllRequests()
+                local active = {}
+                local recent = {}
+                
+                for _, req in ipairs(requests) do
+                    if req.status ~= requestManager.STATES.DELIVERED and
+                       req.status ~= requestManager.STATES.FAILED and
+                       req.status ~= requestManager.STATES.CANCELLED then
+                        table.insert(active, req)
+                    else
+                        table.insert(recent, req)
+                    end
+                end
+                
+                if #active == 0 and #recent == 0 then
+                    ctx.mess("No requests found")
+                    return
+                end
+                
+                local p = ctx.pager("=== Requests ===")
+                
+                if #active > 0 then
+                    p.setTextColor(colors.cyan)
+                    p.print("-- Active --")
+                    for _, req in ipairs(active) do
+                        local item = req.item:gsub("minecraft:", "")
+                        local statusStr = requestManager.getStatusString(req)
+                        
+                        p.setTextColor(colors.yellow)
+                        p.write(string.format("#%d ", req.id))
+                        p.setTextColor(colors.white)
+                        p.write(string.format("%dx %s ", req.quantity, item))
+                        p.setTextColor(colors.lightGray)
+                        p.print(string.format("-> %s [%s]", req.deliverTo, statusStr))
+                    end
+                end
+                
+                if #recent > 0 then
+                    if #active > 0 then p.print("") end
+                    p.setTextColor(colors.gray)
+                    p.print("-- Recent --")
+                    local shown = 0
+                    for _, req in ipairs(recent) do
+                        if shown >= 5 then break end
+                        local item = req.item:gsub("minecraft:", "")
+                        local statusStr = requestManager.getStatusString(req)
+                        
+                        p.setTextColor(colors.gray)
+                        p.write(string.format("#%d ", req.id))
+                        p.setTextColor(colors.lightGray)
+                        p.print(string.format("%dx %s [%s]", req.quantity, item, statusStr))
+                        shown = shown + 1
+                    end
+                end
+                
+                p.show()
+                return
+                
+            elseif subCmd == "cancel" then
+                local id = tonumber(args[2])
+                if not id then
+                    ctx.err("Usage: request cancel <id>")
+                    return
+                end
+                
+                if requestManager.cancelRequest(id) then
+                    ctx.succ("Cancelled request #" .. id)
+                else
+                    ctx.err("Could not cancel request #" .. id)
+                end
+                return
+                
+            elseif subCmd == "status" then
+                local id = tonumber(args[2])
+                if not id then
+                    ctx.err("Usage: request status <id>")
+                    return
+                end
+                
+                local req = requestManager.getRequest(id)
+                if not req then
+                    ctx.err("Request #" .. id .. " not found")
+                    return
+                end
+                
+                print("")
+                ctx.mess("=== Request #" .. id .. " ===")
+                print("  Item: " .. req.item:gsub("minecraft:", ""))
+                print("  Quantity: " .. req.quantity)
+                print("  Deliver to: " .. req.deliverTo)
+                print("  Type: " .. (req.isSmelt and "Smelt" or "Craft"))
+                print("  Status: " .. requestManager.getStatusString(req))
+                print("  Produced: " .. (req.produced or 0))
+                print("  Delivered: " .. (req.delivered or 0))
+                if req.jobIds and #req.jobIds > 0 then
+                    print("  Jobs: " .. table.concat(req.jobIds, ", "))
+                end
+                return
+                
+            elseif subCmd == "help" then
+                print("")
+                ctx.mess("=== Request Commands ===")
+                print("  request <item> <quantity> [--smelt]  - Create new request")
+                print("  request list                         - List all requests")
+                print("  request status <id>                  - View request details")
+                print("  request cancel <id>                  - Cancel a request")
+                return
+            end
+            
+            -- Default: create a new request
+            if #args < 2 then
+                ctx.err("Usage: request <item> <quantity> [--smelt]")
+                print("  Results will be stored in storage")
+                print("  Use 'request help' for more commands")
+                return
+            end
+            
+            -- Check for --smelt flag
+            local isSmelt = false
+            local filteredArgs = {}
+            for _, arg in ipairs(args) do
+                if arg == "--smelt" or arg == "-s" then
+                    isSmelt = true
+                else
+                    table.insert(filteredArgs, arg)
+                end
+            end
+            
+            local item = filteredArgs[1]
+            local quantity = tonumber(filteredArgs[2])
+            
+            if not quantity or quantity <= 0 then
+                ctx.err("Quantity must be a positive number")
+                return
+            end
+            
+            -- Add minecraft: prefix if missing
+            if not item:find(":") then
+                item = "minecraft:" .. item
+            end
+            
+            -- Create the request (deliver to storage)
+            local request, err = requestManager.createRequest(item, quantity, "storage", isSmelt)
+            
+            if not request then
+                ctx.err(err or "Failed to create request")
+                return
+            end
+            
+            ctx.succ(string.format("Created request #%d: %dx %s", request.id, quantity, item:gsub("minecraft:", "")))
+            if isSmelt then
+                print("  Type: Smelt")
+            end
+            print("  Results will be stored in storage")
+            print("  Use 'request status " .. request.id .. "' to check progress")
+        end,
+        complete = function(args)
+            if #args == 1 then
+                local query = (args[1] or ""):lower()
+                local options = {"list", "status", "cancel", "help"}
+                local matches = {}
+                
+                -- First check subcommands
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) then
+                        table.insert(matches, opt)
+                    end
+                end
+                
+                -- Also complete item names
+                local allRecipes = recipes.getAll()
+                for output, _ in pairs(allRecipes) do
+                    local shortName = output:gsub("minecraft:", "")
+                    if shortName:find(query, 1, true) then
+                        table.insert(matches, shortName)
+                    end
+                end
+                
+                return matches
+            elseif #args == 2 then
+                local firstArg = args[1]:lower()
+                if firstArg == "status" or firstArg == "cancel" then
+                    -- Complete with request IDs
+                    local requests = requestManager.getActiveRequests()
+                    local ids = {}
+                    for _, req in ipairs(requests) do
+                        table.insert(ids, tostring(req.id))
+                    end
+                    return ids
+                end
+            elseif #args == 3 then
+                local query = (args[3] or ""):lower()
+                if query:find("%-", 1, true) or query == "" then
+                    return {"--smelt"}
+                end
+            end
+            return {}
         end
     },
     
@@ -3759,22 +4206,6 @@ local commands = {
 -- Register log level commands (loglevel, log-level, ll aliases)
 logger.registerCommands(commands)
 
---- Send a message to a player via chatbox
----@param user string The username to send to
----@param message string The message to send
----@param isError? boolean Whether this is an error message
-local function chatTell(user, message, isError)
-    if not chatbox or not chatbox.hasCapability or not chatbox.hasCapability("tell") then
-        return
-    end
-    
-    local mode = "format"
-    local prefix = isError and "&c" or "&a"
-    local formattedMessage = prefix .. message
-    
-    pcall(chatbox.tell, user, formattedMessage, config.chatboxName, mode)
-end
-
 --- Handle chatbox commands from players
 local function chatboxHandler()
     if not chatboxAvailable then
@@ -3796,6 +4227,7 @@ local function chatboxHandler()
             chatTell(user, "\\withdraw <item> <count> - Get items from storage")
             chatTell(user, "\\deposit [items...] - Store items (excludes tools/armor/food)")
             chatTell(user, "\\deposit --all - Store ALL items (no excludes)")
+            chatTell(user, "\\request <item> <count> [--smelt] - Request items")
             chatTell(user, "\\stock [search] - Search item stock")
             chatTell(user, "\\recipe <item> - View recipe details")
             chatTell(user, "\\status - Show system status")
@@ -3982,6 +4414,123 @@ local function chatboxHandler()
                     end
                 end
             end
+            
+        elseif command == "request" then
+            -- Handle request subcommands
+            local subCmd = args and args[1] or nil
+            
+            if subCmd == "list" or subCmd == "ls" then
+                local requests = requestManager.getActiveRequests()
+                
+                if #requests == 0 then
+                    chatTell(user, "No active requests")
+                else
+                    chatTell(user, "=== Active Requests ===")
+                    for _, req in ipairs(requests) do
+                        local item = req.item:gsub("minecraft:", "")
+                        local statusStr = requestManager.getStatusString(req)
+                        chatTell(user, string.format("#%d: %dx %s [%s]", 
+                            req.id, req.quantity, item, statusStr))
+                    end
+                end
+                
+            elseif subCmd == "status" then
+                local id = args[2] and tonumber(args[2])
+                if not id then
+                    chatTell(user, "Usage: \\request status <id>", true)
+                else
+                    local req = requestManager.getRequest(id)
+                    if not req then
+                        chatTell(user, "Request #" .. id .. " not found", true)
+                    else
+                        chatTell(user, string.format("Request #%d: %dx %s", req.id, req.quantity, req.item:gsub("minecraft:", "")))
+                        chatTell(user, "Status: " .. requestManager.getStatusString(req))
+                        chatTell(user, string.format("Produced: %d, Delivered: %d", req.produced or 0, req.delivered or 0))
+                    end
+                end
+                
+            elseif subCmd == "cancel" then
+                local id = args[2] and tonumber(args[2])
+                if not id then
+                    chatTell(user, "Usage: \\request cancel <id>", true)
+                else
+                    if requestManager.cancelRequest(id) then
+                        chatTell(user, "Cancelled request #" .. id)
+                    else
+                        chatTell(user, "Could not cancel request #" .. id, true)
+                    end
+                end
+                
+            elseif not subCmd or subCmd == "help" then
+                chatTell(user, "=== Request Commands ===")
+                chatTell(user, "\\request <item> <count> [--smelt] - Request items")
+                chatTell(user, "\\request list - View active requests")
+                chatTell(user, "\\request status <id> - View request details")
+                chatTell(user, "\\request cancel <id> - Cancel a request")
+                
+            else
+                -- Create a new request - items go to player inventory
+                local item = subCmd
+                local count = args[2] and tonumber(args[2])
+                
+                -- Check for --smelt flag
+                local isSmelt = false
+                if args then
+                    for _, arg in ipairs(args) do
+                        if arg == "--smelt" or arg == "-s" then
+                            isSmelt = true
+                        end
+                    end
+                end
+                
+                if not count or count <= 0 then
+                    chatTell(user, "Usage: \\request <item> <count> [--smelt]", true)
+                else
+                    if not item:find(":") then
+                        item = "minecraft:" .. item
+                    end
+                    
+                    -- Check if we have enough in stock already
+                    local stock = storageManager.getAllStock()
+                    local currentStock = stock[item] or 0
+                    
+                    -- Try to resolve fuzzy item names
+                    if currentStock == 0 then
+                        local resolvedItem = storageManager.resolveItem(subCmd)
+                        if resolvedItem then
+                            item = resolvedItem
+                            currentStock = stock[item] or 0
+                        end
+                    end
+                    
+                    -- If we already have enough in stock, just deliver immediately
+                    if currentStock >= count and not isSmelt then
+                        if storageManager.hasManipulator() then
+                            local delivered = storageManager.withdrawToPlayer(item, count, user)
+                            if delivered > 0 then
+                                chatTell(user, string.format("Delivered %dx %s (from stock)", 
+                                    delivered, item:gsub("minecraft:", "")))
+                            else
+                                chatTell(user, "Failed to deliver items", true)
+                            end
+                        else
+                            chatTell(user, "No manipulator - items ready in storage", true)
+                        end
+                    else
+                        -- Create a request to craft/smelt
+                        local request, err = requestManager.createRequest(item, count, user, isSmelt)
+                        
+                        if not request then
+                            chatTell(user, err or "Failed to create request", true)
+                        else
+                            local typeStr = isSmelt and "smelt" or "craft"
+                            chatTell(user, string.format("Request #%d created: %s %dx %s", 
+                                request.id, typeStr, count, item:gsub("minecraft:", "")))
+                            chatTell(user, "You'll be notified when items are ready")
+                        end
+                    end
+                end
+            end
         end
     end
 end
@@ -4026,6 +4575,7 @@ local function main()
         monitorRefreshLoop,
         exportProcessLoop,
         furnaceProcessLoop,
+        requestProcessLoop,
         chatboxHandler,
         function()
             cmd("AutoCrafter", VERSION, commands)
