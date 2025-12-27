@@ -2466,12 +2466,31 @@ local commands = {
                         local action = result._action
                         
                         if action == "add" then
+                            -- Calculate next open slot
+                            local usedSlots = {}
+                            for _, slotCfg in ipairs(items) do
+                                if slotCfg.slot then
+                                    usedSlots[slotCfg.slot] = true
+                                end
+                                if slotCfg.slotStart and slotCfg.slotEnd then
+                                    for s = slotCfg.slotStart, slotCfg.slotEnd do
+                                        usedSlots[s] = true
+                                    end
+                                end
+                            end
+                            
+                            -- Find next open slot (start from 1)
+                            local nextSlot = 1
+                            while usedSlots[nextSlot] do
+                                nextSlot = nextSlot + 1
+                            end
+                            
                             -- Form to add a new item
                             local addForm = FormUI.new("Add Item to Export")
                             local itemField = addForm:text("Item Name", "", nil, false)
                             local qtyField = addForm:number("Quantity", cfg.mode == "stock" and 64 or 0)
-                            local useSlotField = addForm:checkbox("Use specific slot", false)
-                            local slotField = addForm:number("Slot number", 1)
+                            local useSlotField = addForm:checkbox("Use specific slot", true)
+                            local slotField = addForm:number("Slot number", nextSlot)
                             local vacuumField = addForm:checkbox("Vacuum (remove non-matching)", false)
                             addForm:label("")
                             if cfg.mode == "stock" then
