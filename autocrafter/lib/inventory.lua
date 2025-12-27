@@ -46,6 +46,47 @@ local function key(item, nbt)
     return nbt and (item .. ":" .. nbt) or item
 end
 
+---Convert a wildcard pattern to a Lua pattern
+---Supports * as a wildcard that matches any characters
+---@param wildcardPattern string Pattern with wildcards (e.g., "cobble*", "*dirt")
+---@return string luaPattern
+local function wildcardToPattern(wildcardPattern)
+    -- Escape Lua pattern special characters, except *
+    local escaped = wildcardPattern:gsub("([%^%$%(%)%%%.%[%]%+%-%?])", "%%%1")
+    -- Convert * to Lua pattern .*
+    local pattern = escaped:gsub("%*", ".*")
+    -- Anchor pattern to match entire string
+    return "^" .. pattern .. "$"
+end
+
+---Check if an item name matches a filter (supports wildcards)
+---@param itemName string Full item name (e.g., "minecraft:cobblestone")
+---@param filter string Filter pattern (may contain * wildcards)
+---@return boolean
+local function matchesFilter(itemName, filter)
+    -- Check if filter contains wildcard
+    if filter:find("%*") then
+        local pattern = wildcardToPattern(filter)
+        return itemName:match(pattern) ~= nil
+    else
+        -- Exact match
+        return itemName == filter
+    end
+end
+
+---Check if an item name matches any of the given filters (supports wildcards)
+---@param itemName string Full item name (e.g., "minecraft:cobblestone")
+---@param filters string[] Array of filter patterns
+---@return boolean
+local function matchesAnyFilter(itemName, filters)
+    for _, filter in ipairs(filters) do
+        if matchesFilter(itemName, filter) then
+            return true
+        end
+    end
+    return false
+end
+
 ---Get or wrap a peripheral
 ---@param name string Peripheral name
 ---@return table? peripheral
@@ -1210,13 +1251,13 @@ function inventory.depositFromPlayer(playerName, itemFilter, maxCount, excludes)
     local ok2, playerItems = pcall(playerInv.list)
     if not ok2 or not playerItems then return 0, "Cannot list player inventory" end
     
-    -- Build filters
-    local filterSet = nil
+    -- Build filters (now supports wildcards)
+    local filters = nil
     if itemFilter then
-        filterSet = {}
-        if type(itemFilter) == "string" then filterSet[itemFilter] = true
+        if type(itemFilter) == "string" then
+            filters = {itemFilter}
         elseif type(itemFilter) == "table" then
-            for _, f in ipairs(itemFilter) do filterSet[f] = true end
+            filters = itemFilter
         end
     end
     
@@ -1233,7 +1274,8 @@ function inventory.depositFromPlayer(playerName, itemFilter, maxCount, excludes)
         if maxCount and totalToDeposit >= maxCount then break end
         if excludeSet[item.name] then goto continue end
         
-        local matches = not filterSet or filterSet[item.name]
+        -- Check filter match (supports wildcards like "cobble*" or "*dirt")
+        local matches = not filters or matchesAnyFilter(item.name, filters)
         if matches then
             local toXfer = maxCount and math.min(item.count, maxCount - totalToDeposit) or item.count
             slotsToDeposit[#slotsToDeposit + 1] = {slot = slot, count = toXfer}

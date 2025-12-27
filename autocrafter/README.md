@@ -60,7 +60,7 @@ The server provides a command interface:
 - `list` - List all auto-craft items
 - `scan` - Force inventory rescan
 - `withdraw <item> <count>` - Withdraw items from storage
-- `deposit <item>` - Deposit all of item type
+- `deposit [items...]` - Deposit items from player (supports wildcards, e.g., `deposit cobble* *dirt`)
 - `crafters` - List connected crafters
 - `recipes [search]` - Search available recipes
 - `exports` - Manage export inventories (see below)

@@ -1176,7 +1176,7 @@ local commands = {
     },
     
     deposit = {
-        description = "Deposit items from player to storage",
+        description = "Deposit items from player to storage (supports wildcards: cobble*, *dirt)",
         category = "storage",
         aliases = {"d", "put"},
         execute = function(args, ctx)
