@@ -25,26 +25,16 @@ function manager.init(storageType)
         inventory.setStorageType(storageType)
     end
     
-    -- Initialize inventory library from cache
-    inventory.init()
-    
     -- ALWAYS discover peripherals to ensure storage array is populated correctly
     -- This is critical to prevent smelted items from going to wrong inventories
     local storageInvs = inventory.discover(true)  -- force=true to ensure fresh discovery
     logger.info(string.format("Discovered %d storage inventories of type: %s", 
         #storageInvs, inventory.getStorageType()))
     
-    -- Check if we have valid cached data, only scan if needed
-    local stock = inventory.getAllStock()
-    local hasCache = stock and next(stock) ~= nil
-    
-    if hasCache then
-        logger.info("Storage manager initialized from cache (stock levels preserved)")
-    else
-        -- No cache, perform initial scan
-        manager.scan()
-        logger.info("Storage manager initialized with full scan")
-    end
+    -- ALWAYS perform initial scan to populate runtime state (items, slots tables)
+    -- The stock cache only stores totals, not item locations needed for transfers
+    manager.scan()
+    logger.info("Storage manager initialized with full scan")
 end
 
 ---Set scan interval
