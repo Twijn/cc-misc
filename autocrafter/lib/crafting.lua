@@ -1,11 +1,49 @@
 --- AutoCrafter Crafting Library
 --- Handles crafting logic and job preparation.
 ---
----@version 1.2.0
+---@version 1.3.0
 
-local VERSION = "1.2.0"
+local VERSION = "1.3.0"
 
 local crafting = {}
+
+-- Lazy load tag config to avoid circular dependencies
+local tagConfig = nil
+local function getTags()
+    if not tagConfig then
+        local success, tags = pcall(require, "config.tags")
+        if success then
+            tagConfig = tags
+        else
+            -- Fallback: no tag support
+            tagConfig = {
+                isTag = function() return false end,
+                resolve = function(tag) return nil, 0 end,
+                getTotalStock = function() return 0 end,
+            }
+        end
+    end
+    return tagConfig
+end
+
+---Resolve an ingredient to an actual item and get its stock
+---Handles both regular items and tags (prefixed with #)
+---@param ingredient string The ingredient (item ID or tag)
+---@param stockLevels table Current stock levels
+---@return string item The resolved item ID
+---@return number stock The stock level for this item
+local function resolveIngredient(ingredient, stockLevels)
+    local tags = getTags()
+    if tags.isTag(ingredient) then
+        local item, stock = tags.resolve(ingredient, stockLevels)
+        if item then
+            return item, stock
+        end
+        -- Tag not mapped, return as-is (will fail to find stock)
+        return ingredient, 0
+    end
+    return ingredient, stockLevels[ingredient] or 0
+end
 
 -- Maximum stack sizes for common items (default 64)
 local MAX_STACK_SIZES = {
@@ -37,7 +75,7 @@ function crafting.canCraft(recipe, stockLevels)
     local minCrafts = math.huge
     
     for _, ingredient in ipairs(recipe.ingredients) do
-        local available = stockLevels[ingredient.item] or 0
+        local item, available = resolveIngredient(ingredient.item, stockLevels)
         local possible = math.floor(available / ingredient.count)
         minCrafts = math.min(minCrafts, possible)
     end
@@ -61,13 +99,14 @@ function crafting.hasMaterials(recipe, stockLevels, quantity)
     local hasAll = true
     
     for _, ingredient in ipairs(recipe.ingredients) do
+        local item, have = resolveIngredient(ingredient.item, stockLevels)
         local needed = ingredient.count * crafts
-        local have = stockLevels[ingredient.item] or 0
         
         if have < needed then
             hasAll = false
             table.insert(missing, {
-                item = ingredient.item,
+                item = item,
+                originalItem = ingredient.item,  -- Keep original for display (may be tag)
                 needed = needed,
                 have = have,
                 short = needed - have,
@@ -126,13 +165,13 @@ function crafting.calculateMaxCrafts(recipe, stockLevels)
     local slotMaxCounts = getMaxItemsPerSlot(recipe)
     
     for _, ingredient in ipairs(recipe.ingredients) do
-        local available = stockLevels[ingredient.item] or 0
+        local item, available = resolveIngredient(ingredient.item, stockLevels)
         local possible = math.floor(available / ingredient.count)
         maxCrafts = math.min(maxCrafts, possible)
         
         -- Limit by stack size per slot based on actual items per slot
         -- Each slot can hold max 64 items (or less for certain items)
-        local stackLimit = crafting.getMaxStackSize(ingredient.item)
+        local stackLimit = crafting.getMaxStackSize(item)
         local itemsPerSlot = slotMaxCounts[ingredient.item] or 1
         local maxPerSlot = math.floor(stackLimit / itemsPerSlot)
         maxCrafts = math.min(maxCrafts, maxPerSlot)
@@ -183,13 +222,19 @@ function crafting.createJob(recipe, quantity, stockLevels, allowPartial)
         crafts = crafts,
         expectedOutput = crafts * outputCount,
         materials = {},
+        resolvedItems = {},  -- Maps tags to resolved item IDs
         status = "pending",
         created = os.epoch("utc"),
     }
     
-    -- Calculate exact materials needed
+    -- Calculate exact materials needed (resolve tags to actual items)
     for _, ingredient in ipairs(recipe.ingredients) do
-        job.materials[ingredient.item] = ingredient.count * crafts
+        local item = resolveIngredient(ingredient.item, stockLevels)
+        job.materials[item] = (job.materials[item] or 0) + (ingredient.count * crafts)
+        -- Track tag-to-item resolution for the crafter
+        if getTags().isTag(ingredient.item) then
+            job.resolvedItems[ingredient.item] = item
+        end
     end
     
     return job

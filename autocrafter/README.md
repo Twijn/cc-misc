@@ -6,6 +6,7 @@ A fully-featured automated crafting and storage system for ComputerCraft that ma
 
 - **Automatic Crafting**: Keep items stocked automatically by defining target quantities
 - **Recipe Loading**: Loads recipes directly from ROM (`/rom/mcdata/minecraft/recipes/`)
+- **Tag Support**: Recipes using tags (e.g., `#c:redstone_dusts`) are resolved to available items
 - **Multi-Turtle Support**: Multiple crafter turtles can work together
 - **Inventory Scanning**: Scans all connected inventories for item counts
 - **Server UI**: Easy-to-use interface to manage settings and view statuses
@@ -181,8 +182,28 @@ autocrafter/
     ├── settings.lua     # Settings management
     ├── targets.lua      # Craft target management
     ├── exports.lua      # Export inventory management
-    └── furnaces.lua     # Furnace configuration
+    ├── furnaces.lua     # Furnace configuration
+    └── tags.lua         # Tag-to-item mappings for recipes
 ```
+
+## Tag Support
+
+Many modded recipes use tags like `#c:redstone_dusts` instead of specific items. The autocrafter resolves these tags to actual items in your storage.
+
+### Default Tags
+
+Common tags are pre-configured (e.g., `#minecraft:planks` → any plank type, `#c:iron_ingots` → iron ingot). The system automatically picks items you have in stock.
+
+### Custom Tag Mappings
+
+You can add custom tag mappings in `config/tags.lua`:
+
+```lua
+-- Example: Map a modded tag to specific items
+tags.setMapping("c:copper_wires", {"techreborn:copper_wire", "immersiveengineering:copper_wire"})
+```
+
+The system will use the first item from the list that's available in storage.
 
 ## Future Expansions
 

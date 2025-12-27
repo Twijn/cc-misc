@@ -450,11 +450,22 @@ end
 
 ---Calculate how many items are needed per slot in the crafting grid
 ---@param recipe table The recipe
+---@param resolvedItems? table Optional tag-to-item mapping for resolving tags
 ---@return table grid Grid slot -> item mapping
 ---@return table counts Grid slot -> count per craft mapping
-local function buildCraftingGrid(recipe)
+local function buildCraftingGrid(recipe, resolvedItems)
     local grid = {}
     local counts = {}
+    resolvedItems = resolvedItems or {}
+    
+    -- Helper to resolve item (use resolved mapping if available)
+    local function resolveItem(item)
+        if resolvedItems[item] then
+            return resolvedItems[item]
+        end
+        return item
+    end
+    
     for i = 1, 9 do 
         grid[i] = nil 
         counts[i] = 0
@@ -470,7 +481,7 @@ local function buildCraftingGrid(recipe)
                 local char = line:sub(col, col)
                 local gridSlot = (row - 1) * 3 + col
                 if char ~= " " and key[char] then
-                    grid[gridSlot] = key[char]
+                    grid[gridSlot] = resolveItem(key[char])
                     counts[gridSlot] = 1
                 end
             end
@@ -479,7 +490,7 @@ local function buildCraftingGrid(recipe)
         local slot = 1
         for _, ingredient in ipairs(recipe.ingredients) do
             for _ = 1, ingredient.count do
-                grid[slot] = ingredient.item
+                grid[slot] = resolveItem(ingredient.item)
                 counts[slot] = 1
                 slot = slot + 1
             end
@@ -567,8 +578,8 @@ local function executeCraft(job)
         return false, "Failed to clear inventory before crafting"
     end
     
-    -- Build crafting grid
-    local grid, slotCounts = buildCraftingGrid(recipe)
+    -- Build crafting grid (use resolved items for tags)
+    local grid, slotCounts = buildCraftingGrid(recipe, job.resolvedItems)
     
     -- Calculate total crafts needed
     local totalCraftsNeeded = job.crafts or 1

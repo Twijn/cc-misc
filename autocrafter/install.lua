@@ -158,6 +158,7 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/config/recipeprefs.lua", path = diskPrefix .. "config/recipeprefs.lua"},
     {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = diskPrefix .. "config/furnaces.lua"},
     {url = BASE_URL .. "/autocrafter/config/workers.lua", path = diskPrefix .. "config/workers.lua"},
+    {url = BASE_URL .. "/autocrafter/config/tags.lua", path = diskPrefix .. "config/tags.lua"},
 }
 
 local crafterFiles = {
