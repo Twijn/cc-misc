@@ -100,6 +100,7 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/config/recipeprefs.lua", path = "config/recipeprefs.lua", name = "recipeprefs.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = "config/furnaces.lua", name = "furnaces.lua", category = "Config"},
     {url = BASE_URL .. "/autocrafter/config/workers.lua", path = "config/workers.lua", name = "workers.lua", category = "Config"},
+    {url = BASE_URL .. "/autocrafter/config/tags.lua", path = "config/tags.lua", name = "tags.lua", category = "Config"},
 }
 
 local crafterFiles = {
