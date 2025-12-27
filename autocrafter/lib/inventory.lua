@@ -699,6 +699,32 @@ function inventory.getStorageInventories()
     return storage
 end
 
+---Get storage inventories that have empty slots (from cache)
+---Returns array sorted by empty slots descending (most space first)
+---@return table[] Array of {name, emptySlots}
+function inventory.getStorageWithSpace()
+    if #storage == 0 then 
+        inventory.discover() 
+    end
+    
+    local storageWithSpace = {}
+    for _, invName in ipairs(storage) do
+        local invSlots = slots[invName] or {}
+        local size = sizes[invName] or 0
+        local usedCount = 0
+        for _ in pairs(invSlots) do usedCount = usedCount + 1 end
+        local emptyCount = size - usedCount
+        if emptyCount > 0 then
+            storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = emptyCount}
+        end
+    end
+    
+    -- Sort by empty slots descending (prefer inventories with more space)
+    table.sort(storageWithSpace, function(a, b) return a.emptySlots > b.emptySlots end)
+    
+    return storageWithSpace
+end
+
 ---Get all inventory names
 ---@return string[]
 function inventory.getInventoryNames()

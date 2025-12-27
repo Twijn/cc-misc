@@ -500,15 +500,16 @@ local function pullAllFromExport(sourceInv)
         local capturedCount = slotInfo.count
         local capturedName = slotInfo.name
         local capturedSourceInv = sourceInv  -- Capture in closure
-        -- Distribute across storage inventories
-        local storageIdx = ((i - 1) % #storageInvs) + 1
+        -- Distribute across storage inventories with space
+        local storageIdx = ((i - 1) % #storageWithSpace) + 1
+        local capturedStorageList = storageWithSpace  -- Capture for closure
         
         meta[#meta + 1] = {name = capturedName}
         tasks[#tasks + 1] = function()
-            -- Try multiple storage inventories if first fails
-            for attempt = 0, math.min(#storageInvs - 1, 5) do
-                local tryIdx = ((storageIdx - 1 + attempt) % #storageInvs) + 1
-                local storageName = storageInvs[tryIdx]
+            -- Try ALL storage inventories with space (not limited to 6)
+            for attempt = 0, #capturedStorageList - 1 do
+                local tryIdx = ((storageIdx - 1 + attempt) % #capturedStorageList) + 1
+                local storageName = capturedStorageList[tryIdx].name
                 local tryDest = inventory.getPeripheral(storageName)
                 if tryDest and tryDest.pullItems then
                     local ok, transferred = pcall(tryDest.pullItems, capturedSourceInv, capturedSlot, capturedCount)
@@ -519,22 +520,21 @@ local function pullAllFromExport(sourceInv)
                     elseif not ok then
                         logger.debug(string.format("pullAllFromExport: pullItems error for slot %d (%s) via %s: %s", 
                             capturedSlot, capturedName, storageName, tostring(transferred)))
-                    else
-                        -- transferred == 0 or nil, barrel may be full
-                        logger.debug(string.format("pullAllFromExport: pullItems returned 0 for slot %d (%s) via %s (barrel full?)", 
-                            capturedSlot, capturedName, storageName))
                     end
+                    -- Don't log every "returned 0" - too spammy when trying many barrels
                 else
                     logger.debug(string.format("pullAllFromExport: Cannot get peripheral or no pullItems for %s", storageName))
                 end
             end
+            logger.debug(string.format("pullAllFromExport: Failed to pull slot %d (%s) after trying %d barrels", 
+                capturedSlot, capturedName, #capturedStorageList))
             return 0
         end
     end
     
     if #tasks == 0 then
         logger.debug(string.format("pullAllFromExport: No tasks created (slotList=%d, storage=%d)", 
-            #slotList, #storageInvs))
+            #slotList, #storageWithSpace))
         return 0
     end
     
