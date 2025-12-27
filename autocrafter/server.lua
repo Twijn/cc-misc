@@ -3618,6 +3618,106 @@ local commands = {
         end
     },
     
+    reboot = {
+        description = "Reboot connected turtles (crafters/workers)",
+        category = "general",
+        aliases = {"restart"},
+        execute = function(args, ctx)
+            -- Get all connected crafters and workers
+            local allCrafters = crafterManager.getCrafters()
+            local allWorkers = workerManager.getWorkers()
+            
+            -- Filter to online ones
+            local onlineCrafters = {}
+            local onlineWorkers = {}
+            
+            for _, c in ipairs(allCrafters) do
+                if c.isOnline then
+                    table.insert(onlineCrafters, c)
+                end
+            end
+            
+            for _, w in ipairs(allWorkers) do
+                if w.isOnline then
+                    table.insert(onlineWorkers, w)
+                end
+            end
+            
+            local totalOnline = #onlineCrafters + #onlineWorkers
+            
+            if totalOnline == 0 then
+                ctx.mess("No online turtles to reboot")
+                return
+            end
+            
+            -- Create FormUI
+            local form = FormUI.new("Reboot Turtles")
+            
+            -- Add checkboxes for crafters
+            local crafterFields = {}
+            if #onlineCrafters > 0 then
+                form:label("=== Crafters ===")
+                for _, c in ipairs(onlineCrafters) do
+                    local label = string.format("#%d %s [%s]", c.id, c.label or "Crafter", c.status or "unknown")
+                    crafterFields[c.id] = form:checkbox(label, true)
+                end
+            end
+            
+            -- Add checkboxes for workers
+            local workerFields = {}
+            if #onlineWorkers > 0 then
+                form:label("=== Workers ===")
+                for _, w in ipairs(onlineWorkers) do
+                    local label = string.format("#%d %s [%s]", w.id, w.label or "Worker", w.status or "unknown")
+                    workerFields[w.id] = form:checkbox(label, true)
+                end
+            end
+            
+            form:label("")
+            form:addSubmitCancel("Reboot Selected", "Cancel")
+            
+            local result = form:run()
+            
+            if not result then
+                ctx.mess("Reboot cancelled")
+                return
+            end
+            
+            -- Count selected and send reboot commands
+            local rebooted = 0
+            
+            for id, field in pairs(crafterFields) do
+                if field() then
+                    -- Find the crafter and send reboot
+                    for _, c in ipairs(onlineCrafters) do
+                        if c.id == id and c.networkName then
+                            comms.send(config.messageTypes.REBOOT, {}, c.networkName)
+                            rebooted = rebooted + 1
+                        end
+                    end
+                end
+            end
+            
+            for id, field in pairs(workerFields) do
+                if field() then
+                    -- Find the worker and send reboot
+                    for _, w in ipairs(onlineWorkers) do
+                        if w.id == id and w.networkName then
+                            comms.send(config.messageTypes.REBOOT, {}, w.networkName)
+                            rebooted = rebooted + 1
+                        end
+                    end
+                end
+            end
+            
+            if rebooted > 0 then
+                ctx.succ(string.format("Sent reboot command to %d turtle(s)", rebooted))
+            else
+                ctx.mess("No turtles selected for reboot")
+            end
+        end
+    },
+    
     update = {
         description = "Update the autocrafter from disk",
         category = "general",
