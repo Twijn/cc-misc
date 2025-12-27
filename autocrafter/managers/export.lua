@@ -441,6 +441,18 @@ local function pullAllFromExport(sourceInv)
         return 0 
     end
     
+    -- Get storage inventories with empty slots (from cache) - similar to pullSlotsBatch
+    local storageWithSpace = inventory.getStorageWithSpace()
+    if #storageWithSpace == 0 then
+        logger.debug("pullAllFromExport: No storage with empty slots according to cache, trying all storage")
+        -- Fall back to all storage
+        for _, invName in ipairs(storageInvs) do
+            storageWithSpace[#storageWithSpace + 1] = {name = invName, emptySlots = 0}
+        end
+    else
+        logger.debug(string.format("pullAllFromExport: Found %d storage inventories with space", #storageWithSpace))
+    end
+    
     -- Get all items in the export inventory
     local list = source.list()
     if not list then 
@@ -475,8 +487,8 @@ local function pullAllFromExport(sourceInv)
         table.insert(summaryParts, string.format("%s:%d", itemName, count))
     end
     
-    logger.debug(string.format("pullAllFromExport: Found %d slots with items in %s, have %d storage inventories. Items: %s", 
-        #slotList, sourceInv, #storageInvs, table.concat(summaryParts, ", ")))
+    logger.debug(string.format("pullAllFromExport: Found %d slots with items in %s, have %d storage with space. Items: %s", 
+        #slotList, sourceInv, #storageWithSpace, table.concat(summaryParts, ", ")))
     
     -- Build parallel tasks
     local tasks = {}
