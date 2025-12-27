@@ -570,33 +570,21 @@ local function requestProcessLoop()
                                 logger.debug(string.format("Request #%d: starting smelt of %dx %s", 
                                     req.id, needed, req.item))
                             else
-                                -- Not enough input material - try to craft it
-                                local inputRecipe = recipes.getRecipeFor(input)
-                                if inputRecipe then
-                                    local inputNeeded = needed - inputStock
-                                    logger.debug(string.format("Request #%d: need to craft %dx %s for smelting", 
-                                        req.id, inputNeeded, input))
-                                    
-                                    -- Copy stock for recursive queuing
-                                    local stockCopy = {}
-                                    for k, v in pairs(stock) do stockCopy[k] = v end
-                                    
-                                    local jobs, err = requestManager.queueRecursive(
-                                        input, inputNeeded, stockCopy, req.id, 0, {}
-                                    )
-                                    
-                                    if #jobs > 0 then
-                                        requestManager.updateRequest(req.id, requestManager.STATES.CRAFTING)
-                                        logger.debug(string.format("Request #%d: queued %d jobs for smelt input", 
-                                            req.id, #jobs))
-                                    else
-                                        requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
-                                            failReason = err or string.format("Cannot craft %s", input)
-                                        })
-                                    end
+                                -- Not enough input material - try to craft it using job tree
+                                local inputNeeded = needed - inputStock
+                                local job, err = queueManager.addJob(input, inputNeeded, stock, "request")
+                                
+                                if job then
+                                    requestManager.updateRequest(req.id, requestManager.STATES.CRAFTING, {
+                                        rootJobId = job.id,
+                                        jobIds = {job.id},
+                                        craftingInput = true,
+                                    })
+                                    logger.debug(string.format("Request #%d: queued job tree #%d for smelt input %dx %s", 
+                                        req.id, job.id, inputNeeded, input))
                                 else
                                     requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
-                                        failReason = string.format("Missing %dx %s (no recipe)", needed - inputStock, input)
+                                        failReason = err or string.format("Cannot craft %s", input)
                                     })
                                 end
                             end
@@ -606,20 +594,10 @@ local function requestProcessLoop()
                             })
                         end
                     else
-                        -- For craft requests, use recursive queuing
-                        -- Copy stock so recursive function can modify it
-                        local stockCopy = {}
-                        for k, v in pairs(stock) do stockCopy[k] = v end
+                        -- For craft requests, use the queue manager's tree-based system
+                        local job, err = requestManager.queueJob(req, stock)
                         
-                        local jobs, err = requestManager.queueRecursive(
-                            req.item, needed, stockCopy, req.id, 0, {}
-                        )
-                        
-                        if #jobs > 0 then
-                            requestManager.updateRequest(req.id, requestManager.STATES.QUEUED)
-                            logger.debug(string.format("Request #%d: queued %d jobs for %dx %s", 
-                                req.id, #jobs, needed, req.item))
-                        else
+                        if not job then
                             -- Check if we already have enough in stock
                             if currentStock >= req.quantity then
                                 requestManager.updateRequest(req.id, requestManager.STATES.READY, {
@@ -641,77 +619,26 @@ local function requestProcessLoop()
                 
             elseif req.status == requestManager.STATES.QUEUED or 
                    req.status == requestManager.STATES.CRAFTING then
-                -- Check if jobs are complete
-                local allComplete = true
-                local anyFailed = false
-                local totalProduced = 0
+                -- Check if job tree is complete using the new tree-based system
+                local complete, statusMsg = requestManager.checkComplete(req, stock)
                 
-                for _, jobId in ipairs(req.jobIds or {}) do
-                    local job = queueManager.getJob(jobId)
-                    if job then
-                        if job.status == queueManager.STATES.PENDING or 
-                           job.status == queueManager.STATES.ASSIGNED or
-                           job.status == queueManager.STATES.CRAFTING then
-                            allComplete = false
-                            -- Update to crafting status if jobs are being worked on
-                            if req.status == requestManager.STATES.QUEUED and 
-                               (job.status == queueManager.STATES.ASSIGNED or 
-                                job.status == queueManager.STATES.CRAFTING) then
-                                requestManager.updateRequest(req.id, requestManager.STATES.CRAFTING)
-                            end
-                        end
-                    else
-                        -- Job not in queue, check history
-                        local history = queueManager.getHistory()
-                        for _, cJob in ipairs(history.completed or {}) do
-                            if cJob.id == jobId then
-                                totalProduced = totalProduced + (cJob.actualOutput or 0)
-                                break
-                            end
-                        end
-                        for _, fJob in ipairs(history.failed or {}) do
-                            if fJob.id == jobId then
-                                anyFailed = true
-                                break
-                            end
-                        end
+                -- Update to crafting if jobs are active
+                if req.status == requestManager.STATES.QUEUED and req.rootJobId then
+                    local treeStatus = queueManager.getJobTreeStatus(req.rootJobId)
+                    if treeStatus.assigned > 0 or treeStatus.crafting > 0 then
+                        requestManager.updateRequest(req.id, requestManager.STATES.CRAFTING)
                     end
-                end
-                
-                -- Update produced count
-                if totalProduced > 0 then
-                    requestManager.updateRequest(req.id, req.status, { produced = totalProduced })
                 end
                 
                 -- Check if we have enough stock now
-                if currentStock >= req.quantity then
+                if complete or currentStock >= req.quantity then
                     requestManager.updateRequest(req.id, requestManager.STATES.READY, {
                         produced = req.quantity
                     })
-                elseif allComplete and (anyFailed or currentStock < req.quantity) then
-                    -- All jobs done but not enough items - may need to queue more or fail
-                    local stillNeeded = req.quantity - currentStock
-                    if stillNeeded > 0 and not anyFailed then
-                        -- Try to queue more using recursive queuing
-                        local stockCopy = {}
-                        for k, v in pairs(stock) do stockCopy[k] = v end
-                        
-                        local jobs, err = requestManager.queueRecursive(
-                            req.item, stillNeeded, stockCopy, req.id, 0, {}
-                        )
-                        
-                        if #jobs > 0 then
-                            logger.debug(string.format("Request #%d: queued %d additional jobs", 
-                                req.id, #jobs))
-                        elseif err then
-                            logger.debug(string.format("Request #%d: cannot queue more: %s", 
-                                req.id, err))
-                        end
-                    elseif anyFailed then
-                        requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
-                            failReason = "Some crafting jobs failed"
-                        })
-                    end
+                elseif statusMsg and statusMsg:find("Failed") then
+                    requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                        failReason = statusMsg
+                    })
                 end
                 
             elseif req.status == requestManager.STATES.SMELTING then
@@ -720,53 +647,30 @@ local function requestProcessLoop()
                 local inputStock = input and (stock[input] or 0) or 0
                 local needed = req.quantity - currentStock
                 
-                -- If we're crafting input materials, check if we can start smelting
-                if inputStock >= needed then
-                    -- Enough input to smelt, check output progress
-                    if currentStock >= req.quantity then
-                        requestManager.updateRequest(req.id, requestManager.STATES.READY, {
-                            produced = req.quantity
-                        })
-                    elseif currentStock > (req.produced or 0) then
+                -- If we were crafting input, check if it's done
+                if req.craftingInput and req.rootJobId then
+                    local treeStatus = queueManager.getJobTreeStatus(req.rootJobId)
+                    if treeStatus.completed == treeStatus.total then
+                        -- Input crafting done, update state
                         requestManager.updateRequest(req.id, requestManager.STATES.SMELTING, {
-                            produced = currentStock
+                            craftingInput = false,
+                        })
+                    elseif treeStatus.failed > 0 then
+                        requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                            failReason = "Failed to craft input material"
                         })
                     end
-                else
-                    -- Still waiting for input materials - check if jobs are still running
-                    local pendingJobs = 0
-                    for _, jobId in ipairs(req.jobIds or {}) do
-                        local job = queueManager.getJob(jobId)
-                        if job then
-                            pendingJobs = pendingJobs + 1
-                        end
-                    end
-                    
-                    if pendingJobs == 0 then
-                        -- No jobs running, try to queue more for input
-                        local inputNeeded = needed - inputStock
-                        local inputRecipe = recipes.getRecipeFor(input)
-                        if inputRecipe and inputNeeded > 0 then
-                            local stockCopy = {}
-                            for k, v in pairs(stock) do stockCopy[k] = v end
-                            
-                            local jobs, _ = requestManager.queueRecursive(
-                                input, inputNeeded, stockCopy, req.id, 0, {}
-                            )
-                            
-                            if #jobs > 0 then
-                                logger.debug(string.format("Request #%d: queued %d jobs for smelt input", 
-                                    req.id, #jobs))
-                            end
-                        end
-                    end
-                    
-                    -- Update produced count
-                    if currentStock > (req.produced or 0) then
-                        requestManager.updateRequest(req.id, requestManager.STATES.SMELTING, {
-                            produced = currentStock
-                        })
-                    end
+                end
+                
+                -- Check smelt progress
+                if currentStock >= req.quantity then
+                    requestManager.updateRequest(req.id, requestManager.STATES.READY, {
+                        produced = req.quantity
+                    })
+                elseif currentStock > (req.produced or 0) then
+                    requestManager.updateRequest(req.id, requestManager.STATES.SMELTING, {
+                        produced = currentStock
+                    })
                 end
                 
             elseif req.status == requestManager.STATES.READY then
@@ -886,7 +790,7 @@ local commands = {
                 local jobs = queueManager.getJobs()
                 local pendingCount = 0
                 for _, job in ipairs(jobs) do
-                    if job.status == "pending" then
+                    if job.status == "pending" or job.status == "waiting" then
                         pendingCount = pendingCount + 1
                     end
                 end
@@ -899,6 +803,61 @@ local commands = {
                 queueManager.clearQueue()
                 ctx.succ(string.format("Cleared %d pending job(s) from queue", pendingCount))
                 return
+                
+            elseif subCmd == "tree" then
+                -- Show job tree for a specific root job
+                local rootId = tonumber(args[2])
+                if not rootId then
+                    ctx.err("Usage: queue tree <root_job_id>")
+                    return
+                end
+                
+                local tree = queueManager.getJobTree(rootId)
+                if #tree == 0 then
+                    ctx.err("No jobs found for tree #" .. rootId)
+                    return
+                end
+                
+                local p = ctx.pager("=== Job Tree #" .. rootId .. " ===")
+                local treeStatus = queueManager.getJobTreeStatus(rootId)
+                
+                p.setTextColor(colors.lightGray)
+                p.print(string.format("Total: %d jobs | Complete: %d | Pending: %d | Waiting: %d",
+                    treeStatus.total, treeStatus.completed, treeStatus.pending, treeStatus.waiting))
+                p.print("")
+                
+                -- Sort by depth for display (parent first)
+                table.sort(tree, function(a, b) return (a.depth or 0) < (b.depth or 0) end)
+                
+                for _, job in ipairs(tree) do
+                    local output = job.recipe and job.recipe.output or "unknown"
+                    output = output:gsub("minecraft:", "")
+                    local indent = string.rep("  ", job.depth or 0)
+                    
+                    local status = job.status
+                    local statusColor = colors.white
+                    if status == "pending" then
+                        statusColor = colors.yellow
+                    elseif status == "waiting" then
+                        statusColor = colors.orange
+                    elseif status == "assigned" or status == "crafting" then
+                        statusColor = colors.lime
+                    elseif status == "completed" then
+                        statusColor = colors.green
+                    elseif status == "failed" then
+                        statusColor = colors.red
+                    end
+                    
+                    p.setTextColor(colors.lightGray)
+                    p.write(indent .. "#" .. job.id .. " ")
+                    p.setTextColor(colors.white)
+                    p.write(string.format("%dx %s ", job.expectedOutput, output))
+                    p.setTextColor(statusColor)
+                    p.print("[" .. status .. "]")
+                end
+                
+                p.show()
+                return
             end
             
             -- Default: show queue
@@ -909,7 +868,10 @@ local commands = {
                 return
             end
             
-            local p = ctx.pager("=== Crafting Queue (" .. #jobs .. " jobs) ===")
+            local stats = queueManager.getStats()
+            local p = ctx.pager(string.format("=== Crafting Queue (%d jobs, %d root, %d child) ===", 
+                #jobs, stats.rootJobs, stats.childJobs))
+            
             for _, job in ipairs(jobs) do
                 local output = job.recipe and job.recipe.output or "unknown"
                 output = output:gsub("minecraft:", "")
@@ -918,12 +880,20 @@ local commands = {
                 local statusColor = colors.white
                 if status == "pending" then
                     statusColor = colors.yellow
+                elseif status == "waiting" then
+                    statusColor = colors.orange
                 elseif status == "assigned" or status == "crafting" then
                     statusColor = colors.lime
                 end
                 
+                -- Show indent for child jobs
+                local indent = ""
+                if job.parentId then
+                    indent = "  "
+                end
+                
                 p.setTextColor(colors.lightGray)
-                p.write(string.format("#%d ", job.id))
+                p.write(indent .. "#" .. job.id .. " ")
                 p.setTextColor(colors.white)
                 p.write(string.format("%dx %s ", job.expectedOutput, output))
                 p.setTextColor(statusColor)
@@ -932,12 +902,13 @@ local commands = {
             p.print("")
             p.setTextColor(colors.lightBlue)
             p.print("Use 'queue clear' to clear all pending jobs")
+            p.print("Use 'queue tree <id>' to view job tree details")
             p.show()
         end,
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"clear"}
+                local options = {"clear", "tree"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) then
@@ -1309,7 +1280,37 @@ local commands = {
                 print("  Status: " .. requestManager.getStatusString(req))
                 print("  Produced: " .. (req.produced or 0))
                 print("  Delivered: " .. (req.delivered or 0))
-                if req.jobIds and #req.jobIds > 0 then
+                
+                -- Show job tree info if available
+                if req.rootJobId then
+                    local treeStatus = queueManager.getJobTreeStatus(req.rootJobId)
+                    print("")
+                    ctx.mess("--- Job Tree ---")
+                    print(string.format("  Root Job: #%d", req.rootJobId))
+                    print(string.format("  Total Jobs: %d", treeStatus.total))
+                    print(string.format("  Completed: %d, Pending: %d, Waiting: %d", 
+                        treeStatus.completed, treeStatus.pending, treeStatus.waiting))
+                    if treeStatus.crafting > 0 or treeStatus.assigned > 0 then
+                        print(string.format("  Active: %d (crafting: %d)", 
+                            treeStatus.crafting + treeStatus.assigned, treeStatus.crafting))
+                    end
+                    if treeStatus.failed > 0 then
+                        print(string.format("  Failed: %d", treeStatus.failed))
+                    end
+                    
+                    -- Show items being crafted
+                    if next(treeStatus.items) then
+                        print("")
+                        ctx.mess("--- Items ---")
+                        for itemName, itemStatus in pairs(treeStatus.items) do
+                            local shortName = itemName:gsub("minecraft:", "")
+                            local status = itemStatus.pending > 0 
+                                and string.format("%d/%d", itemStatus.done, itemStatus.total)
+                                or "done"
+                            print(string.format("  %s: %s", shortName, status))
+                        end
+                    end
+                elseif req.jobIds and #req.jobIds > 0 then
                     print("  Jobs: " .. table.concat(req.jobIds, ", "))
                 end
                 return

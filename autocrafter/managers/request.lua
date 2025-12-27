@@ -314,8 +314,18 @@ function manager.getStatusString(request)
     if status == STATES.PENDING then
         return "Pending"
     elseif status == STATES.QUEUED then
+        -- Get tree status from queue manager if we have a root job
+        local rootJobId = request.rootJobId
+        if rootJobId then
+            return queueManager.getJobTreeStatusString(rootJobId)
+        end
         return "Queued"
     elseif status == STATES.CRAFTING then
+        -- Get tree status from queue manager
+        local rootJobId = request.rootJobId
+        if rootJobId then
+            return queueManager.getJobTreeStatusString(rootJobId)
+        end
         return string.format("Crafting (%d/%d)", produced, quantity)
     elseif status == STATES.SMELTING then
         return string.format("Smelting (%d/%d)", produced, quantity)
@@ -332,141 +342,36 @@ function manager.getStatusString(request)
     end
 end
 
----Recursively queue jobs for an item and its dependencies
----@param item string The item to craft
----@param quantity number How many to produce
----@param stockLevels table Current stock levels (will be modified)
----@param requestId number The request ID to associate jobs with
----@param depth? number Current recursion depth (default 0)
----@param visited? table Items already being processed (to prevent cycles)
----@return table jobs Array of job IDs queued
+---Queue a crafting job for a request (uses queue manager's tree-based system)
+---@param request table The request
+---@param stockLevels table Current stock levels
+---@return table|nil job The root job or nil
 ---@return string|nil error Error message if failed
-function manager.queueRecursive(item, quantity, stockLevels, requestId, depth, visited)
-    depth = depth or 0
-    visited = visited or {}
+function manager.queueJob(request, stockLevels)
+    local job, err = queueManager.addJob(request.item, request.quantity, stockLevels, "request")
     
-    local MAX_DEPTH = 10  -- Prevent infinite recursion
-    if depth > MAX_DEPTH then
-        return {}, "Maximum crafting depth exceeded"
+    if not job then
+        return nil, err
     end
     
-    -- Prevent circular dependencies
-    if visited[item] then
-        return {}, "Circular dependency detected for " .. item
-    end
-    visited[item] = true
+    -- Store the root job ID in the request
+    manager.updateRequest(request.id, STATES.QUEUED, {
+        rootJobId = job.id,
+        jobIds = {job.id},
+    })
     
-    local jobs = {}
-    local craftingLib = require("lib.crafting")
+    logger.info(string.format("Request #%d: queued job tree #%d for %dx %s",
+        request.id, job.id, request.quantity, request.item))
     
-    -- Check current stock
-    local currentStock = stockLevels[item] or 0
-    local needed = quantity - currentStock
-    
-    if needed <= 0 then
-        -- Already have enough in stock
-        logger.debug(string.format("Request #%d: already have %d/%d %s", 
-            requestId, currentStock, quantity, item))
-        return jobs, nil
-    end
-    
-    -- Get recipe for the item
-    local recipe = recipes.getRecipeFor(item)
-    if not recipe then
-        return {}, "No recipe found for " .. item
-    end
-    
-    -- Calculate how many crafts we need
-    local outputCount = recipe.outputCount or 1
-    local craftsNeeded = math.ceil(needed / outputCount)
-    
-    -- Check what materials we're missing
-    local _, missing = craftingLib.hasMaterials(recipe, stockLevels, needed)
-    
-    -- Try to recursively craft any missing materials
-    if missing and #missing > 0 then
-        for _, m in ipairs(missing) do
-            local missingItem = m.item
-            local missingAmount = m.short
-            
-            -- Check if this material can be crafted
-            local matRecipe = recipes.getRecipeFor(missingItem)
-            if matRecipe then
-                logger.debug(string.format("Request #%d: need to craft %dx %s for %s", 
-                    requestId, missingAmount, missingItem, item))
-                
-                -- Recursively queue jobs for the missing material
-                local subJobs, subErr = manager.queueRecursive(
-                    missingItem, 
-                    missingAmount, 
-                    stockLevels, 
-                    requestId, 
-                    depth + 1,
-                    visited
-                )
-                
-                if subErr then
-                    -- Can't craft this material
-                    logger.debug(string.format("Request #%d: cannot craft %s: %s", 
-                        requestId, missingItem, subErr))
-                else
-                    -- Add sub-jobs to our list
-                    for _, jobId in ipairs(subJobs) do
-                        table.insert(jobs, jobId)
-                    end
-                end
-            else
-                -- Material has no recipe, check if it can be smelted
-                local furnaceConfig = require("config.furnaces")
-                local smeltInput = furnaceConfig.getSmeltInput(missingItem)
-                if smeltInput then
-                    logger.debug(string.format("Request #%d: %s can be smelted from %s", 
-                        requestId, missingItem, smeltInput))
-                    -- Note: We don't queue smelt jobs here, furnace manager handles that
-                    -- Just mark that we need smelting
-                end
-            end
-        end
-    end
-    
-    -- Now try to queue the main job with updated stock levels
-    local job, err = queueManager.addJob(item, needed, stockLevels)
-    if job then
-        table.insert(jobs, job.id)
-        manager.addJobToRequest(requestId, job.id)
-        
-        -- Update stock levels to reflect materials used
-        for mat, count in pairs(job.materials or {}) do
-            stockLevels[mat] = (stockLevels[mat] or 0) - count
-        end
-        
-        -- Add expected output to stock (optimistically, for dependent items)
-        stockLevels[item] = (stockLevels[item] or 0) + job.expectedOutput
-        
-        logger.debug(string.format("Request #%d: queued job #%d for %dx %s (depth %d)", 
-            requestId, job.id, job.expectedOutput, item, depth))
-    else
-        -- Still can't craft - might need to wait for sub-jobs to complete
-        if #jobs > 0 then
-            logger.debug(string.format("Request #%d: queued %d sub-jobs, will retry %s later", 
-                requestId, #jobs, item))
-        else
-            return {}, err or ("Cannot craft " .. item)
-        end
-    end
-    
-    -- Clear visited for this item so it can be crafted again if needed
-    visited[item] = nil
-    
-    return jobs, nil
+    return job
 end
 
----Check if all jobs for a request are complete and queue more if needed
+---Check if all jobs for a request are complete
 ---@param request table The request to check
 ---@param stockLevels table Current stock levels
 ---@return boolean complete Whether all required items are ready
 ---@return string|nil status Status message
-function manager.checkAndQueueMore(request, stockLevels)
+function manager.checkComplete(request, stockLevels)
     local currentStock = stockLevels[request.item] or 0
     
     -- If we have enough, we're done
@@ -474,37 +379,48 @@ function manager.checkAndQueueMore(request, stockLevels)
         return true, "Ready"
     end
     
-    -- Check if there are pending/active jobs
-    local pendingJobs = 0
-    for _, jobId in ipairs(request.jobIds or {}) do
-        local job = queueManager.getJob(jobId)
-        if job then
-            pendingJobs = pendingJobs + 1
-        end
+    -- Check the job tree status
+    local rootJobId = request.rootJobId
+    if not rootJobId then
+        return false, "No job queued"
     end
     
-    -- If no pending jobs but we don't have enough, try to queue more
-    if pendingJobs == 0 then
-        local needed = request.quantity - currentStock
-        if needed > 0 then
-            local jobs, err = manager.queueRecursive(
-                request.item,
-                needed,
-                stockLevels,
-                request.id,
-                0,
-                {}
-            )
-            
-            if #jobs > 0 then
-                return false, string.format("Queued %d more jobs", #jobs)
-            elseif err then
-                return false, err
+    -- Get the root job
+    local rootJob = queueManager.getJob(rootJobId)
+    if not rootJob then
+        -- Job might be complete or failed
+        local history = queueManager.getHistory()
+        for _, job in ipairs(history.completed or {}) do
+            if job.id == rootJobId then
+                -- Job completed, update produced count
+                manager.recordProduced(request.id, job.actualOutput or job.expectedOutput)
+                return currentStock >= request.quantity, "Jobs complete, checking stock"
             end
         end
+        for _, job in ipairs(history.failed or {}) do
+            if job.id == rootJobId then
+                return false, "Job failed: " .. (job.failReason or "Unknown")
+            end
+        end
+        return false, "Job not found"
     end
     
-    return false, string.format("Waiting (%d jobs pending)", pendingJobs)
+    -- Check job tree status
+    local treeStatus = queueManager.getJobTreeStatus(rootJobId)
+    
+    if treeStatus.failed > 0 then
+        return false, string.format("Failed (%d jobs failed)", treeStatus.failed)
+    end
+    
+    if treeStatus.completed == treeStatus.total then
+        return currentStock >= request.quantity, "All jobs complete"
+    end
+    
+    local active = treeStatus.assigned + treeStatus.crafting
+    local waiting = treeStatus.waiting + treeStatus.pending
+    
+    return false, string.format("In progress (%d/%d done, %d active, %d waiting)", 
+        treeStatus.completed, treeStatus.total, active, waiting)
 end
 
 return manager
