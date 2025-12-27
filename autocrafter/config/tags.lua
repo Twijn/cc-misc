@@ -7,14 +7,31 @@
 ---
 ---@version 1.0.0
 
-local persist = require("lib.persist")
-local config = require("config")
-
 local module = {}
 
--- Cache path for persisted tag mappings
-local cachePath = (config.cachePath or "/disk/data/cache") .. "/tags.json"
-local tagData = persist(cachePath)
+-- Try to load persist for saving custom mappings (optional)
+local tagData = nil
+local function getTagData()
+    if tagData == nil then
+        local ok, persist = pcall(require, "lib.persist")
+        if ok then
+            -- Try to get cache path from config, fall back to default
+            local cachePath = "/disk/data/cache"
+            local configOk, config = pcall(require, "config")
+            if configOk and config.cachePath then
+                cachePath = config.cachePath
+            end
+            tagData = persist(cachePath .. "/tags.json")
+        else
+            -- No persist available, use empty storage
+            tagData = {
+                get = function() return nil end,
+                set = function() end,
+            }
+        end
+    end
+    return tagData
+end
 
 -- Default tag mappings for common tags
 -- Users can add/modify these via the API
@@ -88,7 +105,8 @@ local defaultMappings = {
 ---Get all mappings (user + default)
 ---@return table mappings All tag mappings
 local function getMappings()
-    local saved = tagData:get("mappings") or {}
+    local data = getTagData()
+    local saved = data:get("mappings") or {}
     -- Merge with defaults (user mappings override defaults)
     local merged = {}
     for tag, items in pairs(defaultMappings) do
@@ -172,18 +190,20 @@ end
 ---@param items table Array of item IDs
 function module.setMapping(tag, items)
     local cleanTag = tag:sub(1, 1) == "#" and tag:sub(2) or tag
-    local saved = tagData:get("mappings") or {}
+    local data = getTagData()
+    local saved = data:get("mappings") or {}
     saved[cleanTag] = items
-    tagData:set("mappings", saved)
+    data:set("mappings", saved)
 end
 
 ---Remove a tag mapping
 ---@param tag string The tag (with or without # prefix)
 function module.removeMapping(tag)
     local cleanTag = tag:sub(1, 1) == "#" and tag:sub(2) or tag
-    local saved = tagData:get("mappings") or {}
+    local data = getTagData()
+    local saved = data:get("mappings") or {}
     saved[cleanTag] = nil
-    tagData:set("mappings", saved)
+    data:set("mappings", saved)
 end
 
 ---Get all configured tag mappings
@@ -201,7 +221,8 @@ end
 ---Get user-defined tag mappings (excluding defaults)
 ---@return table mappings User mappings {tag -> items}
 function module.getUserMappings()
-    return tagData:get("mappings") or {}
+    local data = getTagData()
+    return data:get("mappings") or {}
 end
 
 ---Calculate total stock for a tag across all matching items

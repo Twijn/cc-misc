@@ -9,21 +9,31 @@ local crafting = {}
 
 -- Lazy load tag config to avoid circular dependencies
 local tagConfig = nil
+local tagLoadError = nil
 local function getTags()
     if not tagConfig then
         local success, tags = pcall(require, "config.tags")
-        if success then
+        if success and type(tags) == "table" and tags.isTag then
             tagConfig = tags
         else
+            -- Store error for debugging if needed
+            tagLoadError = tostring(tags)
             -- Fallback: no tag support
             tagConfig = {
-                isTag = function() return false end,
-                resolve = function(tag) return nil, 0 end,
-                getTotalStock = function() return 0 end,
+                isTag = function(_) return false end,
+                resolve = function(_, _) return nil, 0 end,
+                getTotalStock = function(_, _) return 0 end,
             }
         end
     end
     return tagConfig
+end
+
+---Get the last tag load error (for debugging)
+---@return string|nil error The error message if tag loading failed
+function crafting.getTagLoadError()
+    getTags() -- Ensure we've tried to load
+    return tagLoadError
 end
 
 ---Resolve an ingredient to an actual item and get its stock

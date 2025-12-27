@@ -56,7 +56,11 @@ local function parseShaped(data)
             recipe.key[char] = "#" .. ingredient.tag -- prefix tags with #
         elseif type(ingredient) == "table" and ingredient[1] then
             -- Multiple options - take first for now
-            recipe.key[char] = ingredient[1].item or ingredient[1].tag
+            if ingredient[1].item then
+                recipe.key[char] = ingredient[1].item
+            elseif ingredient[1].tag then
+                recipe.key[char] = "#" .. ingredient[1].tag
+            end
         end
     end
     
@@ -103,7 +107,11 @@ local function parseShapeless(data)
         elseif ingredient.tag then
             item = "#" .. ingredient.tag
         elseif type(ingredient) == "table" and ingredient[1] then
-            item = ingredient[1].item or ingredient[1].tag
+            if ingredient[1].item then
+                item = ingredient[1].item
+            elseif ingredient[1].tag then
+                item = "#" .. ingredient[1].tag
+            end
         end
         
         if item then
