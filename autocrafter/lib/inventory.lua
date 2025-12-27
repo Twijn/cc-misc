@@ -211,6 +211,10 @@ end
 --------------------------------------------------------------------------------
 
 ---Update cache after removing items
+---@param inv string Inventory name
+---@param slot number Slot number
+---@param itemKey string Item key (name or name:nbt)
+---@param count number Amount removed
 local function cacheRemove(inv, slot, itemKey, count)
     if not slots[inv] then return end
     
@@ -224,8 +228,16 @@ local function cacheRemove(inv, slot, itemKey, count)
         slotData.count = newCount
     end
     
-    -- Update stock
-    if stock[itemKey] then
+    -- Update stock (only for storage inventories)
+    local isStorage = false
+    for _, name in ipairs(storage) do
+        if name == inv then
+            isStorage = true
+            break
+        end
+    end
+    
+    if isStorage and stock[itemKey] then
         stock[itemKey] = math.max(0, stock[itemKey] - count)
         if stock[itemKey] == 0 then stock[itemKey] = nil end
     end
@@ -1256,6 +1268,41 @@ function inventory.depositFromPlayer(playerName, itemFilter, maxCount, excludes)
     
     if deposited > 0 then inventory.scan() end
     return deposited, deposited == 0 and "No items transferred" or nil
+end
+
+---Update cache after items are removed from a slot (public API)
+---Use this instead of scanSingle for performance when transfer count is known
+---@param inv string Inventory name
+---@param slot number Slot number
+---@param itemName string Item name (e.g., "minecraft:diamond")
+---@param count number Amount that was removed
+---@param nbt? string Optional NBT hash
+function inventory.updateCacheRemove(inv, slot, itemName, count, nbt)
+    local itemKey = key(itemName, nbt)
+    cacheRemove(inv, slot, itemKey, count)
+end
+
+---Update cache after items are added to a slot (public API)
+---Use this instead of scanSingle for performance when transfer count is known
+---@param inv string Inventory name
+---@param slot number Slot number
+---@param itemName string Item name (e.g., "minecraft:diamond")
+---@param count number Amount that was added
+---@param nbt? string Optional NBT hash
+function inventory.updateCacheAdd(inv, slot, itemName, count, nbt)
+    cacheAdd(inv, slot, itemName, count, nbt)
+end
+
+---Update stock total only (without tracking exact slot location)
+---Use this when items were added to storage but exact destination slot is unknown
+---This is more efficient than scanSingle but results in slightly stale location cache
+---The location cache will self-correct on the next periodic scan
+---@param itemName string Item name (e.g., "minecraft:diamond")
+---@param count number Amount that was added
+---@param nbt? string Optional NBT hash
+function inventory.updateStockAdd(itemName, count, nbt)
+    local itemKey = key(itemName, nbt)
+    stock[itemKey] = (stock[itemKey] or 0) + count
 end
 
 inventory.VERSION = VERSION

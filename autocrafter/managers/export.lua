@@ -168,6 +168,8 @@ local function pushToExport(item, count, destInv, destSlot)
                 
                 if transferred > 0 then
                     sources[loc.inv] = (sources[loc.inv] or 0) + transferred
+                    -- Update cache incrementally - no need to rescan entire inventory
+                    inventory.updateCacheRemove(loc.inv, loc.slot, item, transferred)
                 end
             end
             ::continue::
@@ -203,7 +205,7 @@ local function pushToExport(item, count, destInv, destSlot)
             local capturedAmount = toPush
             local capturedDestInv = destInv  -- Capture destInv in closure
             
-            meta[#meta + 1] = {inv = capturedInv}
+            meta[#meta + 1] = {inv = capturedInv, slot = capturedSlot}
             tasks[#tasks + 1] = function()
                 local ok, transferred = pcall(source.pushItems, capturedDestInv, capturedSlot, capturedAmount)
                 if not ok then
@@ -254,6 +256,8 @@ local function pushToExport(item, count, destInv, destSlot)
         if transferred > 0 then
             pushed = pushed + transferred
             sources[meta[i].inv] = (sources[meta[i].inv] or 0) + transferred
+            -- Update cache incrementally - no need to rescan entire inventory
+            inventory.updateCacheRemove(meta[i].inv, meta[i].slot, item, transferred)
         end
     end
     
@@ -314,12 +318,14 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
             local result = tasks[1]()
             if result > 0 then
                 logger.debug(string.format("pullFromExport: Pulled %d from slot %d of %s", result, sourceSlot, sourceInv))
+                -- Update stock (we know the item from the function parameter)
+                inventory.updateStockAdd(item, result)
                 return result
             end
-            -- If first failed, try rest in parallel
+            -- If first failed, try rest sequentially
             local pulled = 0
             for i = 2, #tasks do
-                local result = tasks[i]()
+                result = tasks[i]()
                 if result > 0 then
                     pulled = pulled + result
                     break
@@ -327,6 +333,8 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
             end
             if pulled > 0 then
                 logger.debug(string.format("pullFromExport: Pulled %d from slot %d of %s (retry)", pulled, sourceSlot, sourceInv))
+                -- Update stock
+                inventory.updateStockAdd(item, pulled)
             else
                 logger.warn(string.format("pullFromExport: Failed to pull from slot %d of %s", sourceSlot, sourceInv))
             end
@@ -393,10 +401,19 @@ local function pullFromExport(item, count, sourceInv, sourceSlot)
         end
         parallel.waitForAll(table.unpack(taskFns))
         
-        -- Sum actual results
+        -- Sum actual results and track which storage inventories were used
         pulled = 0
-        for _, result in ipairs(results) do
-            pulled = pulled + (result or 0)
+        for i, result in ipairs(results) do
+            local transferred = result or 0
+            if transferred > 0 then
+                pulled = pulled + transferred
+            end
+        end
+        
+        -- Update stock total (lightweight - no need to scan for exact slot)
+        -- Location cache will be corrected on next periodic scan
+        if pulled > 0 then
+            inventory.updateStockAdd(item, pulled)
         end
         
         logger.debug(string.format("pullFromExport: Pulled %d %s from %s", pulled, item, sourceInv))
@@ -447,6 +464,7 @@ local function pullAllFromExport(sourceInv)
     -- Build parallel tasks
     local tasks = {}
     local results = {}
+    local meta = {}  -- Track item name for each task
     
     for i, slotInfo in ipairs(slotList) do
         local capturedSlot = slotInfo.slot
@@ -456,6 +474,7 @@ local function pullAllFromExport(sourceInv)
         -- Distribute across storage inventories
         local storageIdx = ((i - 1) % #storageInvs) + 1
         
+        meta[#meta + 1] = {name = capturedName}
         tasks[#tasks + 1] = function()
             -- Try multiple storage inventories if first fails
             for attempt = 0, math.min(#storageInvs - 1, 5) do
@@ -495,10 +514,17 @@ local function pullAllFromExport(sourceInv)
         parallel.waitForAll(table.unpack(batchFns))
     end
     
-    -- Sum results
+    -- Sum results and update stock cache
     local pulled = 0
-    for _, result in ipairs(results) do
-        pulled = pulled + (result or 0)
+    for i, result in ipairs(results) do
+        local transferred = result or 0
+        if transferred > 0 then
+            pulled = pulled + transferred
+            -- Update stock total for this item (lightweight - no scan needed)
+            if meta[i] and meta[i].name then
+                inventory.updateStockAdd(meta[i].name, transferred)
+            end
+        end
     end
     
     logger.debug(string.format("pullAllFromExport: Completed - pulled %d items from %s", pulled, sourceInv))
@@ -550,7 +576,7 @@ local function processVacuumSlots(name, inv, slotConfig)
             end
             
             if shouldPull then
-                slotsToPull[#slotsToPull + 1] = {slot = slot, count = slotItem.count}
+                slotsToPull[#slotsToPull + 1] = {slot = slot, count = slotItem.count, name = slotItem.name}
             end
         end
     end
@@ -560,12 +586,14 @@ local function processVacuumSlots(name, inv, slotConfig)
     -- Build parallel tasks
     local tasks = {}
     local results = {}
+    local meta = {}  -- Track item name for each task
     
     for i, slotInfo in ipairs(slotsToPull) do
         local capturedSlot = slotInfo.slot
         local capturedCount = slotInfo.count
         local storageIdx = ((i - 1) % #storageInvs) + 1
         
+        meta[#meta + 1] = {name = slotInfo.name}
         tasks[#tasks + 1] = function()
             for attempt = 0, math.min(#storageInvs - 1, 5) do
                 local tryIdx = ((storageIdx - 1 + attempt) % #storageInvs) + 1
@@ -600,10 +628,17 @@ local function processVacuumSlots(name, inv, slotConfig)
         parallel.waitForAll(table.unpack(batchFns))
     end
     
-    -- Sum results
+    -- Sum results and update stock cache
     local pulled = 0
-    for _, result in ipairs(results) do
-        pulled = pulled + (result or 0)
+    for i, result in ipairs(results) do
+        local transferred = result or 0
+        if transferred > 0 then
+            pulled = pulled + transferred
+            -- Update stock total for this item (lightweight - no scan needed)
+            if meta[i] and meta[i].name then
+                inventory.updateStockAdd(meta[i].name, transferred)
+            end
+        end
     end
     
     return pulled
