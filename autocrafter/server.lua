@@ -166,11 +166,14 @@ local function processCraftTargets()
     
     -- Get all current jobs and build a lookup table of queued amounts per item
     -- This is O(jobs) instead of O(targets * jobs)
+    -- Include ALL jobs (pending, waiting, assigned, crafting) to avoid duplicate queuing
     local allJobs = queueManager.getJobs()
     local queuedByItem = {}
     for _, job in ipairs(allJobs) do
         if job.recipe and job.recipe.output then
-            if job.status == "pending" or job.status == "assigned" or job.status == "crafting" then
+            -- Count all non-completed/non-failed jobs to avoid creating duplicates
+            if job.status == "pending" or job.status == "waiting" or 
+               job.status == "assigned" or job.status == "crafting" then
                 local output = job.recipe.output
                 queuedByItem[output] = (queuedByItem[output] or 0) + (job.expectedOutput or 0)
             end
@@ -209,8 +212,22 @@ local function processCraftTargets()
         logger.debug(string.format("processCraftTargets: queued job #%d for %dx %s", 
             job.id, job.expectedOutput, target.item))
         
-        -- Update queued lookup table for subsequent iterations
+        -- Update queued lookup table for the root job
         queuedByItem[target.item] = (queuedByItem[target.item] or 0) + job.expectedOutput
+        
+        -- IMPORTANT: Also update for any child jobs created (dependencies)
+        -- This prevents creating duplicate jobs when both an item and its dependency are targets
+        if job.rootId then
+            local treeJobs = queueManager.getJobTree(job.rootId)
+            for _, treeJob in ipairs(treeJobs) do
+                if treeJob.recipe and treeJob.recipe.output and treeJob.id ~= job.id then
+                    local childOutput = treeJob.recipe.output
+                    queuedByItem[childOutput] = (queuedByItem[childOutput] or 0) + (treeJob.expectedOutput or 0)
+                    logger.debug(string.format("processCraftTargets: child job #%d will produce %dx %s", 
+                        treeJob.id, treeJob.expectedOutput or 0, childOutput))
+                end
+            end
+        end
         
         -- Update stock to reflect materials reserved for this job
         -- This prevents creating jobs that can't be fulfilled
