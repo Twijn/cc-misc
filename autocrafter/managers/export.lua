@@ -444,8 +444,13 @@ local function pullAllFromExport(sourceInv)
     -- Get all items in the export inventory
     local list = source.list()
     if not list then 
-        logger.debug(string.format("pullAllFromExport: Failed to list items in %s", sourceInv))
+        logger.debug(string.format("pullAllFromExport: Failed to list items in %s (list returned nil)", sourceInv))
         return 0 
+    end
+    
+    if next(list) == nil then
+        logger.debug(string.format("pullAllFromExport: Empty table returned from %s (peripheral sees no items)", sourceInv))
+        return 0
     end
     
     -- Build list of slots to pull
@@ -459,7 +464,19 @@ local function pullAllFromExport(sourceInv)
         return 0 
     end
     
-    logger.debug(string.format("pullAllFromExport: Found %d slots with items in %s", #slotList, sourceInv))
+    -- Log what we found
+    local itemSummary = {}
+    for _, slotInfo in ipairs(slotList) do
+        local shortName = slotInfo.name:gsub("minecraft:", "")
+        itemSummary[shortName] = (itemSummary[shortName] or 0) + slotInfo.count
+    end
+    local summaryParts = {}
+    for itemName, count in pairs(itemSummary) do
+        table.insert(summaryParts, string.format("%s:%d", itemName, count))
+    end
+    
+    logger.debug(string.format("pullAllFromExport: Found %d slots with items in %s, have %d storage inventories. Items: %s", 
+        #slotList, sourceInv, #storageInvs, table.concat(summaryParts, ", ")))
     
     -- Build parallel tasks
     local tasks = {}
@@ -479,20 +496,37 @@ local function pullAllFromExport(sourceInv)
             -- Try multiple storage inventories if first fails
             for attempt = 0, math.min(#storageInvs - 1, 5) do
                 local tryIdx = ((storageIdx - 1 + attempt) % #storageInvs) + 1
-                local tryDest = inventory.getPeripheral(storageInvs[tryIdx])
+                local storageName = storageInvs[tryIdx]
+                local tryDest = inventory.getPeripheral(storageName)
                 if tryDest and tryDest.pullItems then
                     local ok, transferred = pcall(tryDest.pullItems, capturedSourceInv, capturedSlot, capturedCount)
                     if ok and transferred and transferred > 0 then
+                        logger.debug(string.format("pullAllFromExport: Pulled %d of %s from slot %d via %s", 
+                            transferred, capturedName, capturedSlot, storageName))
                         return transferred
                     elseif not ok then
-                        logger.debug(string.format("pullAllFromExport: pullItems error for slot %d (%s): %s", 
-                            capturedSlot, capturedName, tostring(transferred)))
+                        logger.debug(string.format("pullAllFromExport: pullItems error for slot %d (%s) via %s: %s", 
+                            capturedSlot, capturedName, storageName, tostring(transferred)))
+                    else
+                        -- transferred == 0 or nil, barrel may be full
+                        logger.debug(string.format("pullAllFromExport: pullItems returned 0 for slot %d (%s) via %s (barrel full?)", 
+                            capturedSlot, capturedName, storageName))
                     end
+                else
+                    logger.debug(string.format("pullAllFromExport: Cannot get peripheral or no pullItems for %s", storageName))
                 end
             end
             return 0
         end
     end
+    
+    if #tasks == 0 then
+        logger.debug(string.format("pullAllFromExport: No tasks created (slotList=%d, storage=%d)", 
+            #slotList, #storageInvs))
+        return 0
+    end
+    
+    logger.debug(string.format("pullAllFromExport: Created %d tasks for %d slots", #tasks, #slotList))
     
     -- Execute in parallel batches
     local taskFns = {}
