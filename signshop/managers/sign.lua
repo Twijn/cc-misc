@@ -80,6 +80,10 @@ manager.updateAll = function()
   local signs = table.pack(peripheral.find("minecraft:sign"))
   for _, sign in ipairs(signs) do
     local data = sign.getSignText()
+    if not data then
+      logger.warn(string.format("Could not read sign text for %s", peripheral.getName(sign)))
+      goto continue
+    end
     local meta = data[4]
     local product = productManager.get(meta)
 
@@ -95,6 +99,7 @@ manager.updateAll = function()
       end
       table.insert(signData[product.meta], peripheral.getName(sign))
     end
+    ::continue::
   end
   productSigns.setAll(signData)
   logger.info(string.format("Updated %d signs in %.02f seconds", #signs, os.clock() - start))
