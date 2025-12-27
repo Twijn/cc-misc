@@ -560,8 +560,7 @@ local function requestProcessLoop()
                 local needed = req.quantity - (req.produced or 0)
                 if needed > 0 then
                     if req.isSmelt then
-                        -- For smelt requests, we add a temporary smelt target
-                        -- The furnace manager will handle the smelting
+                        -- For smelt requests, check if we have input or need to craft it
                         local input = furnaceConfig.getSmeltInput(req.item)
                         if input then
                             local inputStock = stock[input] or 0
@@ -571,10 +570,35 @@ local function requestProcessLoop()
                                 logger.debug(string.format("Request #%d: starting smelt of %dx %s", 
                                     req.id, needed, req.item))
                             else
-                                -- Not enough input material
-                                requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
-                                    failReason = string.format("Missing %dx %s", needed - inputStock, input)
-                                })
+                                -- Not enough input material - try to craft it
+                                local inputRecipe = recipes.getRecipeFor(input)
+                                if inputRecipe then
+                                    local inputNeeded = needed - inputStock
+                                    logger.debug(string.format("Request #%d: need to craft %dx %s for smelting", 
+                                        req.id, inputNeeded, input))
+                                    
+                                    -- Copy stock for recursive queuing
+                                    local stockCopy = {}
+                                    for k, v in pairs(stock) do stockCopy[k] = v end
+                                    
+                                    local jobs, err = requestManager.queueRecursive(
+                                        input, inputNeeded, stockCopy, req.id, 0, {}
+                                    )
+                                    
+                                    if #jobs > 0 then
+                                        requestManager.updateRequest(req.id, requestManager.STATES.CRAFTING)
+                                        logger.debug(string.format("Request #%d: queued %d jobs for smelt input", 
+                                            req.id, #jobs))
+                                    else
+                                        requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                                            failReason = err or string.format("Cannot craft %s", input)
+                                        })
+                                    end
+                                else
+                                    requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
+                                        failReason = string.format("Missing %dx %s (no recipe)", needed - inputStock, input)
+                                    })
+                                end
                             end
                         else
                             requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
@@ -582,13 +606,19 @@ local function requestProcessLoop()
                             })
                         end
                     else
-                        -- For craft requests, queue jobs
-                        local job, err = queueManager.addJob(req.item, needed, stock)
-                        if job then
-                            requestManager.addJobToRequest(req.id, job.id)
+                        -- For craft requests, use recursive queuing
+                        -- Copy stock so recursive function can modify it
+                        local stockCopy = {}
+                        for k, v in pairs(stock) do stockCopy[k] = v end
+                        
+                        local jobs, err = requestManager.queueRecursive(
+                            req.item, needed, stockCopy, req.id, 0, {}
+                        )
+                        
+                        if #jobs > 0 then
                             requestManager.updateRequest(req.id, requestManager.STATES.QUEUED)
-                            logger.debug(string.format("Request #%d: queued job #%d for %dx %s", 
-                                req.id, job.id, job.expectedOutput, req.item))
+                            logger.debug(string.format("Request #%d: queued %d jobs for %dx %s", 
+                                req.id, #jobs, needed, req.item))
                         else
                             -- Check if we already have enough in stock
                             if currentStock >= req.quantity then
@@ -662,11 +692,20 @@ local function requestProcessLoop()
                     -- All jobs done but not enough items - may need to queue more or fail
                     local stillNeeded = req.quantity - currentStock
                     if stillNeeded > 0 and not anyFailed then
-                        -- Try to queue more
-                        local job, err = queueManager.addJob(req.item, stillNeeded, stock)
-                        if job then
-                            requestManager.addJobToRequest(req.id, job.id)
-                            logger.debug(string.format("Request #%d: queued additional job #%d", req.id, job.id))
+                        -- Try to queue more using recursive queuing
+                        local stockCopy = {}
+                        for k, v in pairs(stock) do stockCopy[k] = v end
+                        
+                        local jobs, err = requestManager.queueRecursive(
+                            req.item, stillNeeded, stockCopy, req.id, 0, {}
+                        )
+                        
+                        if #jobs > 0 then
+                            logger.debug(string.format("Request #%d: queued %d additional jobs", 
+                                req.id, #jobs))
+                        elseif err then
+                            logger.debug(string.format("Request #%d: cannot queue more: %s", 
+                                req.id, err))
                         end
                     elseif anyFailed then
                         requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
@@ -676,17 +715,58 @@ local function requestProcessLoop()
                 end
                 
             elseif req.status == requestManager.STATES.SMELTING then
-                -- Check smelting progress
-                if currentStock >= req.quantity then
-                    requestManager.updateRequest(req.id, requestManager.STATES.READY, {
-                        produced = req.quantity
-                    })
-                end
-                -- Update produced count based on current stock
-                if currentStock > (req.produced or 0) then
-                    requestManager.updateRequest(req.id, requestManager.STATES.SMELTING, {
-                        produced = currentStock
-                    })
+                -- Check if input crafting is complete, then check smelt progress
+                local input = furnaceConfig.getSmeltInput(req.item)
+                local inputStock = input and (stock[input] or 0) or 0
+                local needed = req.quantity - currentStock
+                
+                -- If we're crafting input materials, check if we can start smelting
+                if inputStock >= needed then
+                    -- Enough input to smelt, check output progress
+                    if currentStock >= req.quantity then
+                        requestManager.updateRequest(req.id, requestManager.STATES.READY, {
+                            produced = req.quantity
+                        })
+                    elseif currentStock > (req.produced or 0) then
+                        requestManager.updateRequest(req.id, requestManager.STATES.SMELTING, {
+                            produced = currentStock
+                        })
+                    end
+                else
+                    -- Still waiting for input materials - check if jobs are still running
+                    local pendingJobs = 0
+                    for _, jobId in ipairs(req.jobIds or {}) do
+                        local job = queueManager.getJob(jobId)
+                        if job then
+                            pendingJobs = pendingJobs + 1
+                        end
+                    end
+                    
+                    if pendingJobs == 0 then
+                        -- No jobs running, try to queue more for input
+                        local inputNeeded = needed - inputStock
+                        local inputRecipe = recipes.getRecipeFor(input)
+                        if inputRecipe and inputNeeded > 0 then
+                            local stockCopy = {}
+                            for k, v in pairs(stock) do stockCopy[k] = v end
+                            
+                            local jobs, _ = requestManager.queueRecursive(
+                                input, inputNeeded, stockCopy, req.id, 0, {}
+                            )
+                            
+                            if #jobs > 0 then
+                                logger.debug(string.format("Request #%d: queued %d jobs for smelt input", 
+                                    req.id, #jobs))
+                            end
+                        end
+                    end
+                    
+                    -- Update produced count
+                    if currentStock > (req.produced or 0) then
+                        requestManager.updateRequest(req.id, requestManager.STATES.SMELTING, {
+                            produced = currentStock
+                        })
+                    end
                 end
                 
             elseif req.status == requestManager.STATES.READY then
