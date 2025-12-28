@@ -2857,15 +2857,26 @@ local commands = {
                         p.setTextColor(colors.white)
                         p.write(string.format("%d. %s ", i, item.item:gsub("minecraft:", "")))
                         p.setTextColor(colors.lightGray)
+                        local details = ""
                         if item.slot then
-                            p.print(string.format("x%d (slot %d)", item.quantity, item.slot))
+                            details = string.format("x%d (slot %d)", item.quantity, item.slot)
+                        elseif item.slotStart and item.slotEnd then
+                            details = string.format("x%d (slots %d-%d)", item.quantity, item.slotStart, item.slotEnd)
                         else
-                            p.print(string.format("x%d", item.quantity))
+                            details = string.format("x%d", item.quantity)
                         end
+                        if item.nbtMode and item.nbtMode ~= "any" then
+                            details = details .. " [nbt:" .. item.nbtMode .. "]"
+                        end
+                        if item.vacuum then
+                            details = details .. " [vacuum]"
+                        end
+                        p.print(details)
                     end
                 end
                 p.print("")
                 p.setTextColor(colors.lightBlue)
+                p.print("Use 'exports edit <inv>' for FormUI editor")
                 p.print("Use 'exports additem <inv> <item> <qty> [slot]' to add")
                 p.print("Use 'exports rmitem <inv> <item>' to remove")
                 if cfg.mode == "empty" then
@@ -2985,6 +2996,11 @@ local commands = {
                         if item.vacuum then
                             display = display .. " [vacuum]"
                         end
+                        
+                        -- Show NBT mode if not default
+                        if item.nbtMode and item.nbtMode ~= "any" then
+                            display = display .. " [nbt:" .. item.nbtMode .. "]"
+                        end
                         table.insert(itemDisplay, display)
                     end
                     
@@ -3059,6 +3075,14 @@ local commands = {
                             local slotField = addForm:number("Slot number", nextSlot)
                             local vacuumField = addForm:checkbox("Vacuum (remove non-matching)", false)
                             addForm:label("")
+                            addForm:label("-- NBT Matching --")
+                            local nbtModeField = addForm:select("NBT Mode", 
+                                {"any (all variants)", "none (no NBT only)", "with (has NBT only)", "exact (specific NBT)"}, 1)
+                            addForm:label("'any' = all variants of item")
+                            addForm:label("'none' = only items WITHOUT NBT data")
+                            addForm:label("'with' = only items WITH any NBT data")
+                            addForm:label("'exact' = specific NBT hash (advanced)")
+                            addForm:label("")
                             if cfg.mode == "stock" then
                                 addForm:label("Quantity = amount to keep stocked per slot")
                             else
@@ -3074,6 +3098,13 @@ local commands = {
                                 local useSlot = useSlotField()
                                 local slot = useSlot and slotField() or nil
                                 local vacuum = vacuumField()
+                                local nbtModeIdx = nbtModeField()
+                                local nbtModes = {"any", "none", "with", "exact"}
+                                local nbtMode = nbtModes[nbtModeIdx]
+                                
+                                -- For "exact" mode, we'd need additional NBT hash input
+                                -- For now, just use the mode (exact without hash = no match)
+                                local nbtHash = nil
                                 
                                 -- Add minecraft: prefix if missing
                                 if itemName ~= "" and not itemName:find(":") then
@@ -3081,7 +3112,7 @@ local commands = {
                                 end
                                 
                                 if itemName ~= "" then
-                                    exportConfig.addItem(invName, itemName, qty, slot, nil, nil, vacuum)
+                                    exportConfig.addItem(invName, itemName, qty, slot, nil, nil, vacuum, nbtMode, nbtHash)
                                     -- Refresh items list
                                     cfg = exportConfig.get(invName)
                                     items = cfg.slots or {}
@@ -3097,6 +3128,10 @@ local commands = {
                             local endField = rangeForm:number("End Slot", 9)
                             local vacuumField = rangeForm:checkbox("Vacuum (remove non-matching)", true)
                             rangeForm:label("")
+                            rangeForm:label("-- NBT Matching --")
+                            local nbtModeField = rangeForm:select("NBT Mode",
+                                {"any (all variants)", "none (no NBT only)", "with (has NBT only)", "exact (specific NBT)"}, 1)
+                            rangeForm:label("")
                             rangeForm:label("Example: slots 1-9 with 64 coal each")
                             rangeForm:label("Vacuum removes non-matching items from slots")
                             rangeForm:addSubmitCancel()
@@ -3108,6 +3143,9 @@ local commands = {
                                 local slotStart = startField()
                                 local slotEnd = endField()
                                 local vacuum = vacuumField()
+                                local nbtModeIdx = nbtModeField()
+                                local nbtModes = {"any", "none", "with", "exact"}
+                                local nbtMode = nbtModes[nbtModeIdx]
                                 
                                 -- Add minecraft: prefix if missing
                                 if itemName ~= "" and not itemName:find(":") then
@@ -3115,7 +3153,7 @@ local commands = {
                                 end
                                 
                                 if itemName ~= "" and slotStart <= slotEnd then
-                                    exportConfig.addSlotRange(invName, itemName, qty, slotStart, slotEnd, vacuum)
+                                    exportConfig.addSlotRange(invName, itemName, qty, slotStart, slotEnd, vacuum, nbtMode, nil)
                                     -- Refresh items list
                                     cfg = exportConfig.get(invName)
                                     items = cfg.slots or {}

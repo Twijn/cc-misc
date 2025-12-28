@@ -1,8 +1,9 @@
 --- AutoCrafter Export Manager
 --- Manages automated item export to external inventories (e.g., ender storage).
 --- Supports "stock" mode (keep items stocked) and "empty" mode (drain from storage).
+--- Supports NBT matching modes: "any" (all variants), "none" (no NBT), "with" (has NBT), "exact" (specific NBT)
 ---
----@version 1.0.1
+---@version 1.1.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
@@ -10,6 +11,9 @@ local inventory = require("lib.inventory")
 local exportConfig = require("config.exports")
 
 local manager = {}
+
+-- NBT matching mode constants (mirrors config)
+local NBT_MODE = exportConfig.NBT_MODES
 
 -- Cache of wrapped export peripherals
 local exportPeripherals = {}
@@ -19,6 +23,64 @@ local exportRunCount = 0  -- Track how many times exports have been processed
 
 -- Default search type for export inventories
 local DEFAULT_SEARCH_TYPE = "ender_storage"
+
+---Check if an item key has NBT data
+---@param itemKey string The item key (may include :nbtHash)
+---@return boolean hasNbt True if item has NBT
+---@return string baseName The base item name
+---@return string|nil nbtHash The NBT hash if present
+local function parseItemKey(itemKey)
+    local colonPos = itemKey:find(":", 11)  -- Skip "minecraft:" prefix
+    if colonPos then
+        local baseName = itemKey:sub(1, colonPos - 1)
+        local nbtHash = itemKey:sub(colonPos + 1)
+        return true, baseName, nbtHash
+    end
+    return false, itemKey, nil
+end
+
+---Check if a slot item matches the export slot config based on NBT mode
+---@param slotItemName string The item name from slot
+---@param slotItemNbt? string The NBT hash from slot (if any)
+---@param configItem string The configured item name (base name)
+---@param nbtMode? string The NBT matching mode (default: "any")
+---@param nbtHash? string The specific NBT hash to match (for "exact" mode)
+---@return boolean matches True if item matches config
+local function itemMatchesConfig(slotItemName, slotItemNbt, configItem, nbtMode, nbtHash)
+    -- First check base name matches
+    if slotItemName ~= configItem then
+        return false
+    end
+    
+    nbtMode = nbtMode or NBT_MODE.ANY
+    
+    if nbtMode == NBT_MODE.ANY then
+        -- Match any variant (with or without NBT)
+        return true
+    elseif nbtMode == NBT_MODE.NONE then
+        -- Only match items WITHOUT NBT
+        return slotItemNbt == nil or slotItemNbt == ""
+    elseif nbtMode == NBT_MODE.WITH then
+        -- Only match items WITH any NBT
+        return slotItemNbt ~= nil and slotItemNbt ~= ""
+    elseif nbtMode == NBT_MODE.EXACT then
+        -- Match specific NBT hash
+        return slotItemNbt == nbtHash
+    end
+    
+    return false
+end
+
+---Check if an item key matches the export slot config based on NBT mode
+---@param itemKey string The full item key (name or name:nbt)
+---@param configItem string The configured item name (base name)
+---@param nbtMode? string The NBT matching mode (default: "any")
+---@param nbtHash? string The specific NBT hash to match (for "exact" mode)
+---@return boolean matches True if item matches config
+local function itemKeyMatchesConfig(itemKey, configItem, nbtMode, nbtHash)
+    local hasNbt, baseName, keyNbtHash = parseItemKey(itemKey)
+    return itemMatchesConfig(baseName, keyNbtHash, configItem, nbtMode, nbtHash)
+end
 
 ---Initialize the export manager
 function manager.init()
@@ -74,36 +136,42 @@ function manager.needsCheck()
     return (os.clock() - lastExportCheck) >= exportCheckInterval
 end
 
----Get current item count in an export inventory slot
+---Get current item count in an export inventory slot (NBT-aware)
 ---@param inv table The wrapped peripheral
 ---@param slot number The slot number
----@param item string The item ID to match
----@return number count The current count (0 if empty or different item)
-local function getSlotCount(inv, slot, item)
-    if not inv.getItemDetail then
+---@param item string The item ID (base name) to match
+---@param nbtMode? string NBT matching mode (default: "any")
+---@param nbtHash? string Specific NBT hash for "exact" mode
+---@return number count The current count (0 if empty or doesn't match)
+local function getSlotCount(inv, slot, item, nbtMode, nbtHash)
+    local detail
+    if inv.getItemDetail then
+        detail = inv.getItemDetail(slot)
+    else
         local list = inv.list()
-        if list and list[slot] then
-            local slotItem = list[slot]
-            if slotItem.name == item then
-                return slotItem.count
-            end
+        if list then
+            detail = list[slot]
         end
-        return 0
     end
     
-    local detail = inv.getItemDetail(slot)
-    if detail and detail.name == item then
+    if not detail then return 0 end
+    
+    -- Use NBT-aware matching
+    local slotNbt = detail.nbt  -- May be nil
+    if itemMatchesConfig(detail.name, slotNbt, item, nbtMode, nbtHash) then
         return detail.count
     end
     return 0
 end
 
----Get total item count in an export inventory
+---Get total item count in an export inventory (NBT-aware)
 ---@param inv table The wrapped peripheral
----@param item string The item ID to match
+---@param item string The item ID (base name) to match
+---@param nbtMode? string NBT matching mode (default: "any")
+---@param nbtHash? string Specific NBT hash for "exact" mode
 ---@return number count The total count
----@return table slots Array of {slot, count} pairs containing the item
-local function getInventoryItemCount(inv, item)
+---@return table slots Array of {slot, count, nbt} pairs containing matching items
+local function getInventoryItemCount(inv, item, nbtMode, nbtHash)
     local list = inv.list()
     if not list then return 0, {} end
     
@@ -111,9 +179,10 @@ local function getInventoryItemCount(inv, item)
     local slots = {}
     
     for slot, slotItem in pairs(list) do
-        if slotItem.name == item then
+        local slotNbt = slotItem.nbt  -- May be nil
+        if itemMatchesConfig(slotItem.name, slotNbt, item, nbtMode, nbtHash) then
             total = total + slotItem.count
-            table.insert(slots, {slot = slot, count = slotItem.count})
+            table.insert(slots, {slot = slot, count = slotItem.count, nbt = slotNbt})
         end
     end
     
@@ -122,14 +191,18 @@ end
 
 ---Push items to an export inventory (only for explicitly configured exports)
 ---Items are ONLY taken from storage inventories, never from other exports or random chests.
----Uses parallel transfers for speed
----@param item string The item ID - must be explicitly configured for this export
+---Uses parallel transfers for speed. NBT-aware based on nbtMode.
+---@param item string The item ID (base name) - must be explicitly configured for this export
 ---@param count number Amount to push
 ---@param destInv string Destination inventory name - must be a configured export
 ---@param destSlot? number Optional destination slot
+---@param nbtMode? string NBT matching mode (default: "any")
+---@param nbtHash? string Specific NBT hash for "exact" mode
 ---@return number pushed Amount actually pushed
 ---@return table sources Array of {inventory, count} pairs indicating where items came from
-local function pushToExport(item, count, destInv, destSlot)
+local function pushToExport(item, count, destInv, destSlot, nbtMode, nbtHash)
+    nbtMode = nbtMode or NBT_MODE.ANY
+    
     -- CRITICAL: Verify this destination is actually a configured export inventory
     -- This prevents accidentally pushing items to random ender storages
     local exportCfg = exportConfig.get(destInv)
@@ -138,14 +211,38 @@ local function pushToExport(item, count, destInv, destSlot)
         return 0, {}
     end
     
-    -- Find item in storage only (not in other export inventories)
-    local locations = inventory.findItem(item, true)
+    -- Find items in storage based on NBT mode
+    local locations
+    if nbtMode == NBT_MODE.EXACT then
+        -- Exact NBT match - use full key
+        local fullKey = nbtHash and (item .. ":" .. nbtHash) or item
+        locations = inventory.findItem(fullKey, true)
+    elseif nbtMode == NBT_MODE.NONE then
+        -- No NBT - use base name only (no NBT suffix)
+        locations = inventory.findItem(item, true)
+    elseif nbtMode == NBT_MODE.WITH then
+        -- Any NBT - find all variants with NBT, filter out non-NBT
+        local allVariants = inventory.findItemByBaseName(item, true)
+        locations = {}
+        for _, loc in ipairs(allVariants) do
+            local hasNbt, _, _ = parseItemKey(loc.key)
+            if hasNbt then
+                locations[#locations + 1] = loc
+            end
+        end
+    else
+        -- ANY mode - find all variants (base name match)
+        locations = inventory.findItemByBaseName(item, true)
+    end
+    
     if #locations == 0 then 
-        logger.debug(string.format("pushToExport: No %s found in storage for export to %s", item, destInv))
+        logger.debug(string.format("pushToExport: No %s found in storage for export to %s (nbtMode=%s)", 
+            item, destInv, nbtMode))
         return 0, {} 
     end
     
-    logger.debug(string.format("pushToExport: Found %d location(s) for %s, need %d", #locations, item, count))
+    logger.debug(string.format("pushToExport: Found %d location(s) for %s (nbtMode=%s), need %d", 
+        #locations, item, nbtMode, count))
     
     -- Sort by count (largest first) for efficiency
     table.sort(locations, function(a, b) return a.count > b.count end)
@@ -168,8 +265,9 @@ local function pushToExport(item, count, destInv, destSlot)
                 
                 if transferred > 0 then
                     sources[loc.inv] = (sources[loc.inv] or 0) + transferred
-                    -- Update cache incrementally - no need to rescan entire inventory
-                    inventory.updateCacheRemove(loc.inv, loc.slot, item, transferred)
+                    -- Update cache incrementally - use full key from location if available
+                    local itemKey = loc.key or item
+                    inventory.updateCacheRemove(loc.inv, loc.slot, itemKey, transferred)
                 end
             end
             ::continue::
@@ -204,8 +302,9 @@ local function pushToExport(item, count, destInv, destSlot)
             local capturedSlot = loc.slot
             local capturedAmount = toPush
             local capturedDestInv = destInv  -- Capture destInv in closure
+            local capturedKey = loc.key or item  -- Capture full key for cache update
             
-            meta[#meta + 1] = {inv = capturedInv, slot = capturedSlot}
+            meta[#meta + 1] = {inv = capturedInv, slot = capturedSlot, key = capturedKey}
             tasks[#tasks + 1] = function()
                 local ok, transferred = pcall(source.pushItems, capturedDestInv, capturedSlot, capturedAmount)
                 if not ok then
@@ -256,8 +355,8 @@ local function pushToExport(item, count, destInv, destSlot)
         if transferred > 0 then
             pushed = pushed + transferred
             sources[meta[i].inv] = (sources[meta[i].inv] or 0) + transferred
-            -- Update cache incrementally - no need to rescan entire inventory
-            inventory.updateCacheRemove(meta[i].inv, meta[i].slot, item, transferred)
+            -- Update cache incrementally - use full key from metadata
+            inventory.updateCacheRemove(meta[i].inv, meta[i].slot, meta[i].key, transferred)
         end
     end
     
@@ -579,13 +678,15 @@ local function pullAllFromExport(sourceInv)
 end
 
 ---Process vacuum slots (remove items that don't match expected item in slot range)
----Uses parallel transfers for speed
+---Uses parallel transfers for speed. NBT-aware matching.
 ---@param name string The peripheral name
 ---@param inv table The wrapped peripheral
 ---@param slotConfig table The slot configuration
 ---@return number pulled Amount of non-matching items pulled to storage
 local function processVacuumSlots(name, inv, slotConfig)
     local expectedItem = slotConfig.item
+    local nbtMode = slotConfig.nbtMode or NBT_MODE.ANY
+    local nbtHash = slotConfig.nbtHash
     local storageInvs = inventory.getStorageInventories()
     
     if #storageInvs == 0 then return 0 end
@@ -616,9 +717,14 @@ local function processVacuumSlots(name, inv, slotConfig)
             if expectedItem == "*" then
                 -- Wildcard vacuum: pull everything from these slots
                 shouldPull = true
-            elseif slotItem.name ~= expectedItem then
-                -- Specific item vacuum: pull non-matching items
-                shouldPull = true
+            else
+                -- Check if item matches using NBT-aware matching
+                local slotNbt = slotItem.nbt
+                local matches = itemMatchesConfig(slotItem.name, slotNbt, expectedItem, nbtMode, nbtHash)
+                if not matches then
+                    -- Doesn't match expected item - should vacuum
+                    shouldPull = true
+                end
             end
             
             if shouldPull then
@@ -743,6 +849,8 @@ local function processExportInventory(name, config)
         local slotStart = slotConfig.slotStart
         local slotEnd = slotConfig.slotEnd
         local isVacuum = slotConfig.vacuum
+        local nbtMode = slotConfig.nbtMode or NBT_MODE.ANY
+        local nbtHash = slotConfig.nbtHash
         
         -- Process vacuum slots first (remove non-matching items)
         if isVacuum then
@@ -762,20 +870,20 @@ local function processExportInventory(name, config)
         if slotStart and slotEnd then
             for slot = slotStart, slotEnd do
                 if config.mode == "stock" then
-                    local currentCount = getSlotCount(inv, slot, item)
+                    local currentCount = getSlotCount(inv, slot, item, nbtMode, nbtHash)
                     if currentCount < targetQty then
                         local needed = targetQty - currentCount
-                        local pushed, sources = pushToExport(item, needed, name, slot)
+                        local pushed, sources = pushToExport(item, needed, name, slot, nbtMode, nbtHash)
                         result.pushed = result.pushed + pushed
                         
                         if pushed > 0 then
-                            logger.debug(string.format("Stocked %d %s to %s slot %d", pushed, item, name, slot))
+                            logger.debug(string.format("Stocked %d %s to %s slot %d (nbtMode=%s)", pushed, item, name, slot, nbtMode))
                         end
                     end
                 elseif config.mode == "empty" then
-                    local currentCount = getSlotCount(inv, slot, item)
-                    logger.debug(string.format("Empty slot range: slot %d of %s, item=%s, current=%d, targetQty=%d", 
-                        slot, name, item, currentCount, targetQty))
+                    local currentCount = getSlotCount(inv, slot, item, nbtMode, nbtHash)
+                    logger.debug(string.format("Empty slot range: slot %d of %s, item=%s, current=%d, targetQty=%d, nbtMode=%s", 
+                        slot, name, item, currentCount, targetQty, nbtMode))
                     if currentCount > 0 then
                         local toPull = currentCount
                         if targetQty > 0 then
@@ -796,18 +904,18 @@ local function processExportInventory(name, config)
             -- Stock mode: keep the export inventory stocked with items from storage
             local currentCount
             if specificSlot then
-                currentCount = getSlotCount(inv, specificSlot, item)
+                currentCount = getSlotCount(inv, specificSlot, item, nbtMode, nbtHash)
             else
-                currentCount = getInventoryItemCount(inv, item)
+                currentCount = getInventoryItemCount(inv, item, nbtMode, nbtHash)
             end
             
-            logger.debug(string.format("Stock check for %s in %s: current=%d, target=%d", 
-                item, name, currentCount, targetQty))
+            logger.debug(string.format("Stock check for %s in %s: current=%d, target=%d, nbtMode=%s", 
+                item, name, currentCount, targetQty, nbtMode))
             
             if currentCount < targetQty then
                 local needed = targetQty - currentCount
-                logger.debug(string.format("Need to push %d %s to %s", needed, item, name))
-                local pushed, sources = pushToExport(item, needed, name, specificSlot)
+                logger.debug(string.format("Need to push %d %s to %s (nbtMode=%s)", needed, item, name, nbtMode))
+                local pushed, sources = pushToExport(item, needed, name, specificSlot, nbtMode, nbtHash)
                 result.pushed = result.pushed + pushed
                 
                 if pushed > 0 then
@@ -817,9 +925,9 @@ local function processExportInventory(name, config)
                         table.insert(sourceStrs, string.format("%s(%d)", src.inventory, src.count))
                     end
                     local sourceDesc = #sourceStrs > 0 and table.concat(sourceStrs, ", ") or "unknown"
-                    logger.debug(string.format("Stocked %d %s to %s from %s", pushed, item, name, sourceDesc))
+                    logger.debug(string.format("Stocked %d %s to %s from %s (nbtMode=%s)", pushed, item, name, sourceDesc, nbtMode))
                 elseif needed > 0 then
-                    logger.debug(string.format("Failed to stock %s to %s: 0 pushed of %d needed", item, name, needed))
+                    logger.debug(string.format("Failed to stock %s to %s: 0 pushed of %d needed (nbtMode=%s)", item, name, needed, nbtMode))
                 end
             end
             
@@ -827,13 +935,13 @@ local function processExportInventory(name, config)
             -- Empty mode: pull items FROM the export inventory INTO storage
             local currentCount, itemSlots
             if specificSlot then
-                currentCount = getSlotCount(inv, specificSlot, item)
+                currentCount = getSlotCount(inv, specificSlot, item, nbtMode, nbtHash)
             else
-                currentCount, itemSlots = getInventoryItemCount(inv, item)
+                currentCount, itemSlots = getInventoryItemCount(inv, item, nbtMode, nbtHash)
             end
             
-            logger.debug(string.format("Empty check for %s in %s: current=%d, targetQty=%d, slot=%s", 
-                item, name, currentCount, targetQty, specificSlot and tostring(specificSlot) or "any"))
+            logger.debug(string.format("Empty check for %s in %s: current=%d, targetQty=%d, slot=%s, nbtMode=%s", 
+                item, name, currentCount, targetQty, specificSlot and tostring(specificSlot) or "any", nbtMode))
             
             if currentCount > 0 then
                 local toPull = currentCount
@@ -842,8 +950,8 @@ local function processExportInventory(name, config)
                     toPull = math.max(0, currentCount - targetQty)
                 end
                 
-                logger.debug(string.format("Empty mode: will try to pull %d of %d %s from %s", 
-                    toPull, currentCount, item, name))
+                logger.debug(string.format("Empty mode: will try to pull %d of %d %s from %s (nbtMode=%s)", 
+                    toPull, currentCount, item, name, nbtMode))
                 
                 if toPull > 0 then
                     local pulled = pullFromExport(item, toPull, name, specificSlot)
@@ -856,7 +964,7 @@ local function processExportInventory(name, config)
                     end
                 end
             else
-                logger.debug(string.format("Empty mode: item %s not found in %s", item, name))
+                logger.debug(string.format("Empty mode: item %s not found in %s (nbtMode=%s)", item, name, nbtMode))
             end
         end
         

@@ -268,6 +268,41 @@ function inventory.findItem(item, storageOnly)
     return filtered
 end
 
+---Find item locations by base name (ignoring NBT)
+---This allows finding all variants of an item (e.g., all enchanted books regardless of enchantment)
+---@param baseName string Item base name (e.g., "minecraft:enchanted_book")
+---@param storageOnly? boolean Only search storage inventories
+---@return table[] locations {inv, slot, count, key} - key includes NBT hash if present
+function inventory.findItemByBaseName(baseName, storageOnly)
+    local storageSet = {}
+    if storageOnly then
+        for _, name in ipairs(storage) do storageSet[name] = true end
+    end
+    
+    local results = {}
+    
+    -- Search all item keys for those starting with baseName
+    for itemKey, locs in pairs(items) do
+        -- Check if key matches base name (exact match or starts with baseName:)
+        local matches = (itemKey == baseName) or (itemKey:sub(1, #baseName + 1) == baseName .. ":")
+        
+        if matches then
+            for _, loc in ipairs(locs) do
+                if not storageOnly or storageSet[loc.inv] then
+                    results[#results + 1] = {
+                        inv = loc.inv,
+                        slot = loc.slot,
+                        count = loc.count,
+                        key = itemKey,  -- Include full key so caller knows which variant
+                    }
+                end
+            end
+        end
+    end
+    
+    return results
+end
+
 --------------------------------------------------------------------------------
 -- Cache Updates (after transfers)
 --------------------------------------------------------------------------------

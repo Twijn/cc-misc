@@ -2,8 +2,9 @@
 --- Manages automated item export to external inventories (e.g., ender storage).
 --- Supports both "stock" mode (keep items stocked) and "empty" mode (drain items).
 --- Supports slot ranges and "vacuum" slots that deposit non-matching items back to storage.
+--- Supports NBT matching modes: "any" (all variants), "none" (no NBT), "with" (has NBT), "exact" (specific NBT)
 ---
----@version 1.1.0
+---@version 1.2.0
 
 local persist = require("lib.persist")
 local logger = require("lib.log")
@@ -14,6 +15,14 @@ exports.setDefault("inventories", {})
 
 local module = {}
 
+-- NBT matching modes
+module.NBT_MODES = {
+    ANY = "any",       -- Match item regardless of NBT (default, backward compatible)
+    NONE = "none",     -- Only match items WITHOUT NBT data
+    WITH = "with",     -- Only match items WITH any NBT data
+    EXACT = "exact",   -- Match items with specific NBT hash
+}
+
 ---@class ExportSlot
 ---@field item string The item ID to export ("*" for vacuum slot that accepts any non-matching item)
 ---@field quantity number Target quantity (for stock mode) or 0 (for empty mode)
@@ -21,6 +30,8 @@ local module = {}
 ---@field slotStart? number Start of slot range (inclusive)
 ---@field slotEnd? number End of slot range (inclusive)
 ---@field vacuum? boolean If true, deposits non-matching items from these slots to storage
+---@field nbtMode? string NBT matching mode: "any", "none", "with", "exact" (default: "any")
+---@field nbtHash? string Specific NBT hash to match (only used when nbtMode = "exact")
 
 ---@class ExportInventory
 ---@field name string The peripheral name
@@ -63,13 +74,15 @@ end
 
 ---Add an item to an export inventory
 ---@param invName string The peripheral name
----@param item string The item ID
+---@param item string The item ID (base name)
 ---@param quantity number Target quantity (0 for empty mode = drain all)
 ---@param slot? number Optional specific slot
 ---@param slotStart? number Optional start of slot range (inclusive)
 ---@param slotEnd? number Optional end of slot range (inclusive)
 ---@param vacuum? boolean If true, this is a vacuum slot that deposits non-matching items
-function module.addItem(invName, item, quantity, slot, slotStart, slotEnd, vacuum)
+---@param nbtMode? string NBT matching mode: "any", "none", "with", "exact" (default: "any")
+---@param nbtHash? string Specific NBT hash to match (only used when nbtMode = "exact")
+function module.addItem(invName, item, quantity, slot, slotStart, slotEnd, vacuum, nbtMode, nbtHash)
     local inventories = exports.get("inventories") or {}
     local inv = inventories[invName]
     
@@ -88,8 +101,10 @@ function module.addItem(invName, item, quantity, slot, slotStart, slotEnd, vacuu
             -- Update existing
             inv.slots[i].quantity = quantity
             inv.slots[i].vacuum = vacuum
+            inv.slots[i].nbtMode = nbtMode
+            inv.slots[i].nbtHash = nbtHash
             exports.set("inventories", inventories)
-            logger.info(string.format("Updated export: %s -> %s x%d", invName, item, quantity))
+            logger.info(string.format("Updated export: %s -> %s x%d (nbtMode=%s)", invName, item, quantity, nbtMode or "any"))
             return
         end
     end
@@ -102,19 +117,22 @@ function module.addItem(invName, item, quantity, slot, slotStart, slotEnd, vacuu
         slotStart = slotStart,
         slotEnd = slotEnd,
         vacuum = vacuum,
+        nbtMode = nbtMode,
+        nbtHash = nbtHash,
     }
     table.insert(inv.slots, newSlot)
     exports.set("inventories", inventories)
     
+    local nbtDesc = nbtMode and nbtMode ~= "any" and (" nbt=" .. nbtMode) or ""
     if slotStart and slotEnd then
-        logger.info(string.format("Added export: %s -> %s x%d (slots %d-%d%s)", 
-            invName, item, quantity, slotStart, slotEnd, vacuum and " vacuum" or ""))
+        logger.info(string.format("Added export: %s -> %s x%d (slots %d-%d%s%s)", 
+            invName, item, quantity, slotStart, slotEnd, vacuum and " vacuum" or "", nbtDesc))
     elseif slot then
-        logger.info(string.format("Added export: %s -> %s x%d (slot %d%s)", 
-            invName, item, quantity, slot, vacuum and " vacuum" or ""))
+        logger.info(string.format("Added export: %s -> %s x%d (slot %d%s%s)", 
+            invName, item, quantity, slot, vacuum and " vacuum" or "", nbtDesc))
     else
-        logger.info(string.format("Added export: %s -> %s x%d%s", 
-            invName, item, quantity, vacuum and " vacuum" or ""))
+        logger.info(string.format("Added export: %s -> %s x%d%s%s", 
+            invName, item, quantity, vacuum and " vacuum" or "", nbtDesc))
     end
 end
 
@@ -125,8 +143,10 @@ end
 ---@param slotStart number Start of slot range (inclusive)
 ---@param slotEnd number End of slot range (inclusive)
 ---@param vacuum? boolean If true, non-matching items in range are deposited to storage
-function module.addSlotRange(invName, item, quantity, slotStart, slotEnd, vacuum)
-    module.addItem(invName, item, quantity, nil, slotStart, slotEnd, vacuum)
+---@param nbtMode? string NBT matching mode: "any", "none", "with", "exact" (default: "any")
+---@param nbtHash? string Specific NBT hash to match (only used when nbtMode = "exact")
+function module.addSlotRange(invName, item, quantity, slotStart, slotEnd, vacuum, nbtMode, nbtHash)
+    module.addItem(invName, item, quantity, nil, slotStart, slotEnd, vacuum, nbtMode, nbtHash)
 end
 
 ---Add a vacuum slot range (deposits non-matching items from these slots to storage)
