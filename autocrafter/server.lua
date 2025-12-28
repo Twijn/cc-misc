@@ -79,20 +79,41 @@ local function initialize()
     print("AutoCrafter Server v" .. VERSION)
     print("")
     
-    -- Initialize communications
-    if comms.init(true) then
-        comms.setChannel(settings.get("modemChannel"))
-    else
-        term.setTextColor(colors.yellow)
-        print("Warning: No modem found!")
+    -- Helper for timing startup phases
+    local function timed(label, fn)
+        local start = os.clock()
+        term.setTextColor(colors.lightGray)
+        term.write("  " .. label .. "... ")
+        local result = fn()
+        local elapsed = os.clock() - start
+        term.setTextColor(colors.gray)
+        print(string.format("%.2fs", elapsed))
         term.setTextColor(colors.white)
+        return result
     end
     
+    print("Initializing subsystems:")
+    
+    -- Initialize communications
+    timed("Modem/comms", function()
+        if comms.init(true) then
+            comms.setChannel(settings.get("modemChannel"))
+        end
+    end)
+    
     -- Load recipes and initialize managers
-    local recipeCount = recipes.init()
-    queueManager.init()
-    storageManager.init(config.storagePeripheralType)
-    storageManager.setScanInterval(settings.get("scanInterval"))
+    local recipeCount = timed("Loading recipes", function()
+        return recipes.init()
+    end)
+    
+    timed("Queue manager", function()
+        queueManager.init()
+    end)
+    
+    timed("Storage manager", function()
+        storageManager.init(config.storagePeripheralType)
+        storageManager.setScanInterval(settings.get("scanInterval"))
+    end)
     
     -- Verify storage peripherals are available
     local storageInvs = inventory.getStorageInventories()
@@ -108,12 +129,12 @@ local function initialize()
         term.setTextColor(colors.white)
     end
     
-    crafterManager.init()
-    monitorManager.init(config.monitorRefreshInterval)
-    exportManager.init()
-    furnaceManager.init()
-    workerManager.init()
-    requestManager.init()
+    timed("Crafter manager", function() crafterManager.init() end)
+    timed("Monitor manager", function() monitorManager.init(config.monitorRefreshInterval) end)
+    timed("Export manager", function() exportManager.init() end)
+    timed("Furnace manager", function() furnaceManager.init() end)
+    timed("Worker manager", function() workerManager.init() end)
+    timed("Request manager", function() requestManager.init() end)
     
     -- Show summary stats
     local storageStats = storageManager.getStats()

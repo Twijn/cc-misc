@@ -27,14 +27,16 @@ function manager.init(storageType)
     
     -- ALWAYS discover peripherals to ensure storage array is populated correctly
     -- This is critical to prevent smelted items from going to wrong inventories
+    local discoverStart = os.clock()
     local storageInvs = inventory.discover(true)  -- force=true to ensure fresh discovery
-    logger.info(string.format("Discovered %d storage inventories of type: %s", 
-        #storageInvs, inventory.getStorageType()))
+    logger.info(string.format("Discovered %d storage inventories of type: %s (%.2fs)", 
+        #storageInvs, inventory.getStorageType(), os.clock() - discoverStart))
     
     -- ALWAYS perform initial scan to populate runtime state (items, slots tables)
     -- The stock cache only stores totals, not item locations needed for transfers
+    local scanStart = os.clock()
     manager.scan()
-    logger.info("Storage manager initialized with full scan")
+    logger.info(string.format("Initial inventory scan complete (%.2fs)", os.clock() - scanStart))
 end
 
 ---Set scan interval

@@ -134,11 +134,15 @@ function inventory.discover(force)
         return storage
     end
     
+    local start = os.clock()
     peripherals = {}
     sizes = {}
     storage = {}
     
-    for _, name in ipairs(peripheral.getNames()) do
+    local allNames = peripheral.getNames()
+    local invCount = 0
+    
+    for _, name in ipairs(allNames) do
         local types = {peripheral.getType(name)}
         local isInv, isStorage = false, false
         
@@ -152,6 +156,7 @@ function inventory.discover(force)
             if p then
                 peripherals[name] = p
                 sizes[name] = p.size and p.size() or 0
+                invCount = invCount + 1
                 if isStorage then
                     storage[#storage + 1] = name
                 end
@@ -159,7 +164,9 @@ function inventory.discover(force)
         end
     end
     
-    logger.debug(("Discovered %d storage peripherals (%s)"):format(#storage, storageType))
+    local elapsed = os.clock() - start
+    logger.debug(string.format("Discovered %d peripherals, %d inventories, %d storage (%s) in %.2fs",
+        #allNames, invCount, #storage, storageType, elapsed))
     return storage
 end
 
@@ -167,6 +174,8 @@ end
 ---@param force? boolean Force peripheral rediscovery
 ---@return table<string, number> Stock levels
 function inventory.scan(force)
+    local totalStart = os.clock()
+    
     inventory.discover(force)
     
     -- Parallel scan all inventories
@@ -180,9 +189,12 @@ function inventory.scan(force)
         end
     end
     
+    local listStart = os.clock()
     local results = parallel_run(scanTasks, 32)
+    local listTime = os.clock() - listStart
     
     -- Rebuild all caches
+    local rebuildStart = os.clock()
     slots = {}
     items = {}
     stock = {}
@@ -190,11 +202,14 @@ function inventory.scan(force)
     local storageSet = {}
     for _, name in ipairs(storage) do storageSet[name] = true end
     
+    local totalSlots = 0
+    local totalItems = 0
     for i, name in ipairs(invList) do
         local list = results[i] and results[i][1] or {}
         slots[name] = list
         
         for slot, item in pairs(list) do
+            totalSlots = totalSlots + 1
             local k = key(item)
             
             -- Track locations
@@ -204,12 +219,18 @@ function inventory.scan(force)
             -- Only count storage items in stock
             if storageSet[name] then
                 stock[k] = (stock[k] or 0) + item.count
+                totalItems = totalItems + item.count
             end
         end
     end
+    local rebuildTime = os.clock() - rebuildStart
     
     stockCache.set("levels", stock)
     stockCache.set("lastScan", os.epoch("utc"))
+    
+    local totalTime = os.clock() - totalStart
+    logger.debug(string.format("Scan complete: %d inventories, %d slots, %d items (list: %.2fs, rebuild: %.2fs, total: %.2fs)",
+        #invList, totalSlots, totalItems, listTime, rebuildTime, totalTime))
     
     return stock
 end
