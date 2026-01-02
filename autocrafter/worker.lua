@@ -36,6 +36,10 @@ local progress = {
     startTime = 0,
 }
 
+-- Rate limiting for "no more item" messages to prevent log spam
+local noMoreItemLogged = {}  -- item -> timestamp of last log
+local NO_MORE_ITEM_LOG_INTERVAL = 300  -- Only log once per 5 minutes per item
+
 -- Cached peripherals
 local cachedModem = nil
 local cachedModemName = nil
@@ -357,9 +361,18 @@ local function executeConcreteTask(task, quantity)
             
             local response = comms.receive(5, config.messageTypes.RESPONSE_WITHDRAW)
             if not response or not response.data or response.data.withdrawn == 0 then
-                logger.info("No more " .. inputItem .. " available")
+                -- Rate-limit this log message to prevent spam
+                local now = os.epoch("utc") / 1000
+                local lastLogged = noMoreItemLogged[inputItem] or 0
+                if now - lastLogged >= NO_MORE_ITEM_LOG_INTERVAL then
+                    logger.info("No more " .. inputItem .. " available")
+                    noMoreItemLogged[inputItem] = now
+                end
                 depositInventory()
                 return true, produced
+            else
+                -- Item is available again, clear the rate limit
+                noMoreItemLogged[inputItem] = nil
             end
             
             powderSlot = 1

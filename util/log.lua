@@ -17,10 +17,10 @@
 ---log.setLevel("debug")  -- Show all messages including debug
 ---log.setLevel("warn")   -- Show only warnings and errors
 ---
----@version 1.5.0
+---@version 1.5.1
 -- @module log
 
-local VERSION = "1.5.0"
+local VERSION = "1.5.1"
 
 local module = {}
 
@@ -55,6 +55,7 @@ local minFreeSpace = 10000  -- Minimum free bytes before cleanup (10KB)
 local lastDiskCheck = 0
 local diskCheckInterval = 60  -- Check disk space every 60 seconds
 local maxLogAgeDays = 30  -- Delete logs older than 30 days
+local writeFailureCount = 0  -- Track consecutive write failures
 
 ---Generate a file-safe date string for log filenames
 ---@return string # Date string in YYYY/MM/DD format
@@ -208,6 +209,65 @@ local function checkAndCleanupDiskSpace()
     return cleaned
 end
 
+---Force cleanup of old logs regardless of interval timer
+---@return boolean success Whether cleanup freed any space
+local function forceCleanupForSpace()
+    -- Reset the timer to force a check
+    lastDiskCheck = 0
+    
+    local cleaned = checkAndCleanupDiskSpace()
+    if cleaned then
+        return true
+    end
+    
+    -- If normal cleanup didn't help, try more aggressive cleanup
+    local logFiles = getLogFiles("log")
+    if #logFiles == 0 then
+        return false
+    end
+    
+    -- Sort by date (oldest first)
+    table.sort(logFiles, function(a, b)
+        local dateA = getLogFileDate(a.path) or 0
+        local dateB = getLogFileDate(b.path) or 0
+        return dateA < dateB
+    end)
+    
+    local currentDate = getCurrentDateNumber()
+    
+    -- Delete oldest logs until we have enough space (keep today's log)
+    for _, file in ipairs(logFiles) do
+        local fileDate = getLogFileDate(file.path)
+        if fileDate and fileDate < currentDate then
+            fs.delete(file.path)
+            
+            -- Clean up empty parent directories
+            local parentDir = file.path:match("(.+)/[^/]+$")
+            if parentDir and fs.exists(parentDir) and fs.isDir(parentDir) then
+                local contents = fs.list(parentDir)
+                if #contents == 0 then
+                    fs.delete(parentDir)
+                    local grandParent = parentDir:match("(.+)/[^/]+$")
+                    if grandParent and fs.exists(grandParent) and fs.isDir(grandParent) then
+                        contents = fs.list(grandParent)
+                        if #contents == 0 then
+                            fs.delete(grandParent)
+                        end
+                    end
+                end
+            end
+            
+            -- Check if we now have enough space
+            local freeSpace = fs.getFreeSpace("/")
+            if freeSpace > minFreeSpace then
+                return true
+            end
+        end
+    end
+    
+    return false
+end
+
 ---Flush the log buffer to disk
 local function flushBuffer()
     if logBufferSize == 0 then return end
@@ -217,12 +277,47 @@ local function flushBuffer()
     
     local path = getLogPath()
     local f = fs.open(path, "a")
-    if f then
-        for _, entry in ipairs(logBuffer) do
-            f.writeLine(entry)
+    
+    -- If open failed, disk might be full - try aggressive cleanup
+    if not f then
+        writeFailureCount = writeFailureCount + 1
+        
+        -- Try to cleanup and retry
+        if forceCleanupForSpace() then
+            f = fs.open(path, "a")
         end
-        f.close()
+        
+        -- If still can't open after cleanup, drop oldest buffer entries
+        if not f then
+            -- Drop half the buffer to reduce pressure
+            if logBufferSize > 2 then
+                local newBuffer = {}
+                for i = math.floor(logBufferSize / 2) + 1, logBufferSize do
+                    table.insert(newBuffer, logBuffer[i])
+                end
+                logBuffer = newBuffer
+                logBufferSize = #newBuffer
+            end
+            
+            -- Try one more time
+            f = fs.open(path, "a")
+            if not f then
+                -- Give up on this batch, clear buffer to prevent memory issues
+                logBuffer = {}
+                logBufferSize = 0
+                lastFlush = os.clock()
+                return
+            end
+        end
+    else
+        writeFailureCount = 0
     end
+    
+    -- Write entries
+    for _, entry in ipairs(logBuffer) do
+        f.writeLine(entry)
+    end
+    f.close()
     
     logBuffer = {}
     logBufferSize = 0
