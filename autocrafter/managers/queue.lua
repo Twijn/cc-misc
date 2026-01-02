@@ -198,7 +198,7 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
     local currentStock = stockLevels[output] or 0
     local needed = quantity - currentStock
     if needed <= 0 then
-        logger.debug(string.format("Already have %d/%d %s in stock", currentStock, quantity, output))
+        -- Already have enough in stock, no job needed
         visited[output] = nil
         return nil, nil  -- Not an error, just not needed
     end

@@ -173,6 +173,10 @@ local function initialize()
     logger.info("AutoCrafter Server started")
 end
 
+-- Track last error per item to avoid spam (reset after 60 seconds)
+local lastCraftError = {}
+local CRAFT_ERROR_COOLDOWN = 60  -- seconds
+
 --- Process crafting targets and create jobs
 --- Creates jobs to meet craft targets, queuing work for when crafters become available
 local function processCraftTargets()
@@ -182,8 +186,6 @@ local function processCraftTargets()
     if #needed == 0 then
         return  -- No targets need crafting
     end
-    
-    logger.debug(string.format("processCraftTargets: %d targets need crafting", #needed))
     
     -- Get all current jobs and build a lookup table of queued amounts per item
     -- This is O(jobs) instead of O(targets * jobs)
@@ -208,16 +210,20 @@ local function processCraftTargets()
         -- Calculate how many items still need to be queued
         local remainingNeeded = target.needed - totalQueued
         if remainingNeeded <= 0 then
-            -- Already have enough queued
-            logger.debug(string.format("processCraftTargets: %s already queued (%d >= %d needed)", 
-                target.item, totalQueued, target.needed))
+            -- Already have enough queued, no need to log this
             goto continue
         end
         
         -- Get recipe to determine output count per craft
         local recipe = recipes.getRecipeFor(target.item)
         if not recipe then
-            logger.debug(string.format("processCraftTargets: no recipe for %s", target.item))
+            -- Rate-limit "no recipe" messages
+            local now = os.clock()
+            local lastErr = lastCraftError[target.item]
+            if not lastErr or (now - lastErr) >= CRAFT_ERROR_COOLDOWN then
+                lastCraftError[target.item] = now
+                logger.debug(string.format("processCraftTargets: no recipe for %s", target.item))
+            end
             goto continue
         end
         
@@ -225,7 +231,13 @@ local function processCraftTargets()
         local job, err = queueManager.addJob(target.item, remainingNeeded, stock)
         if not job then
             if err then
-                logger.debug("Cannot craft more " .. target.item .. ": " .. err)
+                -- Rate-limit error logging to avoid spam
+                local now = os.clock()
+                local lastErr = lastCraftError[target.item]
+                if not lastErr or (now - lastErr) >= CRAFT_ERROR_COOLDOWN then
+                    lastCraftError[target.item] = now
+                    logger.debug("Cannot craft more " .. target.item .. ": " .. err)
+                end
             end
             goto continue
         end

@@ -882,8 +882,6 @@ local function processExportInventory(name, config)
                     end
                 elseif config.mode == "empty" then
                     local currentCount = getSlotCount(inv, slot, item, nbtMode, nbtHash)
-                    logger.debug(string.format("Empty slot range: slot %d of %s, item=%s, current=%d, targetQty=%d, nbtMode=%s", 
-                        slot, name, item, currentCount, targetQty, nbtMode))
                     if currentCount > 0 then
                         local toPull = currentCount
                         if targetQty > 0 then
@@ -908,9 +906,6 @@ local function processExportInventory(name, config)
             else
                 currentCount = getInventoryItemCount(inv, item, nbtMode, nbtHash)
             end
-            
-            logger.debug(string.format("Stock check for %s in %s: current=%d, target=%d, nbtMode=%s", 
-                item, name, currentCount, targetQty, nbtMode))
             
             if currentCount < targetQty then
                 local needed = targetQty - currentCount
@@ -940,9 +935,6 @@ local function processExportInventory(name, config)
                 currentCount, itemSlots = getInventoryItemCount(inv, item, nbtMode, nbtHash)
             end
             
-            logger.debug(string.format("Empty check for %s in %s: current=%d, targetQty=%d, slot=%s, nbtMode=%s", 
-                item, name, currentCount, targetQty, specificSlot and tostring(specificSlot) or "any", nbtMode))
-            
             if currentCount > 0 then
                 local toPull = currentCount
                 if targetQty > 0 then
@@ -950,21 +942,14 @@ local function processExportInventory(name, config)
                     toPull = math.max(0, currentCount - targetQty)
                 end
                 
-                logger.debug(string.format("Empty mode: will try to pull %d of %d %s from %s (nbtMode=%s)", 
-                    toPull, currentCount, item, name, nbtMode))
-                
                 if toPull > 0 then
                     local pulled = pullFromExport(item, toPull, name, specificSlot)
                     result.pulled = result.pulled + pulled
                     
                     if pulled > 0 then
                         logger.debug(string.format("Emptied %d %s from %s", pulled, item, name))
-                    else
-                        logger.debug(string.format("Empty mode: pullFromExport returned 0 for %s from %s", item, name))
                     end
                 end
-            else
-                logger.debug(string.format("Empty mode: item %s not found in %s (nbtMode=%s)", item, name, nbtMode))
             end
         end
         
@@ -995,12 +980,7 @@ function manager.processExports()
         return stats
     end
     
-    logger.debug(string.format("processExports: Processing %d export inventories", invCount))
-    
     for name, config in pairs(inventories) do
-        logger.debug(string.format("processExports: Processing %s (mode=%s, slots=%d)", 
-            name, config.mode or "?", #(config.slots or {})))
-        
         local ok, result = pcall(processExportInventory, name, config)
         
         if ok then
