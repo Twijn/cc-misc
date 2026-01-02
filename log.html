@@ -246,7 +246,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>log <span class="version-badge">v1.5.0</span></h1>
+        <h1>log <span class="version-badge">v1.5.1</span></h1>
         <p>A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for warnings, blue for info), automatic daily log file creation and rotation, persistent log storage in log/ directory, timestamped log entries, buffered writes for performance, configurable log levels, and automatic cleanup of old log files when disk space is low.</p>
     </div>
     
@@ -379,7 +379,7 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     <h2>Functions</h2>
     <div class='function'>
         <h3><code>module.debug(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L281' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L376' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log a debug message in gray (only to file, not console by default)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -390,7 +390,7 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.info(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L287' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L382' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log an informational message in blue</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -401,7 +401,7 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.warn(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L293' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L388' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log a warning message in yellow</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -412,7 +412,7 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.error(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L299' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L394' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log an error message in red</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -423,7 +423,7 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.critical(msg)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L305' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L400' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Log a critical/crash message in red This is always logged both to console and file, and immediately flushed</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -434,12 +434,12 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.flush()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L332' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L427' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Flush any pending log entries to disk</p>
     </div>
     <div class='function'>
         <h3><code>module.setLevel(level)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L337' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L432' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Set the current log level Messages with levels more verbose than this will only be written to file, not console</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -451,19 +451,19 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.getLevel()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L367' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L462' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get the current log level name</p>
         <div class='returns'><strong>Returns:</strong> string levelName The current log level name</div>
     </div>
     <div class='function'>
         <h3><code>module.getLevels()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L378' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L473' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get all available log levels</p>
         <div class='returns'><strong>Returns:</strong> table levels Table with level names as keys and numbers as values</div>
     </div>
     <div class='function'>
         <h3><code>module.registerCommands(commands)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L389' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L484' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Register log level commands with a cmd command table This adds "loglevel" command with aliases "log-level" and "ll"</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -475,7 +475,7 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.configureDiskManagement(settings)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L448' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L543' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Configure disk space management settings - minFreeSpace: Minimum free bytes before cleanup (default: 10000) - maxLogAgeDays: Delete logs older than this (default: 30) - checkInterval: Seconds between disk space checks (default: 60)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -486,13 +486,13 @@ log.setLevel("warn")   -- Show only warnings and errors</code></pre>
     </div>
     <div class='function'>
         <h3><code>module.getDiskStats()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L465' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L560' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Get disk space statistics for the log directory</p>
         <div class='returns'><strong>Returns:</strong> table stats Statistics about log storage</div>
     </div>
     <div class='function'>
         <h3><code>module.cleanupOldLogs(maxAgeDays?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L489' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/log.lua#L584' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
         <p>Manually trigger cleanup of old log files</p>
         <div class='params'>
             <strong>Parameters:</strong>
