@@ -1466,6 +1466,58 @@ local commands = {
         end
     },
     
+    force_queue = {
+        description = "Force run processCraftTargets once with debug output",
+        category = "queue",
+        aliases = {"fq"},
+        execute = function(args, ctx)
+            ctx.mess("Running processCraftTargets() with debug logging...")
+            
+            -- Temporarily enable debug logging
+            local oldLevel = logger.getLevel()
+            logger.setLevel("debug")
+            
+            local stock = storageManager.getAllStock()
+            local needed = targets.getNeeded(stock)
+            
+            print("")
+            print(string.format("Targets needing craft: %d", #needed))
+            for i, target in ipairs(needed) do
+                print(string.format("  %d. %s: need %d (have %d)", 
+                    i, target.item:gsub("minecraft:", ""), target.needed, target.current))
+            end
+            print("")
+            
+            if #needed == 0 then
+                ctx.mess("No targets need crafting")
+                logger.setLevel(oldLevel)
+                return
+            end
+            
+            -- Call processCraftTargets
+            processCraftTargets()
+            
+            -- Restore log level
+            logger.setLevel(oldLevel)
+            
+            -- Show results
+            local allJobs = queueManager.getJobs()
+            print("")
+            ctx.mess(string.format("Queue now has %d jobs", #allJobs))
+            
+            if #allJobs > 0 then
+                print("Recent jobs:")
+                for i = math.max(1, #allJobs - 5), #allJobs do
+                    local job = allJobs[i]
+                    print(string.format("  Job #%d: %s (%s)", 
+                        job.id, 
+                        job.recipe and job.recipe.output or "?",
+                        job.status))
+                end
+            end
+        end
+    },
+    
     diagnose = {
         description = "Diagnose why targets are not being crafted/smelted",
         category = "queue",
@@ -1481,7 +1533,9 @@ local commands = {
             local queuedByItem = {}
             for _, job in ipairs(allJobs) do
                 if job.recipe and job.recipe.output then
-                    if job.status == "pending" or job.status == "assigned" or job.status == "crafting" then
+                    -- Include WAITING jobs too (matches processCraftTargets logic)
+                    if job.status == "pending" or job.status == "waiting" or 
+                       job.status == "assigned" or job.status == "crafting" then
                         local output = job.recipe.output
                         queuedByItem[output] = (queuedByItem[output] or 0) + (job.expectedOutput or 0)
                     end
@@ -1514,8 +1568,26 @@ local commands = {
                         target.target, target.current, target.needed))
                     
                     if queued > 0 then
+                        -- Show job status breakdown
+                        local statusCounts = {pending=0, waiting=0, assigned=0, crafting=0}
+                        for _, job in ipairs(allJobs) do
+                            if job.recipe and job.recipe.output == item then
+                                statusCounts[job.status] = (statusCounts[job.status] or 0) + 1
+                            end
+                        end
+                        
                         p.setTextColor(colors.lime)
-                        p.print(string.format("  Queued: %d items in job queue", queued))
+                        p.print(string.format("  Queued: %d items", queued))
+                        p.setTextColor(colors.gray)
+                        local statuses = {}
+                        if statusCounts.waiting > 0 then table.insert(statuses, statusCounts.waiting .. " waiting") end
+                        if statusCounts.pending > 0 then table.insert(statuses, statusCounts.pending .. " pending") end
+                        if statusCounts.assigned > 0 then table.insert(statuses, statusCounts.assigned .. " assigned") end
+                        if statusCounts.crafting > 0 then table.insert(statuses, statusCounts.crafting .. " crafting") end
+                        if #statuses > 0 then
+                            p.print("    (" .. table.concat(statuses, ", ") .. ")")
+                        end
+                        
                         if stillNeeded <= 0 then
                             p.setTextColor(colors.green)
                             p.print("  Status: Sufficient jobs queued")
