@@ -1467,18 +1467,14 @@ local commands = {
     },
     
     force_queue = {
-        description = "Force run processCraftTargets once with debug output",
+        description = "Force run processCraftTargets once",
         category = "queue",
         aliases = {"fq"},
         execute = function(args, ctx)
-            ctx.mess("Running processCraftTargets() with debug logging...")
-            
-            -- Temporarily enable debug logging
-            local oldLevel = logger.getLevel()
-            logger.setLevel("debug")
-            
             local stock = storageManager.getAllStock()
             local needed = targets.getNeeded(stock)
+            
+            local beforeCount = #queueManager.getJobs()
             
             print("")
             print(string.format("Targets needing craft: %d", #needed))
@@ -1490,30 +1486,38 @@ local commands = {
             
             if #needed == 0 then
                 ctx.mess("No targets need crafting")
-                logger.setLevel(oldLevel)
                 return
             end
+            
+            ctx.mess("Running processCraftTargets()...")
             
             -- Call processCraftTargets
             processCraftTargets()
             
-            -- Restore log level
-            logger.setLevel(oldLevel)
-            
             -- Show results
             local allJobs = queueManager.getJobs()
-            print("")
-            ctx.mess(string.format("Queue now has %d jobs", #allJobs))
+            local afterCount = #allJobs
+            local created = afterCount - beforeCount
             
-            if #allJobs > 0 then
-                print("Recent jobs:")
-                for i = math.max(1, #allJobs - 5), #allJobs do
+            print("")
+            if created > 0 then
+                ctx.succ(string.format("Created %d new job(s), queue now has %d total", created, afterCount))
+                print("New jobs:")
+                for i = math.max(1, #allJobs - created), #allJobs do
                     local job = allJobs[i]
-                    print(string.format("  Job #%d: %s (%s)", 
+                    print(string.format("  Job #%d: %dx %s (%s)", 
                         job.id, 
-                        job.recipe and job.recipe.output or "?",
+                        job.expectedOutput or 0,
+                        (job.recipe and job.recipe.output or "?"):gsub("minecraft:", ""),
                         job.status))
                 end
+            else
+                ctx.warn("No jobs were created")
+                print("This could mean:")
+                print("  - Materials are missing")
+                print("  - Jobs are already queued")
+                print("  - Recipes are missing")
+                print("Run 'why' for detailed diagnostics")
             end
         end
     },
