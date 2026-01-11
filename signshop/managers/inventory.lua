@@ -46,17 +46,22 @@ function manager.rescan()
   local stock = {}
   local chests = getChests()
   for _, chest in ipairs(chests) do
-    for slot, item in pairs(chest.list()) do
-      local key = getItemKey(item)
-      if not detailCache.get(key) then
-        local detail = chest.getItemDetail(slot)
-        detail.count = nil -- remove current count from it (will be overwritten in getItemDetail() with the current stock)
-        detailCache.set(key, detail)
+    if chest and chest.list then
+      local items = chest.list()
+      if items then
+        for slot, item in pairs(items) do
+          local key = getItemKey(item)
+          if not detailCache.get(key) then
+            local detail = chest.getItemDetail(slot)
+            detail.count = nil -- remove current count from it (will be overwritten in getItemDetail() with the current stock)
+            detailCache.set(key, detail)
+          end
+          if not stock[key] then
+            stock[key] = 0
+          end
+          stock[key] = stock[key] + item.count
+        end
       end
-      if not stock[key] then
-        stock[key] = 0
-      end
-      stock[key] = stock[key] + item.count
     end
   end
   stockCache.setAll(stock)
