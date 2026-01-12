@@ -186,14 +186,14 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
     -- Check recursion limit
     if depth > MAX_DEPTH then
         local errMsg = "Maximum crafting depth exceeded for " .. output
-        logger.warn(errMsg)
+        logger.debug(errMsg)
         return nil, errMsg
     end
     
     -- Check for circular dependencies
     if visited[output] then
         local errMsg = "Circular dependency detected for " .. output
-        logger.warn(errMsg)
+        logger.debug(errMsg)
         return nil, errMsg
     end
     visited[output] = true
@@ -211,7 +211,7 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
     if not recipe then
         local errMsg = "No recipe for " .. output:gsub("minecraft:", "")
         if depth == 0 then
-            logger.warn(errMsg)
+            logger.debug(errMsg)
         end
         visited[output] = nil
         return nil, errMsg

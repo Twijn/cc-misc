@@ -236,14 +236,14 @@ local function processCraftTargets()
                 local lastErr = lastCraftError[target.item]
                 if not lastErr or (now - lastErr) >= CRAFT_ERROR_COOLDOWN then
                     lastCraftError[target.item] = now
-                    logger.warn(string.format("Cannot queue %s (need %d): %s", 
+                    logger.debug(string.format("Cannot queue %s (need %d): %s", 
                         target.item:gsub("minecraft:", ""), remainingNeeded, err))
                     
                     -- Add detailed material check
                     local hasMats, missing = require("lib.crafting").hasMaterials(recipe, stock, remainingNeeded)
                     if not hasMats and missing then
                         for _, m in ipairs(missing) do
-                            logger.warn(string.format("  Missing: %s (need %d, have %d)",
+                            logger.debug(string.format("  Missing: %s (need %d, have %d)",
                                 m.item:gsub("minecraft:", ""), m.needed, m.have))
                         end
                     end
