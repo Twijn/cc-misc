@@ -185,12 +185,16 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
     
     -- Check recursion limit
     if depth > MAX_DEPTH then
-        return nil, "Maximum crafting depth exceeded for " .. output
+        local errMsg = "Maximum crafting depth exceeded for " .. output
+        logger.warn(errMsg)
+        return nil, errMsg
     end
     
     -- Check for circular dependencies
     if visited[output] then
-        return nil, "Circular dependency detected for " .. output
+        local errMsg = "Circular dependency detected for " .. output
+        logger.warn(errMsg)
+        return nil, errMsg
     end
     visited[output] = true
     
@@ -198,7 +202,6 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
     local currentStock = stockLevels[output] or 0
     local needed = quantity - currentStock
     if needed <= 0 then
-        -- Already have enough in stock, no job needed
         visited[output] = nil
         return nil, nil  -- Not an error, just not needed
     end
@@ -206,8 +209,12 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
     -- Get recipe
     local recipe = recipes.getRecipeFor(output)
     if not recipe then
+        local errMsg = "No recipe for " .. output:gsub("minecraft:", "")
+        if depth == 0 then
+            logger.warn(errMsg)
+        end
         visited[output] = nil
-        return nil, "No recipe found for " .. output
+        return nil, errMsg
     end
     
     -- Check what materials we have and what's missing
@@ -225,9 +232,6 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
             -- Check if this material can be crafted
             local matRecipe = recipes.getRecipeFor(matItem)
             if matRecipe then
-                logger.debug(string.format("Creating child job for %dx %s (needed by %s)", 
-                    matNeeded, matItem, output))
-                
                 -- Recursively create jobs for the missing material
                 local childJob, childErr, childJobs = manager.createJobTree(
                     matItem, 
@@ -240,7 +244,6 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
                 )
                 
                 if childErr then
-                    logger.debug(string.format("Cannot craft dependency %s: %s", matItem, childErr))
                     -- Continue - maybe we can still craft with what we have
                 elseif childJob then
                     -- Add child jobs to our collection
@@ -252,9 +255,6 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
                     -- Update stock optimistically with expected output
                     stockLevels[matItem] = (stockLevels[matItem] or 0) + childJob.expectedOutput
                 end
-            else
-                -- Check if it can be smelted (for future support)
-                logger.debug(string.format("No recipe for dependency %s", matItem))
             end
         end
     end
@@ -296,11 +296,16 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
         else
             -- No children and still missing materials - this is a real failure
             local missingStr = ""
-            for _, m in ipairs(stillMissing or {}) do
-                missingStr = missingStr .. string.format("\n  %s: need %d, have %d", m.item, m.needed, m.have)
+            if stillMissing and depth == 0 then
+                -- Only log details at root level
+                for _, m in ipairs(stillMissing) do
+                    missingStr = missingStr .. string.format("\n  %s: need %d, have %d", 
+                        m.item:gsub("minecraft:", ""), m.needed, m.have)
+                end
             end
+            
             visited[output] = nil
-            return nil, "Missing materials:" .. missingStr
+            return nil, "Missing materials" .. missingStr
         end
     else
         -- Job created successfully
