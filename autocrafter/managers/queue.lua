@@ -232,6 +232,12 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
             -- Check if this material can be crafted
             local matRecipe = recipes.getRecipeFor(matItem)
             if matRecipe then
+                -- Create a copy of visited for this branch to avoid false circular dependency detection
+                local visitedCopy = {}
+                for k, v in pairs(visited) do
+                    visitedCopy[k] = v
+                end
+                
                 -- Recursively create jobs for the missing material
                 local childJob, childErr, childJobs = manager.createJobTree(
                     matItem, 
@@ -240,7 +246,7 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
                     nil,  -- parentId set after we create parent
                     rootId,
                     depth + 1,
-                    visited
+                    visitedCopy
                 )
                 
                 if childErr then
