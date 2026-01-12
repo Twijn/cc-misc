@@ -1476,20 +1476,27 @@ local commands = {
             
             local beforeCount = #queueManager.getJobs()
             
-            print("")
-            print(string.format("Targets needing craft: %d", #needed))
+            -- Create pager for output
+            local p = ctx.pager("=== Force Queue Results ===")
+            
+            p.print("")
+            p.print(string.format("Targets needing craft: %d", #needed))
             for i, target in ipairs(needed) do
-                print(string.format("  %d. %s: need %d (have %d)", 
+                p.print(string.format("  %d. %s: need %d (have %d)", 
                     i, target.item:gsub("minecraft:", ""), target.needed, target.current))
             end
-            print("")
+            p.print("")
             
             if #needed == 0 then
-                ctx.mess("No targets need crafting")
+                p.setTextColor(colors.lightBlue)
+                p.print("No targets need crafting")
+                p.show()
                 return
             end
             
-            ctx.mess("Running processCraftTargets()...")
+            p.setTextColor(colors.lightBlue)
+            p.print("Running processCraftTargets()...")
+            p.setTextColor(colors.white)
             
             -- Call processCraftTargets
             processCraftTargets()
@@ -1499,26 +1506,32 @@ local commands = {
             local afterCount = #allJobs
             local created = afterCount - beforeCount
             
-            print("")
+            p.print("")
             if created > 0 then
-                ctx.succ(string.format("Created %d new job(s), queue now has %d total", created, afterCount))
-                print("New jobs:")
+                p.setTextColor(colors.green)
+                p.print(string.format("Created %d new job(s), queue now has %d total", created, afterCount))
+                p.setTextColor(colors.white)
+                p.print("New jobs:")
                 for i = math.max(1, #allJobs - created), #allJobs do
                     local job = allJobs[i]
-                    print(string.format("  Job #%d: %dx %s (%s)", 
+                    p.print(string.format("  Job #%d: %dx %s (%s)", 
                         job.id, 
                         job.expectedOutput or 0,
                         (job.recipe and job.recipe.output or "?"):gsub("minecraft:", ""),
                         job.status))
                 end
             else
-                ctx.warn("No jobs were created")
-                print("This could mean:")
-                print("  - Materials are missing")
-                print("  - Jobs are already queued")
-                print("  - Recipes are missing")
-                print("Run 'why' for detailed diagnostics")
+                p.setTextColor(colors.yellow)
+                p.print("No jobs were created")
+                p.setTextColor(colors.white)
+                p.print("This could mean:")
+                p.print("  - Materials are missing")
+                p.print("  - Jobs are already queued")
+                p.print("  - Recipes are missing")
+                p.print("Run 'why' for detailed diagnostics")
             end
+            
+            p.show()
         end
     },
     
