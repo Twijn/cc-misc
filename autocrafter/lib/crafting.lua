@@ -171,20 +171,18 @@ end
 function crafting.calculateMaxCrafts(recipe, stockLevels)
     local maxCrafts = math.huge
     
-    -- Get the actual per-slot counts for stack limit calculation
-    local slotMaxCounts = getMaxItemsPerSlot(recipe)
-    
     for _, ingredient in ipairs(recipe.ingredients) do
         local item, available = resolveIngredient(ingredient.item, stockLevels)
         local possible = math.floor(available / ingredient.count)
         maxCrafts = math.min(maxCrafts, possible)
         
-        -- Limit by stack size per slot based on actual items per slot
-        -- Each slot can hold max 64 items (or less for certain items)
+        -- Limit by stack size: can't craft more than what fits in a slot
+        -- For most items this is 64, some are less (ender pearls = 16, buckets = 1, etc)
         local stackLimit = crafting.getMaxStackSize(item)
-        local itemsPerSlot = slotMaxCounts[ingredient.item] or 1
-        local maxPerSlot = math.floor(stackLimit / itemsPerSlot)
-        maxCrafts = math.min(maxCrafts, maxPerSlot)
+        -- Each craft requires ingredient.count items in a slot
+        -- Maximum crafts = stackLimit / items_per_craft_per_slot
+        local maxCraftsForStack = math.floor(stackLimit / ingredient.count)
+        maxCrafts = math.min(maxCrafts, maxCraftsForStack)
     end
     
     if maxCrafts == math.huge then
@@ -211,18 +209,6 @@ function crafting.createJob(recipe, quantity, stockLevels, allowPartial)
     local maxCrafts = crafting.calculateMaxCrafts(recipe, stockLevels)
     
     if maxCrafts == 0 then
-        -- Debug: Log why maxCrafts is 0
-        local logger = require("lib.log")
-        logger.warn(string.format("createJob failed for %s: maxCrafts=0 (quantity=%d, desiredCrafts=%d)", 
-            recipe.output, quantity, desiredCrafts))
-        logger.warn("  Materials check:")
-        for _, ingredient in ipairs(recipe.ingredients) do
-            local item, available = resolveIngredient(ingredient.item, stockLevels)
-            local needed = ingredient.count * desiredCrafts
-            logger.warn(string.format("    %s: need %d, have %d (resolved from %s)", 
-                item, needed, available, ingredient.item))
-        end
-        
         -- No materials available - return missing info
         local _, missing = crafting.hasMaterials(recipe, stockLevels, quantity)
         return nil, missing
