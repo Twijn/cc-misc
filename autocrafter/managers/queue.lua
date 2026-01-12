@@ -811,14 +811,20 @@ function manager.getHistory(historyType)
     end
 end
 
----Reset stale assigned or crafting jobs back to pending
----@param timeoutMs number Timeout in milliseconds
----@return number count Number of jobs reset
-function manager.resetStaleJobs(timeoutMs)
+---Reset stale assigned or crafting jobs back to pending, and fail jobs waiting too long
+---@param timeoutMs number Timeout in milliseconds for assigned/crafting jobs
+---@param waitingTimeoutMs? number Timeout for waiting jobs (default: 5 minutes)
+---@return number resetCount Number of jobs reset
+---@return number failedCount Number of waiting jobs failed
+function manager.resetStaleJobs(timeoutMs, waitingTimeoutMs)
+    waitingTimeoutMs = waitingTimeoutMs or (5 * 60 * 1000)  -- Default: 5 minutes
+    
     local jobs = queueData.get("jobs") or {}
     local now = os.epoch("utc")
     local resetCount = 0
+    local failedCount = 0
     local modified = false
+    local toFail = {}
     
     for i, job in ipairs(jobs) do
         if job.status == STATES.ASSIGNED or job.status == STATES.CRAFTING then
@@ -835,6 +841,17 @@ function manager.resetStaleJobs(timeoutMs)
                 resetCount = resetCount + 1
                 modified = true
             end
+        elseif job.status == STATES.WAITING then
+            -- Check if waiting job has been stuck too long
+            local createdAt = job.created or 0
+            local age = now - createdAt
+            
+            if age > waitingTimeoutMs then
+                logger.warn(string.format("Failing stale waiting job #%d (age: %.1fs)", 
+                    job.id, age / 1000))
+                table.insert(toFail, {id = job.id, reason = "Timed out waiting for materials"})
+                failedCount = failedCount + 1
+            end
         end
     end
     
@@ -842,7 +859,12 @@ function manager.resetStaleJobs(timeoutMs)
         queueData.set("jobs", jobs)
     end
     
-    return resetCount
+    -- Fail timed out waiting jobs (do this after to avoid modifying during iteration)
+    for _, failInfo in ipairs(toFail) do
+        manager.failJob(failInfo.id, failInfo.reason)
+    end
+    
+    return resetCount, failedCount
 end
 
 return manager

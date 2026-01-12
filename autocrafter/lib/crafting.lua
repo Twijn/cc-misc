@@ -211,6 +211,18 @@ function crafting.createJob(recipe, quantity, stockLevels, allowPartial)
     local maxCrafts = crafting.calculateMaxCrafts(recipe, stockLevels)
     
     if maxCrafts == 0 then
+        -- Debug: Log why maxCrafts is 0
+        local logger = require("lib.log")
+        logger.warn(string.format("createJob failed for %s: maxCrafts=0 (quantity=%d, desiredCrafts=%d)", 
+            recipe.output, quantity, desiredCrafts))
+        logger.warn("  Materials check:")
+        for _, ingredient in ipairs(recipe.ingredients) do
+            local item, available = resolveIngredient(ingredient.item, stockLevels)
+            local needed = ingredient.count * desiredCrafts
+            logger.warn(string.format("    %s: need %d, have %d (resolved from %s)", 
+                item, needed, available, ingredient.item))
+        end
+        
         -- No materials available - return missing info
         local _, missing = crafting.hasMaterials(recipe, stockLevels, quantity)
         return nil, missing
