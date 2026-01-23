@@ -1,7 +1,7 @@
 --- AutoCrafter Monitor Manager
 --- Manages display output to monitors.
 ---
----@version 2.1.0
+---@version 2.2.0
 
 local logger = require("lib.log")
 
@@ -10,6 +10,7 @@ local manager = {}
 local monitor = nil
 local refreshInterval = 5  -- Default, can be overridden
 local lastRefresh = 0
+local columnsPerRow = 2  -- Default: 2 columns for compact layout
 
 ---Find and attach to a monitor
 ---@param interval? number Optional refresh interval override
@@ -29,6 +30,21 @@ function manager.init(interval)
         logger.info("No monitor found, display disabled")
         return false
     end
+end
+
+---Set number of columns per row for target display
+---@param cols number Number of columns (1, 2, or 3)
+function manager.setColumns(cols)
+    if cols >= 1 and cols <= 3 then
+        columnsPerRow = cols
+        logger.info(string.format("Monitor columns set to %d", cols))
+    end
+end
+
+---Get current column setting
+---@return number columns Current number of columns
+function manager.getColumns()
+    return columnsPerRow
 end
 
 ---Check if monitor is available
@@ -265,142 +281,133 @@ function manager.drawStatus(data)
         end
     end
     
-    -- Decide on layout
-    local useColumns = isWide and totalTargets > 10
-    local colWidth = useColumns and math.floor((w - 3) / 2) or (w - 4)
+    -- Use flexible column layout (configurable via manager.setColumns)
+    local colWidth = math.floor((w - 2) / columnsPerRow) - 1  -- -1 for spacing
+    local nameWidth = math.max(8, colWidth - 12)  -- Reserve space for status + progress
     
-    -- === CRAFT TARGETS ===
-    if #craftTargets > 0 then
-        monitor.setTextColor(colors.yellow)
-        monitor.setCursorPos(2, y)
-        local headerText = string.format("Craft [%d/%d]", craftSatisfied, #craftTargets)
-        monitor.write(headerText)
-        y = y + 1
+    -- Helper to draw a single target entry
+    local function drawTarget(target, colX, rowY, isSmelt)
+        monitor.setCursorPos(colX, rowY)
         
-        local maxCraftShow = useColumns and math.floor(availableLines * 0.6) or math.floor(availableLines * 0.5)
-        if #smeltTargets == 0 then
-            maxCraftShow = availableLines - 1
-        end
-        
-        -- Sort: show needing work first
-        local sortedCraft = {}
-        for _, t in ipairs(craftTargets) do
-            table.insert(sortedCraft, t)
-        end
-        table.sort(sortedCraft, function(a, b)
-            local aNeed = a.current < a.target
-            local bNeed = b.current < b.target
-            if aNeed ~= bNeed then return aNeed end
-            return (a.target - a.current) > (b.target - b.current)
-        end)
-        
-        local shown = 0
-        for i, target in ipairs(sortedCraft) do
-            if shown >= maxCraftShow then
-                local remaining = #sortedCraft - shown
-                if remaining > 0 then
-                    monitor.setCursorPos(2, y)
-                    monitor.setTextColor(colors.gray)
-                    monitor.write(string.format("... +%d more", remaining))
-                    y = y + 1
-                end
-                break
-            end
-            
-            monitor.setCursorPos(2, y)
-            
-            -- Status indicator
-            if target.current >= target.target then
-                monitor.setTextColor(colors.lime)
-                monitor.write("+")
+        -- Status indicator
+        if target.current >= target.target then
+            monitor.setTextColor(colors.lime)
+            monitor.write("+")
+        else
+            if isSmelt then
+                monitor.setTextColor(colors.red)
+                monitor.write("~")
             else
                 monitor.setTextColor(colors.orange)
                 monitor.write("*")
             end
-            
-            -- Item name
-            monitor.setTextColor(colors.white)
-            local nameWidth = colWidth - 10
-            local name = shortenName(target.item, nameWidth)
-            monitor.write(name)
-            
-            -- Progress
-            local progX = 2 + nameWidth + 1
-            monitor.setCursorPos(progX, y)
-            monitor.setTextColor(colors.lightGray)
-            local prog = string.format("%s/%s", formatNum(target.current), formatNum(target.target))
-            monitor.write(prog)
-            
-            y = y + 1
-            shown = shown + 1
         end
-        y = y + 1
+        
+        -- Item name
+        monitor.setTextColor(colors.white)
+        local name = shortenName(target.item, nameWidth)
+        monitor.write(name)
+        
+        -- Progress (right-aligned in column)
+        local progX = colX + nameWidth + 1
+        monitor.setCursorPos(progX, rowY)
+        monitor.setTextColor(colors.lightGray)
+        local prog = string.format("%s/%s", formatNum(target.current), formatNum(target.target))
+        monitor.write(prog)
     end
     
-    -- === SMELT TARGETS ===
-    if #smeltTargets > 0 then
-        monitor.setTextColor(colors.yellow)
-        monitor.setCursorPos(2, y)
-        local headerText = string.format("Smelt [%d/%d]", smeltSatisfied, #smeltTargets)
-        monitor.write(headerText)
-        y = y + 1
-        
-        local remainingLines = h - y - 4
-        local maxSmeltShow = math.max(3, remainingLines)
-        
-        -- Sort: show needing work first
-        local sortedSmelt = {}
-        for _, t in ipairs(smeltTargets) do
-            table.insert(sortedSmelt, t)
+    -- Combine all targets and sort by priority
+    local allTargets = {}
+    
+    -- Add craft targets
+    for _, t in ipairs(craftTargets) do
+        local target = {
+            item = t.item,
+            current = t.current,
+            target = t.target,
+            isSmelt = false,
+            needsWork = t.current < t.target,
+            shortage = t.target - t.current
+        }
+        table.insert(allTargets, target)
+    end
+    
+    -- Add smelt targets
+    for _, t in ipairs(smeltTargets) do
+        local target = {
+            item = t.item,
+            current = t.current,
+            target = t.target,
+            isSmelt = true,
+            needsWork = t.current < t.target,
+            shortage = t.target - t.current
+        }
+        table.insert(allTargets, target)
+    end
+    
+    -- Sort: items needing work first, then by largest shortage
+    table.sort(allTargets, function(a, b)
+        if a.needsWork ~= b.needsWork then return a.needsWork end
+        return a.shortage > b.shortage
+    end)
+    
+    -- === TARGETS HEADER ===
+    monitor.setTextColor(colors.yellow)
+    monitor.setCursorPos(2, y)
+    local totalSatisfied = craftSatisfied + smeltSatisfied
+    local headerText = string.format("Targets [%d/%d]", totalSatisfied, totalTargets)
+    monitor.write(headerText)
+    
+    -- Show crafting/smelting breakdown if both exist
+    if #craftTargets > 0 and #smeltTargets > 0 then
+        monitor.setTextColor(colors.gray)
+        monitor.write(string.format(" (C:%d S:%d)", #craftTargets, #smeltTargets))
+    end
+    y = y + 1
+    
+    -- Calculate how many targets we can show
+    local maxRows = h - y - 4  -- Reserve space for fuel section
+    local maxTargets = maxRows * columnsPerRow
+    
+    -- Draw targets in 2-column layout
+    local shown = 0
+    local col = 0
+    local rowY = y
+    
+    for i, target in ipairs(allTargets) do
+        if shown >= maxTargets then
+            -- Show "more" indicator
+            local remaining = #allTargets - shown
+            if remaining > 0 then
+                monitor.setCursorPos(2, rowY)
+                monitor.setTextColor(colors.gray)
+                monitor.write(string.format("... +%d more", remaining))
+                rowY = rowY + 1
+            end
+            break
         end
-        table.sort(sortedSmelt, function(a, b)
-            local aNeed = a.current < a.target
-            local bNeed = b.current < b.target
-            if aNeed ~= bNeed then return aNeed end
-            return (a.target - a.current) > (b.target - b.current)
-        end)
         
-        local shown = 0
-        for i, target in ipairs(sortedSmelt) do
-            if shown >= maxSmeltShow then
-                local remaining = #sortedSmelt - shown
-                if remaining > 0 then
-                    monitor.setCursorPos(2, y)
-                    monitor.setTextColor(colors.gray)
-                    monitor.write(string.format("... +%d more", remaining))
-                    y = y + 1
-                end
-                break
-            end
-            
-            monitor.setCursorPos(2, y)
-            
-            -- Status indicator
-            if target.current >= target.target then
-                monitor.setTextColor(colors.lime)
-                monitor.write("+")
-            else
-                monitor.setTextColor(colors.red)
-                monitor.write("~")
-            end
-            
-            -- Item name
-            monitor.setTextColor(colors.white)
-            local nameWidth = colWidth - 10
-            local name = shortenName(target.item, nameWidth)
-            monitor.write(name)
-            
-            -- Progress
-            local progX = 2 + nameWidth + 1
-            monitor.setCursorPos(progX, y)
-            monitor.setTextColor(colors.lightGray)
-            local prog = string.format("%s/%s", formatNum(target.current), formatNum(target.target))
-            monitor.write(prog)
-            
-            y = y + 1
-            shown = shown + 1
+        -- Calculate column position
+        local colX = 2 + (col * (colWidth + 1))
+        
+        -- Draw the target
+        drawTarget(target, colX, rowY, target.isSmelt)
+        
+        shown = shown + 1
+        col = col + 1
+        
+        -- Move to next row after filling all columns
+        if col >= columnsPerRow then
+            col = 0
+            rowY = rowY + 1
         end
     end
+    
+    -- Move y position past the last row
+    if col > 0 then
+        rowY = rowY + 1
+    end
+    y = rowY + 1
     
     -- === FUEL SECTION (bottom) ===
     if data.fuelSummary and data.fuelSummary.fuelStock then
