@@ -228,20 +228,24 @@ local function processCraftTargets()
         end
         
         -- Create a job for this target (one job at a time per target to avoid flooding)
-        local job, err = queueManager.addJob(target.item, remainingNeeded, stock)
+        -- Pass the total target quantity; createJobTree will account for current stock
+        local job, err = queueManager.addJob(target.item, target.target, stock)
         if not job then
-            logger.info(string.format("Failed to queue %s: %s", target.item:gsub("minecraft:", ""), err or "unknown"))
-            if err then
+            -- Don't log "Already have enough in stock" as an error since it's expected
+            -- when current stock + queued jobs >= target
+            if err and err ~= "Already have enough in stock" then
+                logger.info(string.format("Failed to queue %s: %s", target.item:gsub("minecraft:", ""), err))
+                
                 -- Rate-limit error logging to avoid spam
                 local now = os.clock()
                 local lastErr = lastCraftError[target.item]
                 if not lastErr or (now - lastErr) >= CRAFT_ERROR_COOLDOWN then
                     lastCraftError[target.item] = now
                     logger.debug(string.format("Cannot queue %s (need %d): %s", 
-                        target.item:gsub("minecraft:", ""), remainingNeeded, err))
+                        target.item:gsub("minecraft:", ""), target.needed, err))
                     
                     -- Add detailed material check
-                    local hasMats, missing = require("lib.crafting").hasMaterials(recipe, stock, remainingNeeded)
+                    local hasMats, missing = require("lib.crafting").hasMaterials(recipe, stock, target.needed)
                     if not hasMats and missing then
                         for _, m in ipairs(missing) do
                             logger.debug(string.format("  Missing: %s (need %d, have %d)",
@@ -540,9 +544,10 @@ local function furnaceProcessLoop()
                     if toQueue > 0 then
                         -- Refresh stock for accurate job creation
                         stock = storageManager.getAllStock()
-                        local job, err = queueManager.addJob("minecraft:dried_kelp_block", toQueue, stock)
+                        -- Pass total blocks needed; createJobTree will account for current stock
+                        local job, err = queueManager.addJob("minecraft:dried_kelp_block", blocksNeeded, stock)
                         if job then
-                            logger.info(string.format("Dried kelp mode: queued %d dried kelp blocks", toQueue))
+                            logger.info(string.format("Dried kelp mode: queued %d dried kelp blocks", job.expectedOutput or 0))
                         elseif err then
                             logger.debug("Dried kelp mode: " .. err)
                         end
@@ -632,8 +637,8 @@ local function requestProcessLoop()
                                     req.id, needed, req.item))
                             else
                                 -- Not enough input material - try to craft it using job tree
-                                local inputNeeded = needed - inputStock
-                                local job, err = queueManager.addJob(input, inputNeeded, stock, "request")
+                                -- Pass total needed; createJobTree will account for current stock
+                                local job, err = queueManager.addJob(input, needed, stock, "request")
                                 
                                 if job then
                                     requestManager.updateRequest(req.id, requestManager.STATES.CRAFTING, {
@@ -642,7 +647,7 @@ local function requestProcessLoop()
                                         craftingInput = true,
                                     })
                                     logger.debug(string.format("Request #%d: queued job tree #%d for smelt input %dx %s", 
-                                        req.id, job.id, inputNeeded, input))
+                                        req.id, job.id, needed, input))
                                 else
                                     requestManager.updateRequest(req.id, requestManager.STATES.FAILED, {
                                         failReason = err or string.format("Cannot craft %s", input)
