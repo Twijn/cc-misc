@@ -194,6 +194,7 @@ function manager.dispense(product, maxCount)
       end
       if matches then
         local remaining = maxCount - dispensed
+        logger.info(string.format("Transferring %d %s from chest %d slot %d to aisle %s", remaining, product.modid, i, slot, product.aisleName))
         local moved = chest.pushItems(aisle.self, slot, remaining)
         if moved and moved > 0 then
           dispensed = dispensed + moved
@@ -209,6 +210,8 @@ function manager.dispense(product, maxCount)
     end
     if dispensed >= maxCount then break end
   end
+
+  logger.info(string.format("Dispensed %d/%d items for product %s", dispensed, maxCount, product.meta))
 
   if dispensed == 0 and maxCount > 0 then
     local errMsg = string.format("Could not dispense any %s - insufficient stock", product.modid)
