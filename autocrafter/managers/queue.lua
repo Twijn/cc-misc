@@ -203,7 +203,7 @@ function manager.createJobTree(output, quantity, stockLevels, parentId, rootId, 
     local needed = quantity - currentStock
     if needed <= 0 then
         visited[output] = nil
-        return nil, nil  -- Not an error, just not needed
+        return nil, "Already have enough in stock"
     end
     
     -- Get recipe
