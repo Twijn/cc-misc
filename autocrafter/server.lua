@@ -230,6 +230,7 @@ local function processCraftTargets()
         -- Create a job for this target (one job at a time per target to avoid flooding)
         local job, err = queueManager.addJob(target.item, remainingNeeded, stock)
         if not job then
+            logger.info(string.format("Failed to queue %s: %s", target.item:gsub("minecraft:", ""), err or "unknown"))
             if err then
                 -- Rate-limit error logging to avoid spam
                 local now = os.clock()

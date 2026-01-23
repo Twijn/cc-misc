@@ -236,8 +236,8 @@ local function pushToExport(item, count, destInv, destSlot, nbtMode, nbtHash)
     end
     
     if #locations == 0 then 
-        logger.debug(string.format("pushToExport: No %s found in storage for export to %s (nbtMode=%s)", 
-            item, destInv, nbtMode))
+        -- logger.debug(string.format("pushToExport: No %s found in storage for export to %s (nbtMode=%s)", 
+        --     item, destInv, nbtMode))
         return 0, {} 
     end
     
@@ -822,23 +822,23 @@ local function processExportInventory(name, config)
             for itemName, count in pairs(itemSummary) do
                 table.insert(summaryParts, string.format("%s:%d", itemName, count))
             end
-            logger.debug(string.format("processExportInventory: %s contains: %s", 
-                name, table.concat(summaryParts, ", ")))
+            -- logger.debug(string.format("processExportInventory: %s contains: %s", 
+            --     name, table.concat(summaryParts, ", ")))
         else
-            logger.debug(string.format("processExportInventory: %s is empty", name))
+            -- logger.debug(string.format("processExportInventory: %s is empty", name))
         end
     end
     
     -- Special case: empty mode with no items configured = pull ALL items
     if config.mode == "empty" and #slots == 0 then
-        logger.debug(string.format("processExportInventory: %s is in empty mode with no slots, pulling ALL items", name))
+        -- logger.debug(string.format("processExportInventory: %s is in empty mode with no slots, pulling ALL items", name))
         local pulled = pullAllFromExport(name)
         result.pulled = result.pulled + pulled
-        if pulled > 0 then
-            logger.debug(string.format("Emptied all: %d items from %s", pulled, name))
-        else
-            logger.debug(string.format("Empty mode: nothing to pull from %s (may already be empty)", name))
-        end
+        -- if pulled > 0 then
+        --     logger.debug(string.format("Emptied all: %d items from %s", pulled, name))
+        -- else
+        --     logger.debug(string.format("Empty mode: nothing to pull from %s (may already be empty)", name))
+        -- end
         return result
     end
     
@@ -922,7 +922,7 @@ local function processExportInventory(name, config)
                     local sourceDesc = #sourceStrs > 0 and table.concat(sourceStrs, ", ") or "unknown"
                     logger.debug(string.format("Stocked %d %s to %s from %s (nbtMode=%s)", pushed, item, name, sourceDesc, nbtMode))
                 elseif needed > 0 then
-                    logger.debug(string.format("Failed to stock %s to %s: 0 pushed of %d needed (nbtMode=%s)", item, name, needed, nbtMode))
+                    -- logger.debug(string.format("Failed to stock %s to %s: 0 pushed of %d needed (nbtMode=%s)", item, name, needed, nbtMode))
                 end
             end
             
