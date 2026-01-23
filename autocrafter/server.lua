@@ -234,7 +234,7 @@ local function processCraftTargets()
             -- Don't log "Already have enough in stock" as an error since it's expected
             -- when current stock + queued jobs >= target
             if err and err ~= "Already have enough in stock" then
-                logger.info(string.format("Failed to queue %s: %s", target.item:gsub("minecraft:", ""), err))
+                -- logger.info(string.format("Failed to queue %s: %s", target.item:gsub("minecraft:", ""), err))
                 
                 -- Rate-limit error logging to avoid spam
                 local now = os.clock()
