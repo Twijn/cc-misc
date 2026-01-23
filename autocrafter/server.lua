@@ -545,7 +545,7 @@ local function furnaceProcessLoop()
                         -- Refresh stock for accurate job creation
                         stock = storageManager.getAllStock()
                         -- Pass total blocks needed; createJobTree will account for current stock
-                        local job, err = queueManager.addJob("minecraft:dried_kelp_block", blocksNeeded, stock)
+                        local job, err = queueManager.addJob("minecraft:dried_kelp_block", blocksToQueue, stock)
                         if job then
                             logger.info(string.format("Dried kelp mode: queued %d dried kelp blocks", job.expectedOutput or 0))
                         elseif err then
