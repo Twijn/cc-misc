@@ -157,6 +157,8 @@ local serverFiles = {
     {url = BASE_URL .. "/autocrafter/config/exports.lua", path = diskPrefix .. "config/exports.lua"},
     {url = BASE_URL .. "/autocrafter/config/recipes.lua", path = diskPrefix .. "config/recipes.lua"},
     {url = BASE_URL .. "/autocrafter/config/recipeprefs.lua", path = diskPrefix .. "config/recipeprefs.lua"},
+    {url = BASE_URL .. "/autocrafter/config/recipeoverrides.lua", path = diskPrefix .. "config/recipeoverrides.lua"},
+    {url = BASE_URL .. "/autocrafter/config/recipeoverrides-ui.lua", path = diskPrefix .. "config/recipeoverrides-ui.lua"},
     {url = BASE_URL .. "/autocrafter/config/furnaces.lua", path = diskPrefix .. "config/furnaces.lua"},
     {url = BASE_URL .. "/autocrafter/config/workers.lua", path = diskPrefix .. "config/workers.lua"},
     {url = BASE_URL .. "/autocrafter/config/tags.lua", path = diskPrefix .. "config/tags.lua"},

@@ -2,10 +2,11 @@
 --- Loads and parses crafting recipes from ROM.
 ---
 --- Supports both shaped and shapeless recipes from Minecraft's JSON format.
+--- Also supports custom recipe overrides.
 ---
----@version 1.2.0
+---@version 1.3.0
 
-local VERSION = "1.2.0"
+local VERSION = "1.3.0"
 
 local recipes = {}
 local recipeCache = {}
@@ -29,6 +30,25 @@ local function getRecipePrefs()
         end
     end
     return recipePrefs
+end
+
+-- Lazy load custom recipe overrides
+local recipeOverrides = nil
+local function getRecipeOverrides()
+    if not recipeOverrides then
+        local success, overrides = pcall(require, "config.recipeoverrides")
+        if success then
+            recipeOverrides = overrides
+        else
+            -- Fallback: no overrides available
+            recipeOverrides = {
+                get = function() return {} end,
+                has = function() return false end,
+                isEnabled = function() return false end,
+            }
+        end
+    end
+    return recipeOverrides
 end
 
 ---Parse a shaped recipe JSON into a usable format
@@ -224,7 +244,22 @@ end
 ---@param includeDisabled? boolean Whether to include disabled recipes (default: false)
 ---@return table recipes Array of recipes that produce this item
 function recipes.getRecipesFor(output, includeDisabled)
-    local available = recipesByOutput[output] or {}
+    local available = {}
+    
+    -- First, add custom override recipes (they have priority)
+    local overrides = getRecipeOverrides()
+    if overrides.isEnabled() and overrides.has(output) then
+        local customRecipes = overrides.get(output)
+        for _, recipe in ipairs(customRecipes) do
+            table.insert(available, recipe)
+        end
+    end
+    
+    -- Then add standard recipes from ROM
+    local romRecipes = recipesByOutput[output] or {}
+    for _, recipe in ipairs(romRecipes) do
+        table.insert(available, recipe)
+    end
     
     if includeDisabled then
         return available
@@ -262,13 +297,21 @@ function recipes.getRecipesSorted(output, includeDisabled)
         priorityIndex[source] = i
     end
     
-    -- Sort by: 1) priority order if set, 2) fewest ingredients as tiebreaker
+    -- Sort by: 1) priority order if set, 2) recipe.priority field, 3) fewest ingredients as tiebreaker
     table.sort(available, function(a, b)
         local aPriority = priorityIndex[a.source] or 999999
         local bPriority = priorityIndex[b.source] or 999999
         
         if aPriority ~= bPriority then
             return aPriority < bPriority
+        end
+        
+        -- Check recipe.priority field (custom recipes use this)
+        local aRecipePriority = a.priority or 999999
+        local bRecipePriority = b.priority or 999999
+        
+        if aRecipePriority ~= bRecipePriority then
+            return aRecipePriority < bRecipePriority
         end
         
         -- Tiebreaker: fewest ingredients
@@ -295,6 +338,13 @@ end
 ---@param output string The output item ID
 ---@return boolean canCraft Whether the item has a known recipe
 function recipes.canCraft(output)
+    -- Check custom overrides first
+    local overrides = getRecipeOverrides()
+    if overrides.isEnabled() and overrides.has(output) then
+        return true
+    end
+    
+    -- Check ROM recipes
     return recipesByOutput[output] ~= nil and #recipesByOutput[output] > 0
 end
 
