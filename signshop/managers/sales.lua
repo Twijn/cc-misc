@@ -4,6 +4,7 @@
 ---@version 1.6.0
 
 local persist = require("lib.persist")
+local productManager = require("managers.product")
 
 local salesData = persist("sales.json", false)
 
@@ -48,7 +49,7 @@ function manager.recordSale(product, quantity, transaction, refundAmount)
         timestamp = os.epoch("utc"),
         date = os.date("%Y-%m-%d %H:%M:%S"),
         productMeta = product.meta,
-        productName = product.line1 or product.meta,
+        productName = productManager.getName(product),
         quantity = quantity,
         unitPrice = product.cost,
         totalPrice = product.cost * quantity,
