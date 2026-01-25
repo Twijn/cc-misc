@@ -165,9 +165,14 @@ shopk.on("transaction", function(transaction)
         timestamp = os.epoch("utc"),
       }
       
-      local result = inventoryManager.dispense(product, purchased)
-      local dispensed = 0
-      
+      local ok, result = pcall(inventoryManager.dispense, product, purchased)
+
+      if not ok then
+          logger.error(string.format("Dispense crashed: %s", tostring(result)))
+          -- result here is the error message string
+          result = errors.create(errors.types.INTERNAL_ERROR, result)
+      end
+
       if errors.isError(result) then
         logger.warn(string.format("Dispense error [%s]: %s", result.type, result.message))
         dispensed = 0
