@@ -185,7 +185,11 @@ function manager.dispense(product, maxCount)
   logger.info(string.format("Scanning %d chests for %s", #chests, product.modid))
   
   for i, chest in ipairs(chests) do
-    for slot, item in pairs(chest.list()) do
+    local items = chest.list()
+    if not items then
+      logger.warn(string.format("Chest %d returned nil from list(), skipping", i))
+    else
+    for slot, item in pairs(items) do
       if dispensed >= maxCount then break end
       -- Match item: if anyNbt is true, match only by modid; otherwise match both modid and nbt
       local matches = item.name == product.modid
@@ -208,6 +212,7 @@ function manager.dispense(product, maxCount)
         sleep()
       end
     end
+    end -- end items check
     if dispensed >= maxCount then break end
   end
 
