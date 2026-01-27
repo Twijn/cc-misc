@@ -93,10 +93,11 @@ function manager.refundAwaiting()
         details.amount
       )
     )
+    local refundMessage = string.format("Delayed refund from transaction #%d", details.transactionId)
     shopk.send({
       to = details.address,
       amount = details.amount,
-      metadata = string.format("message=Delayed refund from transaction #%d", details.transactionId),
+      metadata = string.format("ref=%d;type=refund;original=%.2f;message=%s", details.transactionId, details.amount, refundMessage),
     }, function(result)
       if result.ok then
         logger.info("Successfully sent refund! Transaction #" .. result.transaction.id)
@@ -120,13 +121,13 @@ shopk.on("ready", function()
   end)
 end)
 
-local function refund(toAddress, amount, message, type)
-  type = type or "error"
+local function refund(toAddress, amount, message, transactionId, originalAmount)
+  originalAmount = originalAmount or amount
   logger.info(string.format("Refunding %.03f to %s with message %s", amount, toAddress, message))
   shopk.send({
     to = toAddress,
     amount = amount,
-    metadata = string.format("%s=%s", type, message),
+    metadata = string.format("ref=%d;type=refund;original=%.2f;message=%s", transactionId, originalAmount, message),
   }, function(result)
     if result.ok then
       logger.info("Refund successful! Transaction #" .. result.transaction.id)
@@ -200,7 +201,7 @@ shopk.on("transaction", function(transaction)
         else
           logger.info(string.format("Partial refund of %.03f KRO (dispensed %d of %d requested)", refundAmount, dispensed, purchased))
         end
-        refund(transaction.from, refundAmount, refundMessage)
+        refund(transaction.from, refundAmount, refundMessage, transaction.id, transaction.value)
       end
 
       if dispensed > 0 then
@@ -234,7 +235,7 @@ shopk.on("transaction", function(transaction)
     return
   end
 
-  refund(transaction.from, transaction.value, "Invalid meta! Use /pay ktwijnmall <amt> <last line of sign, ex: glass>")
+  refund(transaction.from, transaction.value, "Invalid meta! Use /pay ktwijnmall <amt> <last line of sign, ex: glass>", transaction.id, transaction.value)
 end)
 
 return manager
