@@ -186,6 +186,7 @@ function manager.dispense(product, maxCount)
   
   for i, chest in ipairs(chests) do
     local items = chest.list()
+    logger.info("on chest " .. i)
     if not items then
       logger.warn(string.format("Chest %d returned nil from list(), skipping", i))
     else
