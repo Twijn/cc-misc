@@ -4520,9 +4520,21 @@ local function chatboxHandler()
                     chatTell(user, "Count must be a positive number", true)
                 else
                     -- Use fuzzy matching to find the item
-                    local item, stock = storageManager.resolveItem(itemQuery)
+                    local item, stock, matches = storageManager.resolveItem(itemQuery)
                     
-                    if not item or stock == 0 then
+                    if matches and #matches > 1 then
+                        -- Ambiguous - show possible matches
+                        chatTell(user, "Multiple items match '" .. itemQuery .. "':", true)
+                        local shown = 0
+                        for _, m in ipairs(matches) do
+                            if shown >= 5 then
+                                chatTell(user, "  ... and " .. (#matches - 5) .. " more")
+                                break
+                            end
+                            chatTell(user, "  " .. m.item:gsub("minecraft:", "") .. " x" .. m.count)
+                            shown = shown + 1
+                        end
+                    elseif not item or stock == 0 then
                         chatTell(user, "Item not found: " .. itemQuery, true)
                     else
                         local toWithdraw = math.min(count, stock)
@@ -4655,12 +4667,36 @@ local function chatboxHandler()
                 chatTell(user, "Usage: \\recipe <item>", true)
             else
                 local item = args[1]
+                local originalQuery = item
                 if not item:find(":") then
                     item = "minecraft:" .. item
                 end
                 
                 local allRecipes = recipes.getRecipesSorted(item, false)
                 local activeRecipe = recipes.getRecipeFor(item)
+                
+                -- Try fuzzy matching if no recipes found
+                if #allRecipes == 0 then
+                    local resolvedItem, _, matches = storageManager.resolveItem(originalQuery)
+                    if matches and #matches > 1 then
+                        -- Ambiguous - show possible matches
+                        chatTell(user, "Multiple items match '" .. originalQuery .. "':", true)
+                        local shown = 0
+                        for _, m in ipairs(matches) do
+                            if shown >= 5 then
+                                chatTell(user, "  ... and " .. (#matches - 5) .. " more")
+                                break
+                            end
+                            chatTell(user, "  " .. m.item:gsub("minecraft:", ""))
+                            shown = shown + 1
+                        end
+                        goto recipe_done
+                    elseif resolvedItem then
+                        item = resolvedItem
+                        allRecipes = recipes.getRecipesSorted(item, false)
+                        activeRecipe = recipes.getRecipeFor(item)
+                    end
+                end
                 
                 if #allRecipes == 0 then
                     chatTell(user, "No recipe found for: " .. item, true)
@@ -4687,6 +4723,7 @@ local function chatboxHandler()
                         chatTell(user, "Use terminal 'recipeprefs' to configure variants")
                     end
                 end
+                ::recipe_done::
             end
             
         elseif command == "request" then
@@ -4770,8 +4807,21 @@ local function chatboxHandler()
                     
                     -- Try to resolve fuzzy item names
                     if currentStock == 0 then
-                        local resolvedItem = storageManager.resolveItem(subCmd)
-                        if resolvedItem then
+                        local resolvedItem, resolvedStock, matches = storageManager.resolveItem(subCmd)
+                        if matches and #matches > 1 then
+                            -- Ambiguous - show possible matches
+                            chatTell(user, "Multiple items match '" .. subCmd .. "':", true)
+                            local shown = 0
+                            for _, m in ipairs(matches) do
+                                if shown >= 5 then
+                                    chatTell(user, "  ... and " .. (#matches - 5) .. " more")
+                                    break
+                                end
+                                chatTell(user, "  " .. m.item:gsub("minecraft:", "") .. " x" .. m.count)
+                                shown = shown + 1
+                            end
+                            goto continue
+                        elseif resolvedItem then
                             item = resolvedItem
                             currentStock = stock[item] or 0
                         end
@@ -4804,6 +4854,7 @@ local function chatboxHandler()
                         end
                     end
                 end
+                ::continue::
             end
         end
     end

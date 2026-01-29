@@ -295,15 +295,18 @@ end
 
 ---Fuzzy match an item name to the best match in storage
 ---First tries exact match, then partial match
+---Returns a single match only if unambiguous (exact match or single partial match)
 ---@param query string Item name or partial name
 ---@return string|nil item The matched item ID or nil
 ---@return number count The stock count (0 if not found)
+---@return table|nil matches Array of all matches if ambiguous (more than one)
 function manager.resolveItem(query)
     if not query or query == "" then
         return nil, 0
     end
     
     -- Add minecraft: prefix if missing
+    local originalQuery = query
     if not query:find(":") then
         query = "minecraft:" .. query
     end
@@ -315,11 +318,9 @@ function manager.resolveItem(query)
         return query, stock[query]
     end
     
-    -- Try partial/fuzzy match
+    -- Collect all partial matches
     local queryLower = query:lower()
-    local bestMatch = nil
-    local bestCount = 0
-    local bestScore = 0  -- Higher score = better match
+    local matches = {}
     
     for item, count in pairs(stock) do
         local itemLower = item:lower()
@@ -339,16 +340,44 @@ function manager.resolveItem(query)
                 score = 1
             end
             
-            -- Prefer items with higher stock on tie
-            if score > bestScore or (score == bestScore and count > bestCount) then
-                bestMatch = item
-                bestCount = count
-                bestScore = score
-            end
+            table.insert(matches, {item = item, count = count, score = score})
         end
     end
     
-    return bestMatch, bestCount
+    -- No matches found
+    if #matches == 0 then
+        return nil, 0
+    end
+    
+    -- Single match - return it regardless of score
+    if #matches == 1 then
+        return matches[1].item, matches[1].count
+    end
+    
+    -- Multiple matches - sort by score (desc), then by count (desc)
+    table.sort(matches, function(a, b)
+        if a.score ~= b.score then
+            return a.score > b.score
+        end
+        return a.count > b.count
+    end)
+    
+    -- If top match has a significantly better score than others, use it
+    local topScore = matches[1].score
+    local sameScoreCount = 0
+    for _, m in ipairs(matches) do
+        if m.score == topScore then
+            sameScoreCount = sameScoreCount + 1
+        end
+    end
+    
+    -- If only one item has the top score, it's unambiguous
+    if sameScoreCount == 1 then
+        return matches[1].item, matches[1].count
+    end
+    
+    -- Multiple items with same score - ambiguous, return all matches
+    return nil, 0, matches
 end
 
 ---Get top items by count
