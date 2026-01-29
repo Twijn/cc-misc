@@ -1,6 +1,6 @@
 # cmd
 
-Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, string utility functions, command categories for organized help display, and proper alias handling.
+Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, string utility functions, command categories for organized help display, proper alias handling, and exit hooks.
 
 ## Examples
 
@@ -28,7 +28,24 @@ local customCommands = {
    end
  }
 }
+-- Basic usage
 cmd("MyApp", "1.0.0", customCommands)
+-- With exit hooks via options
+cmd("MyApp", "1.0.0", customCommands, {
+ onExit = function(context)
+   print("Goodbye!")
+ end,
+ exitHooks = {
+   function() saveData() end,
+   function() closeConnections() end,
+ }
+})
+-- Or register hooks at runtime from within commands
+execute = function(args, context)
+ context.onExit(function()
+   print("Cleanup complete!")
+ end)
+end
 ```
 
 ## Functions
