@@ -109,6 +109,7 @@ local function getSigns(meta)
   local signNames = productSigns.get(meta)
   if not signNames or #signNames == 0 then
     logger.warn("Could not find product signs for " .. meta)
+    return {}
   end
 
   local signs = {}
