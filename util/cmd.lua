@@ -4,7 +4,7 @@
 --- Features: Built-in commands (clear, exit, help), command history navigation,
 --- tab autocompletion for commands and arguments, colored output for different message types,
 --- table pretty-printing functionality, pager for long output, string utility functions,
---- command categories for organized help display, and proper alias handling.
+--- command categories for organized help display, proper alias handling, and exit hooks.
 ---
 ---@usage
 ---local cmd = require("cmd")
@@ -32,16 +32,36 @@
 ---  }
 ---}
 ---
+----- Basic usage
 ---cmd("MyApp", "1.0.0", customCommands)
 ---
----@version 1.2.0
+----- With exit hooks via options
+---cmd("MyApp", "1.0.0", customCommands, {
+---  onExit = function(context)
+---    print("Goodbye!")
+---  end,
+---  exitHooks = {
+---    function() saveData() end,
+---    function() closeConnections() end,
+---  }
+---})
+---
+----- Or register hooks at runtime from within commands
+---execute = function(args, context)
+---  context.onExit(function()
+---    print("Cleanup complete!")
+---  end)
+---end
+---
+---@version 1.3.0
 -- @module cmd
 
-local VERSION = "1.2.0"
+local VERSION = "1.3.0"
 local pager = require("pager")
 
 local history = {}
 local running = true
+local exitHooks = {}
 
 ---Print an error message in red color
 ---@param txt string The error message to display
@@ -96,6 +116,43 @@ local function printTable(tbl, iteration)
   end
 end
 
+---Run all registered exit hooks
+---@param context? CommandContext The command context to pass to hooks
+local function runExitHooks(context)
+  for i, hook in ipairs(exitHooks) do
+    local success, hookErr = pcall(hook, context)
+    if not success then
+      term.setTextColor(colors.red)
+      print("Exit hook " .. i .. " failed: " .. tostring(hookErr))
+    end
+  end
+end
+
+---Register a function to be called when the command interface exits
+---@param hook fun(context?: CommandContext) The function to call on exit
+---@return number # The index of the registered hook (can be used to remove it)
+local function onExit(hook)
+  assert(type(hook) == "function", "Exit hook must be a function")
+  table.insert(exitHooks, hook)
+  return #exitHooks
+end
+
+---Remove a previously registered exit hook
+---@param index number The index returned by onExit
+---@return boolean # True if the hook was removed
+local function removeExitHook(index)
+  if exitHooks[index] then
+    table.remove(exitHooks, index)
+    return true
+  end
+  return false
+end
+
+---Clear all registered exit hooks
+local function clearExitHooks()
+  exitHooks = {}
+end
+
 ---@class CommandDefinition
 ---@field description string A description of what the command does
 ---@field execute fun(args: string[], context: CommandContext) The function to execute when the command is called
@@ -112,6 +169,9 @@ end
 ---@field mess fun(txt: string) Function to print informational messages
 ---@field succ fun(txt: string) Function to print success messages
 ---@field pager fun(title?: string): table Create a pager for displaying long output
+---@field onExit fun(hook: fun(context?: CommandContext)): number Register an exit hook, returns hook index
+---@field removeExitHook fun(index: number): boolean Remove an exit hook by index
+---@field clearExitHooks fun() Clear all exit hooks
 
 --- Category display order and colors
 local CATEGORY_ORDER = {
@@ -148,7 +208,8 @@ local defaultCommands = {
     description = "Exit the command interface",
     category = "system",
     aliases = {"quit", "q"},
-    execute = function()
+    execute = function(args, context)
+      runExitHooks(context)
       err("Exiting")
       running = false
     end
@@ -502,8 +563,25 @@ end
 ---@param name string The name of the application/system
 ---@param version string The version of the application/system
 ---@param customCommands table<string, CommandDefinition> Custom commands to add to the default set
+---@param options? {onExit?: fun(context?: CommandContext), exitHooks?: fun(context?: CommandContext)[]} Optional configuration
 ---@return nil # This function runs until the user exits
-return function(name, version, customCommands)
+local function startCmd(name, version, customCommands, options)
+  -- Reset state for fresh instance
+  running = true
+  exitHooks = {}
+  
+  -- Register initial exit hooks from options
+  if options then
+    if options.onExit then
+      onExit(options.onExit)
+    end
+    if options.exitHooks then
+      for _, hook in ipairs(options.exitHooks) do
+        onExit(hook)
+      end
+    end
+  end
+  
   local commands = {}
   
   -- Copy default commands
@@ -554,10 +632,27 @@ return function(name, version, customCommands)
         mess = mess,
         succ = succ,
         pager = pager.create,
+        onExit = onExit,
+        removeExitHook = removeExitHook,
+        clearExitHooks = clearExitHooks,
       })
       table.insert(history, str)
     elseif str ~= "" then
       err("No such command")
     end
   end
+  
+  -- Run exit hooks if loop terminated without exit command (e.g., Ctrl+T termination)
+  -- Note: The exit command already runs hooks, but this catches other termination cases
 end
+
+-- Export module with both the main function and utility functions
+return setmetatable({
+  onExit = onExit,
+  removeExitHook = removeExitHook,
+  clearExitHooks = clearExitHooks,
+}, {
+  __call = function(_, ...)
+    return startCmd(...)
+  end
+})
