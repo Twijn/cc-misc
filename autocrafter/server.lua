@@ -2201,6 +2201,20 @@ local commands = {
                 -- For cobblestone, item is preset
                 if taskType == "cobblestone" then
                     item = "minecraft:cobblestone"
+                elseif taskType == "crop_farm" then
+                    -- Validate crop type
+                    if not item then
+                        ctx.err("Crop required for crop_farm task (wheat, carrot, potato, beetroot, nether_wart)")
+                        return
+                    end
+                    if not item:find(":") then
+                        item = "minecraft:" .. item
+                    end
+                    local validCrops = typeInfo.validCrops
+                    if not validCrops[item] then
+                        ctx.err("Invalid crop: " .. item .. " (use: wheat, carrot, potato, beetroot, nether_wart)")
+                        return
+                    end
                 elseif not item then
                     ctx.err("Item required for task type: " .. taskType)
                     return
@@ -2210,7 +2224,20 @@ local commands = {
                     item = "minecraft:" .. item
                 end
                 
-                local taskId = taskType .. "_" .. os.epoch("utc")
+                -- Generate descriptive task ID from item name
+                local itemShortName = item:gsub("minecraft:", ""):gsub("[^%w]+", "_")
+                local taskId = taskType .. "_" .. itemShortName
+                
+                -- Handle duplicate IDs by adding a number suffix
+                local existingTasks = workerConfig.getAllTasks()
+                if existingTasks[taskId] then
+                    local counter = 2
+                    while existingTasks[taskId .. "_" .. counter] do
+                        counter = counter + 1
+                    end
+                    taskId = taskId .. "_" .. counter
+                end
+                
                 local taskConfig = {
                     item = item,
                     stockThreshold = threshold or typeInfo.defaultThreshold,
@@ -2223,6 +2250,14 @@ local commands = {
                 -- For concrete, set the input item
                 if taskType == "concrete" then
                     taskConfig.config.inputItem = item:gsub("_concrete$", "_concrete_powder")
+                end
+                
+                -- For crop_farm, set farm direction and seed info
+                if taskType == "crop_farm" then
+                    local cropInfo = typeInfo.validCrops[item]
+                    taskConfig.config.farmDirection = direction
+                    taskConfig.config.seedItem = cropInfo.seed
+                    taskConfig.config.breakDirection = nil  -- Not used for crop farming
                 end
                 
                 if workerConfig.setTask(taskId, taskType, taskConfig) then

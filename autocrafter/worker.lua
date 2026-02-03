@@ -433,6 +433,295 @@ local function executeCustomTask(task, quantity)
     return executeCobblestoneTask(task, quantity)
 end
 
+---Crop definitions for farming tasks
+---Contains all information needed to plant, grow, and harvest each crop type
+local CROP_DEFINITIONS = {
+    -- Standard overworld crops (max age 7)
+    ["minecraft:wheat"] = {
+        seed = "minecraft:wheat_seeds",
+        block = "minecraft:wheat",
+        drop = "minecraft:wheat",
+        maxAge = 7,
+        canBonemeal = true,
+    },
+    ["minecraft:carrot"] = {
+        seed = "minecraft:carrot",
+        block = "minecraft:carrots",
+        drop = "minecraft:carrot",
+        maxAge = 7,
+        canBonemeal = true,
+    },
+    ["minecraft:potato"] = {
+        seed = "minecraft:potato",
+        block = "minecraft:potatoes",
+        drop = "minecraft:potato",
+        maxAge = 7,
+        canBonemeal = true,
+    },
+    -- Beetroot has max age 3
+    ["minecraft:beetroot"] = {
+        seed = "minecraft:beetroot_seeds",
+        block = "minecraft:beetroots",
+        drop = "minecraft:beetroot",
+        maxAge = 3,
+        canBonemeal = true,
+    },
+    -- Nether wart (grows on soul sand, cannot be bonemealed)
+    ["minecraft:nether_wart"] = {
+        seed = "minecraft:nether_wart",
+        block = "minecraft:nether_wart",
+        drop = "minecraft:nether_wart",
+        maxAge = 3,
+        canBonemeal = false,
+    },
+}
+
+---Get crop definition for an item
+---@param cropItem string The crop item (drop) to look up
+---@return table|nil cropDef The crop definition or nil if not found
+local function getCropDefinition(cropItem)
+    return CROP_DEFINITIONS[cropItem]
+end
+
+---Get crop definition by block name
+---@param blockName string The block name to look up
+---@return table|nil cropDef The crop definition or nil if not found
+local function getCropDefinitionByBlock(blockName)
+    for _, def in pairs(CROP_DEFINITIONS) do
+        if def.block == blockName then
+            return def
+        end
+    end
+    return nil
+end
+
+---Execute crop farm task (farm wheat, carrots, potatoes, beetroot, nether wart)
+---@param task table The task configuration
+---@param quantity number How many crops to harvest
+---@return boolean success
+---@return number produced Amount produced
+local function executeCropFarmTask(task, quantity)
+    local direction = task.config.farmDirection or "down"
+    local dirOps = DIRECTIONS[direction]
+    local cropItem = task.item
+    
+    if not dirOps then
+        logger.warn("Invalid farm direction: " .. direction)
+        return false, 0
+    end
+    
+    -- Get crop definition from our table, falling back to task config
+    local cropDef = getCropDefinition(cropItem)
+    if not cropDef then
+        logger.warn("Unknown crop type: " .. cropItem)
+        return false, 0
+    end
+    
+    local seedItem = cropDef.seed
+    local cropBlock = cropDef.block
+    local maxAge = cropDef.maxAge
+    local canBonemeal = cropDef.canBonemeal
+    
+    local _, _, turtleName = getModem()
+    if not turtleName then
+        logger.warn("No network name available for inventory transfers")
+        return false, 0
+    end
+    
+    local produced = 0
+    local lastDeposit = 0
+    local lastProgressUpdate = 0
+    local PROGRESS_UPDATE_INTERVAL = 5
+    
+    -- Place operation based on direction
+    local placeOp = direction == "front" and turtle.place or
+                   (direction == "up" and turtle.placeUp or turtle.placeDown)
+    
+    -- Helper function to find an item in inventory
+    local function findItemSlot(itemName)
+        for slot = 1, 16 do
+            local detail = turtle.getItemDetail(slot)
+            if detail and detail.name == itemName then
+                return slot
+            end
+        end
+        return nil
+    end
+    
+    -- Helper function to request items from storage
+    local function requestItem(itemName, count)
+        comms.send(config.messageTypes.REQUEST_WITHDRAW, {
+            item = itemName,
+            count = count,
+            destInv = turtleName,
+            destSlot = 1,
+        })
+        
+        local response = comms.receive(5, config.messageTypes.RESPONSE_WITHDRAW)
+        if response and response.data then
+            return response.data.withdrawn or 0
+        end
+        return 0
+    end
+    
+    -- Helper to check if a block is our crop and if it's mature
+    local function checkCropState(blockData)
+        if not blockData then return false, false end
+        
+        -- Check if this block matches our target crop
+        if blockData.name ~= cropBlock then
+            -- Check if it's any known crop block (might be wrong crop planted)
+            local blockDef = getCropDefinitionByBlock(blockData.name)
+            if blockDef then
+                -- It's a crop, but not our target - still check maturity for harvesting
+                local blockMaxAge = blockDef.maxAge
+                local isMature = blockData.state and blockData.state.age == blockMaxAge
+                return true, isMature
+            end
+            return false, false
+        end
+        
+        -- It's our crop - check if mature
+        local isMature = blockData.state and blockData.state.age == maxAge
+        return true, isMature
+    end
+    
+    while produced < quantity and running do
+        -- Deposit periodically or when inventory is getting full
+        if (produced - lastDeposit) >= DEPOSIT_INTERVAL or getFreeSlots() < 2 then
+            local deposited = depositInventory()
+            if deposited > 0 then
+                lastDeposit = produced
+            elseif isInventoryFull() then
+                logger.warn("Inventory full and cannot deposit, pausing")
+                return true, produced
+            end
+        end
+        
+        -- Check if there's already a crop planted
+        local ok, blockData = dirOps.inspect()
+        
+        if ok then
+            local isCrop, isMature = checkCropState(blockData)
+            
+            if isCrop and not isMature and canBonemeal then
+                -- It's our crop but not mature - apply bonemeal if possible
+                local bonemealSlot = findItemSlot("minecraft:bone_meal")
+                if not bonemealSlot then
+                    -- Request bonemeal from storage
+                    local withdrawn = requestItem("minecraft:bone_meal", 64)
+                    if withdrawn == 0 then
+                        local now = os.epoch("utc") / 1000
+                        local lastLogged = noMoreItemLogged["minecraft:bone_meal"] or 0
+                        if now - lastLogged >= NO_MORE_ITEM_LOG_INTERVAL then
+                            logger.info("No bonemeal available")
+                            noMoreItemLogged["minecraft:bone_meal"] = now
+                        end
+                        depositInventory()
+                        return true, produced
+                    else
+                        noMoreItemLogged["minecraft:bone_meal"] = nil
+                    end
+                    bonemealSlot = findItemSlot("minecraft:bone_meal")
+                end
+                
+                if bonemealSlot then
+                    turtle.select(bonemealSlot)
+                    -- Apply bonemeal until crop is mature (up to 10 attempts)
+                    for _ = 1, 10 do
+                        placeOp()  -- Apply bonemeal
+                        sleep(0.05)
+                        local checkOk, checkData = dirOps.inspect()
+                        if checkOk then
+                            _, isMature = checkCropState(checkData)
+                            if isMature then
+                                break
+                            end
+                        end
+                        if turtle.getItemCount(bonemealSlot) == 0 then
+                            bonemealSlot = findItemSlot("minecraft:bone_meal")
+                            if bonemealSlot then
+                                turtle.select(bonemealSlot)
+                            else
+                                break
+                            end
+                        end
+                    end
+                    -- Re-check maturity after bonemealing
+                    local recheckOk, recheckData = dirOps.inspect()
+                    if recheckOk then
+                        _, isMature = checkCropState(recheckData)
+                    end
+                end
+            elseif isCrop and not isMature and not canBonemeal then
+                -- Crop can't be bonemealed (like nether wart) - wait for natural growth
+                sleep(0.5)
+            end
+            
+            -- Re-check current state for harvesting
+            ok, blockData = dirOps.inspect()
+            if ok then
+                isCrop, isMature = checkCropState(blockData)
+            end
+            
+            if isCrop and isMature then
+                -- Harvest the mature crop
+                local digOk = dirOps.dig()
+                if digOk then
+                    produced = produced + 1
+                    progress.current = produced
+                    stats.lastProduced = produced
+                    stats.sessionProduced = stats.sessionProduced + 1
+                    stats.totalProduced = stats.totalProduced + 1
+                    
+                    if produced - lastProgressUpdate >= PROGRESS_UPDATE_INTERVAL then
+                        sendStatus()
+                        lastProgressUpdate = produced
+                    end
+                end
+            end
+        end
+        
+        -- Plant a new seed if the block is empty
+        ok, blockData = dirOps.inspect()
+        if not ok then
+            -- No block - plant a seed
+            local seedSlot = findItemSlot(seedItem)
+            if not seedSlot then
+                -- Request seeds from storage
+                local withdrawn = requestItem(seedItem, 64)
+                if withdrawn == 0 then
+                    local now = os.epoch("utc") / 1000
+                    local lastLogged = noMoreItemLogged[seedItem] or 0
+                    if now - lastLogged >= NO_MORE_ITEM_LOG_INTERVAL then
+                        logger.info("No " .. seedItem .. " available")
+                        noMoreItemLogged[seedItem] = now
+                    end
+                    depositInventory()
+                    return true, produced
+                else
+                    noMoreItemLogged[seedItem] = nil
+                end
+                seedSlot = findItemSlot(seedItem)
+            end
+            
+            if seedSlot then
+                turtle.select(seedSlot)
+                placeOp()  -- Plant seed
+                sleep(0.05)
+            end
+        end
+        
+        -- Small delay to prevent tight loop
+        sleep(0.05)
+    end
+    
+    -- Deposit any remaining items
+    depositInventory()
+    
+    return true, produced
+end
+
 ---Execute current task
 ---@param task table The task to execute
 ---@param quantity number Target quantity
@@ -456,6 +745,8 @@ local function executeTask(task, quantity)
         success, produced = executeCobblestoneTask(task, quantity)
     elseif task.type == "concrete" then
         success, produced = executeConcreteTask(task, quantity)
+    elseif task.type == "crop_farm" then
+        success, produced = executeCropFarmTask(task, quantity)
     elseif task.type == "custom" then
         success, produced = executeCustomTask(task, quantity)
     else

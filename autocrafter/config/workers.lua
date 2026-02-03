@@ -42,6 +42,58 @@ module.TASK_TYPES = {
         defaultTarget = 256,
         configFields = {"inputItem", "breakDirection"},
     },
+    crop_farm = {
+        description = "Crop Farm (wheat, carrots, potatoes, beetroot, nether wart)",
+        -- item: the crop to farm (e.g., "minecraft:wheat", "minecraft:carrot", "minecraft:potato")
+        -- Uses bonemeal from storage to grow crops instantly on a single block
+        -- Note: Nether wart cannot be bonemealed and must grow naturally
+        defaultThreshold = 256,
+        defaultTarget = 512,
+        -- farmDirection: where the crop is planted (front, up, down - default: down)
+        configFields = {"farmDirection"},
+        -- Crop definitions contain: seed (plant item), block (planted block name),
+        -- drop (harvested item), maxAge (mature age), canBonemeal (whether bonemeal works)
+        validCrops = {
+            -- Standard overworld crops (max age 7)
+            ["minecraft:wheat"] = {
+                seed = "minecraft:wheat_seeds",
+                block = "minecraft:wheat",
+                drop = "minecraft:wheat",
+                maxAge = 7,
+                canBonemeal = true,
+            },
+            ["minecraft:carrot"] = {
+                seed = "minecraft:carrot",
+                block = "minecraft:carrots",
+                drop = "minecraft:carrot",
+                maxAge = 7,
+                canBonemeal = true,
+            },
+            ["minecraft:potato"] = {
+                seed = "minecraft:potato",
+                block = "minecraft:potatoes",
+                drop = "minecraft:potato",
+                maxAge = 7,
+                canBonemeal = true,
+            },
+            -- Beetroot has max age 3
+            ["minecraft:beetroot"] = {
+                seed = "minecraft:beetroot_seeds",
+                block = "minecraft:beetroots",
+                drop = "minecraft:beetroot",
+                maxAge = 3,
+                canBonemeal = true,
+            },
+            -- Nether wart (grows on soul sand, no bonemeal)
+            ["minecraft:nether_wart"] = {
+                seed = "minecraft:nether_wart",
+                block = "minecraft:nether_wart",
+                drop = "minecraft:nether_wart",
+                maxAge = 3,
+                canBonemeal = false,
+            },
+        },
+    },
     custom = {
         description = "Custom block breaking task",
         defaultThreshold = 64,
