@@ -27,6 +27,7 @@ local threadCount = (config.parallelism or {}).transferThreads or 8
 local peripherals = {}      -- name -> wrapped peripheral
 local sizes = {}            -- name -> slot count  
 local storage = {}          -- array of storage inventory names
+local storageSet = {}       -- name -> true (fast lookup cache, rebuilt with storage)
 local slots = {}            -- name -> {slot -> {name, count, nbt?}}
 local items = {}            -- itemKey -> {{inv, slot, count}, ...}
 local stock = {}            -- itemKey -> total count
@@ -138,6 +139,7 @@ function inventory.discover(force)
     peripherals = {}
     sizes = {}
     storage = {}
+    storageSet = {}
     
     local allNames = peripheral.getNames()
     local invCount = 0
@@ -159,6 +161,7 @@ function inventory.discover(force)
                 invCount = invCount + 1
                 if isStorage then
                     storage[#storage + 1] = name
+                    storageSet[name] = true
                 end
             end
         end
@@ -199,8 +202,7 @@ function inventory.scan(force)
     items = {}
     stock = {}
     
-    local storageSet = {}
-    for _, name in ipairs(storage) do storageSet[name] = true end
+    -- Note: storageSet is already built in discover(), just use it directly
     
     local totalSlots = 0
     local totalItems = 0
@@ -245,20 +247,45 @@ end
 ---@param item string Item ID
 ---@return number
 function inventory.getStock(item)
-    return stock[item] or 0
+    local count = stock[item] or 0
+    
+    -- If no exact match and item doesn't have NBT, check for NBT variants
+    if count == 0 and not item:find(":.*:") then
+        -- Search for items that start with this base name followed by :
+        for itemKey, itemCount in pairs(stock) do
+            if itemKey:sub(1, #item + 1) == item .. ":" then
+                count = count + itemCount
+            end
+        end
+    end
+    
+    return count
+end
+
+---Get stock by base name (ignoring NBT variations)
+---@param baseName string Item base name
+---@return number total Total stock of all variants
+function inventory.getStockByBaseName(baseName)
+    local total = 0
+    
+    for itemKey, itemCount in pairs(stock) do
+        if itemKey == baseName or itemKey:sub(1, #baseName + 1) == baseName .. ":" then
+            total = total + itemCount
+        end
+    end
+    
+    return total
 end
 
 ---Find item locations
 ---@param item string Item ID
----@param storageOnly? boolean Only search storage inventories
+---@param inStorageOnly? boolean Only search storage inventories
 ---@return table[] locations {inv, slot, count}
-function inventory.findItem(item, storageOnly)
+function inventory.findItem(item, inStorageOnly)
     local locs = items[item] or {}
-    if not storageOnly then return locs end
+    if not inStorageOnly then return locs end
     
-    local storageSet = {}
-    for _, name in ipairs(storage) do storageSet[name] = true end
-    
+    -- Use cached storageSet for O(1) lookup instead of rebuilding
     local filtered = {}
     for _, loc in ipairs(locs) do
         if storageSet[loc.inv] then
@@ -271,14 +298,10 @@ end
 ---Find item locations by base name (ignoring NBT)
 ---This allows finding all variants of an item (e.g., all enchanted books regardless of enchantment)
 ---@param baseName string Item base name (e.g., "minecraft:enchanted_book")
----@param storageOnly? boolean Only search storage inventories
+---@param inStorageOnly? boolean Only search storage inventories
 ---@return table[] locations {inv, slot, count, key} - key includes NBT hash if present
-function inventory.findItemByBaseName(baseName, storageOnly)
-    local storageSet = {}
-    if storageOnly then
-        for _, name in ipairs(storage) do storageSet[name] = true end
-    end
-    
+function inventory.findItemByBaseName(baseName, inStorageOnly)
+    -- Use cached storageSet for O(1) lookup
     local results = {}
     
     -- Search all item keys for those starting with baseName
@@ -288,7 +311,7 @@ function inventory.findItemByBaseName(baseName, storageOnly)
         
         if matches then
             for _, loc in ipairs(locs) do
-                if not storageOnly or storageSet[loc.inv] then
+                if not inStorageOnly or storageSet[loc.inv] then
                     results[#results + 1] = {
                         inv = loc.inv,
                         slot = loc.slot,
@@ -325,16 +348,8 @@ local function cacheRemove(inv, slot, itemKey, count)
         slotData.count = newCount
     end
     
-    -- Update stock (only for storage inventories)
-    local isStorage = false
-    for _, name in ipairs(storage) do
-        if name == inv then
-            isStorage = true
-            break
-        end
-    end
-    
-    if isStorage and stock[itemKey] then
+    -- Update stock (only for storage inventories) - use cached storageSet
+    if storageSet[inv] and stock[itemKey] then
         stock[itemKey] = math.max(0, stock[itemKey] - count)
         if stock[itemKey] == 0 then stock[itemKey] = nil end
     end
@@ -367,9 +382,7 @@ local function cacheAdd(inv, slot, itemName, count, nbt)
         slots[inv][slot] = {name = itemName, count = count, nbt = nbt}
     end
     
-    -- Update stock (only for storage)
-    local storageSet = {}
-    for _, name in ipairs(storage) do storageSet[name] = true end
+    -- Update stock (only for storage) - use cached storageSet
     if storageSet[inv] then
         stock[itemKey] = (stock[itemKey] or 0) + count
     end
@@ -401,14 +414,50 @@ end
 ---@return number withdrawn
 function inventory.withdraw(item, count, destInv, destSlot)
     local locs = inventory.findItem(item, true)
-    if #locs == 0 then return 0 end
     
-    -- Sort by count descending
+    -- If no exact match locations found, try searching by base name (ignoring NBT)
+    -- This handles cases where storage has items with NBT that we want to treat as equivalent
+    if #locs == 0 and not item:find(":.*:") then
+        -- Item doesn't already have NBT hash, try finding variants
+        local variantLocs = inventory.findItemByBaseName(item, true)
+        if #variantLocs > 0 then
+            logger.debug(string.format("withdraw: no exact match for %s, found %d NBT variants", 
+                item, #variantLocs))
+            -- Convert to regular locs format (strip the key field, we don't need it for withdrawal)
+            for _, loc in ipairs(variantLocs) do
+                locs[#locs + 1] = {inv = loc.inv, slot = loc.slot, count = loc.count, itemKey = loc.key}
+            end
+        end
+    end
+    
+    -- If still no locations found but stock says we have items, cache may be stale
+    if #locs == 0 then
+        local stockCount = stock[item] or 0
+        if stockCount > 0 then
+            logger.warn(string.format("withdraw: cache inconsistency for %s - stock=%d but no locations found, triggering rescan", 
+                item, stockCount))
+            inventory.scan(false)
+            locs = inventory.findItem(item, true)
+            -- Try base name again after rescan
+            if #locs == 0 and not item:find(":.*:") then
+                local variantLocs = inventory.findItemByBaseName(item, true)
+                for _, loc in ipairs(variantLocs) do
+                    locs[#locs + 1] = {inv = loc.inv, slot = loc.slot, count = loc.count, itemKey = loc.key}
+                end
+            end
+        end
+        if #locs == 0 then
+            logger.debug(string.format("withdraw: no locations for %s (stock=%d)", item, stock[item] or 0))
+            return 0
+        end
+    end
+    
+    -- Sort by count descending (withdraw from fullest stacks first for efficiency)
     table.sort(locs, function(a, b) return a.count > b.count end)
     
     local withdrawn = 0
     
-    -- Sequential if specific slot (can't parallelize)
+    -- Sequential if specific slot (can't parallelize to same slot)
     if destSlot then
         for _, loc in ipairs(locs) do
             if withdrawn >= count then break end
@@ -416,17 +465,26 @@ function inventory.withdraw(item, count, destInv, destSlot)
             local p = wrap(loc.inv)
             if p and p.pushItems then
                 local amt = math.min(count - withdrawn, loc.count)
-                local xfer = p.pushItems(destInv, loc.slot, amt, destSlot) or 0
+                local ok, xfer = pcall(p.pushItems, destInv, loc.slot, amt, destSlot)
+                xfer = ok and (xfer or 0) or 0
                 if xfer > 0 then
                     withdrawn = withdrawn + xfer
-                    cacheRemove(loc.inv, loc.slot, item, xfer)
+                    -- Use the actual item key if we have it (for NBT variants), else use the requested item
+                    local cacheKey = loc.itemKey or item
+                    cacheRemove(loc.inv, loc.slot, cacheKey, xfer)
+                elseif ok and loc.count > 0 then
+                    -- Transfer returned 0 but we expected items - slot might be empty (stale cache)
+                    logger.debug(string.format("withdraw: slot %s:%d returned 0, expected %d - marking empty", 
+                        loc.inv, loc.slot, loc.count))
+                    local cacheKey = loc.itemKey or item
+                    cacheRemove(loc.inv, loc.slot, cacheKey, loc.count)
                 end
             end
         end
         return withdrawn
     end
     
-    -- Parallel withdrawal
+    -- Parallel withdrawal for better performance
     local tasks, meta = {}, {}
     local remaining = count
     
@@ -438,9 +496,16 @@ function inventory.withdraw(item, count, destInv, destSlot)
             local amt = math.min(remaining, loc.count)
             remaining = remaining - amt
             
-            meta[#meta + 1] = {inv = loc.inv, slot = loc.slot, amt = amt}
+            local capturedInv = loc.inv
+            local capturedSlot = loc.slot
+            local capturedAmt = amt
+            local capturedLocCount = loc.count
+            local capturedItemKey = loc.itemKey or item
+            
+            meta[#meta + 1] = {inv = capturedInv, slot = capturedSlot, amt = capturedAmt, locCount = capturedLocCount, itemKey = capturedItemKey}
             tasks[#tasks + 1] = function()
-                return p.pushItems(destInv, loc.slot, amt) or 0
+                local ok, result = pcall(p.pushItems, destInv, capturedSlot, capturedAmt)
+                return ok and (result or 0) or 0
             end
         end
     end
@@ -451,8 +516,18 @@ function inventory.withdraw(item, count, destInv, destSlot)
         local xfer = result[1] or 0
         if xfer > 0 then
             withdrawn = withdrawn + xfer
-            cacheRemove(meta[i].inv, meta[i].slot, item, xfer)
+            cacheRemove(meta[i].inv, meta[i].slot, meta[i].itemKey, xfer)
+        elseif meta[i].locCount > 0 then
+            -- Transfer returned 0 but we expected items - slot might be empty (stale cache)
+            logger.debug(string.format("withdraw: slot %s:%d returned 0, expected %d - marking empty", 
+                meta[i].inv, meta[i].slot, meta[i].locCount))
+            cacheRemove(meta[i].inv, meta[i].slot, meta[i].itemKey, meta[i].locCount)
         end
+    end
+    
+    -- If we withdrew less than expected, log it
+    if withdrawn < count and withdrawn > 0 then
+        logger.debug(string.format("withdraw: partial withdrawal of %s - got %d/%d", item, withdrawn, count))
     end
     
     return withdrawn
