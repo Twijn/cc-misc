@@ -171,17 +171,19 @@ end
 function crafting.calculateMaxCrafts(recipe, stockLevels)
     local maxCrafts = math.huge
     
+    -- Get max items per slot for this recipe (usually 1 per slot per craft)
+    local slotMaxCounts = getMaxItemsPerSlot(recipe)
+    
     for _, ingredient in ipairs(recipe.ingredients) do
         local item, available = resolveIngredient(ingredient.item, stockLevels)
         local possible = math.floor(available / ingredient.count)
         maxCrafts = math.min(maxCrafts, possible)
         
-        -- Limit by stack size: can't craft more than what fits in a slot
-        -- For most items this is 64, some are less (ender pearls = 16, buckets = 1, etc)
+        -- Limit by stack size per slot
+        -- Each slot can hold at most stackLimit items, and each craft uses itemsPerSlot items in that slot
         local stackLimit = crafting.getMaxStackSize(item)
-        -- Each craft requires ingredient.count items in a slot
-        -- Maximum crafts = stackLimit / items_per_craft_per_slot
-        local maxCraftsForStack = math.floor(stackLimit / ingredient.count)
+        local itemsPerSlot = slotMaxCounts[ingredient.item] or 1
+        local maxCraftsForStack = math.floor(stackLimit / itemsPerSlot)
         maxCrafts = math.min(maxCrafts, maxCraftsForStack)
     end
     
