@@ -49,6 +49,7 @@ return {
         ingredient = "minecraft:golden_carrot",
         nbt = "7b927966e9fb8bf63707e047d1115bf6",
         displayName = "Night Vision",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -60,6 +61,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "49e637ce643534edf76760276a256f83",
         displayName = "Night Vision+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -71,6 +73,7 @@ return {
         ingredient = "minecraft:fermented_spider_eye",
         nbt = "4819bff5a3ef5729b80b029db4197d1e",
         displayName = "Invisibility",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -82,6 +85,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "c0ababf814d554fdaf18666f4af13a59",
         displayName = "Invisibility+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -93,6 +97,7 @@ return {
         ingredient = "minecraft:rabbit_foot",
         nbt = "23a2e7a760bef7f699b61346d102e27d",
         displayName = "Leaping",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -104,6 +109,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "11511284100f60397b173cbc5170411b",
         displayName = "Leaping+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -115,6 +121,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "8b633c4bc7b7593e77b4b40017d17deb",
         displayName = "Leaping II",
+        duration = "1:30",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -126,6 +134,7 @@ return {
         ingredient = "minecraft:magma_cream",
         nbt = "4c2bc6cbe1e099ed20b9b46aca691ff0",
         displayName = "Fire Resistance",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -137,6 +146,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "52c71f193bdd6ca60eb1a38ea256d6bc",
         displayName = "Fire Resistance+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -148,6 +158,7 @@ return {
         ingredient = "minecraft:sugar",
         nbt = "f9cca098e635cfaaf82752b4bf83323c",
         displayName = "Swiftness",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -159,6 +170,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "b52612c4159f570ecc4e89a69e5d69d6",
         displayName = "Swiftness+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -170,6 +182,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "53463ce0188ef51518efa21503c0b78f",
         displayName = "Swiftness II",
+        duration = "1:30",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -181,6 +195,7 @@ return {
         ingredient = "minecraft:fermented_spider_eye",
         nbt = "e281fdf176331217c01f59aef8110bb3",
         displayName = "Slowness",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -192,6 +207,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "fe685eb987eb3cb37a6ebad125534d80",
         displayName = "Slowness+",
+        duration = "4:00",
     },
     {
         basePotionId = "slowness",
@@ -202,6 +218,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "4fa963fabd6aa5b93dea50ebf19911f6",
         displayName = "Slowness IV",
+        duration = "0:20",
+        level = 4,
         -- keep = 0,
     },
     {
@@ -213,6 +231,7 @@ return {
         ingredient = "minecraft:turtle_helmet",
         nbt = "d14bb0906ba67c76e8d3a1a6b9bdb993",
         displayName = "Turtle Master",
+        duration = "0:20",
         -- keep = 0,
     },
     {
@@ -224,6 +243,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "a9bb9b2a58970cd2fc9db7e13b0b4f3b",
         displayName = "Turtle Master+",
+        duration = "0:40",
         -- keep = 0,
     },
     {
@@ -235,6 +255,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "312db0d27bebe67a3084cbcff45c56cd",
         displayName = "Turtle Master II",
+        duration = "0:20",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -246,6 +268,7 @@ return {
         ingredient = "minecraft:pufferfish",
         nbt = "6c1d0ec5fc6a54cb022e30f3f03f42ac",
         displayName = "Water Breathing",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -257,6 +280,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "d30903bfd13f49021b058083866d333a",
         displayName = "Water Breathing+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -268,6 +292,7 @@ return {
         ingredient = "minecraft:glistering_melon_slice",
         nbt = "d3b61c763509f56de2ceaa009b5d614b",
         displayName = "Healing",
+        instant = true,
         -- keep = 0,
     },
     {
@@ -279,6 +304,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "d2821522a06dc3a77780b3341bb9cd0d",
         displayName = "Healing II",
+        instant = true,
+        level = 2,
         -- keep = 0,
     },
     {
@@ -290,6 +317,7 @@ return {
         ingredient = "minecraft:fermented_spider_eye",
         nbt = "d15b871490c1653f5d18c25753bc0f64",
         displayName = "Harming",
+        instant = true,
         -- keep = 0,
     },
     {
@@ -301,6 +329,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "7002fcb7eee67990425c3e2acbc92a26",
         displayName = "Harming II",
+        instant = true,
+        level = 2,
         -- keep = 0,
     },
     {
@@ -312,6 +342,7 @@ return {
         ingredient = "minecraft:spider_eye",
         nbt = "01f6a8923f5cd0440d6d4a1404000bdc",
         displayName = "Poison",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -323,6 +354,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "347700b83a7f5fdc7f32a1821b1c3c64",
         displayName = "Poison+",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -334,6 +366,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "a6d61c05747fd050044d936af6a65484",
         displayName = "Poison II",
+        duration = "0:21",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -345,6 +379,7 @@ return {
         ingredient = "minecraft:ghast_tear",
         nbt = "0c284bac973ce3d74a033d26e97fb4e2",
         displayName = "Regeneration",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -356,6 +391,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "750f67c4e04540dd376d65de258cf83a",
         displayName = "Regeneration+",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -367,6 +403,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "dd185b385cb1a0bf44aa319217d21944",
         displayName = "Regeneration II",
+        duration = "0:22",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -378,6 +416,7 @@ return {
         ingredient = "minecraft:blaze_powder",
         nbt = "03d2a4a1b8486408a6a69ad3af8cc4d5",
         displayName = "Strength",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -389,6 +428,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "651dcaa96623a1fe39bceb700adb3833",
         displayName = "Strength+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -400,6 +440,8 @@ return {
         ingredient = "minecraft:glowstone_dust",
         nbt = "b51df730a552d6f5f6b0707b9e4a92ab",
         displayName = "Strength II",
+        duration = "1:30",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -411,6 +453,7 @@ return {
         ingredient = "minecraft:fermented_spider_eye",
         nbt = "a2639fdeb17a5487f66606d115c1862a",
         displayName = "Weakness",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -422,6 +465,7 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "578a27ac719ffc69d5288d97a366fb8e",
         displayName = "Weakness+",
+        duration = "4:00",
         -- keep = 0,
     },
     {
@@ -433,6 +477,7 @@ return {
         ingredient = "minecraft:phantom_membrane",
         nbt = "108b859a0bacaae84dc3dc3b5700e9d0",
         displayName = "Slow Falling",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -444,8 +489,10 @@ return {
         ingredient = "minecraft:redstone",
         nbt = "03a9d99bdf9566cac249289476e7cfcc",
         displayName = "Slow Falling+",
+        duration = "4:00",
         -- keep = 0,
     },
+    -- Splash Potions
     {
         basePotionId = "water",
         potion = "minecraft:water",
@@ -499,6 +546,7 @@ return {
         ingredient = "minecraft:gunpowder",
         nbt = "7b927966e9fb8bf63707e047d1115bf6",
         displayName = "Night Vision",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -510,6 +558,7 @@ return {
         nbt = "49e637ce643534edf76760276a256f83",
         potionType = "splash",
         displayName = "Night Vision+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -521,6 +570,7 @@ return {
         nbt = "4819bff5a3ef5729b80b029db4197d1e",
         potionType = "splash",
         displayName = "Invisibility",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -532,6 +582,7 @@ return {
         nbt = "c0ababf814d554fdaf18666f4af13a59",
         potionType = "splash",
         displayName = "Invisibility+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -543,6 +594,7 @@ return {
         nbt = "23a2e7a760bef7f699b61346d102e27d",
         potionType = "splash",
         displayName = "Leaping",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -554,6 +606,7 @@ return {
         nbt = "11511284100f60397b173cbc5170411b",
         potionType = "splash",
         displayName = "Leaping+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -565,6 +618,8 @@ return {
         nbt = "8b633c4bc7b7593e77b4b40017d17deb",
         potionType = "splash",
         displayName = "Leaping II",
+        duration = "1:30",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -576,6 +631,7 @@ return {
         nbt = "4c2bc6cbe1e099ed20b9b46aca691ff0",
         potionType = "splash",
         displayName = "Fire Resistance",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -587,6 +643,7 @@ return {
         nbt = "52c71f193bdd6ca60eb1a38ea256d6bc",
         potionType = "splash",
         displayName = "Fire Resistance+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -598,6 +655,7 @@ return {
         nbt = "f9cca098e635cfaaf82752b4bf83323c",
         potionType = "splash",
         displayName = "Swiftness",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -609,6 +667,7 @@ return {
         nbt = "b52612c4159f570ecc4e89a69e5d69d6",
         potionType = "splash",
         displayName = "Swiftness+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -620,6 +679,8 @@ return {
         nbt = "53463ce0188ef51518efa21503c0b78f",
         potionType = "splash",
         displayName = "Swiftness II",
+        duration = "1:30",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -631,6 +692,7 @@ return {
         nbt = "e281fdf176331217c01f59aef8110bb3",
         potionType = "splash",
         displayName = "Slowness",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -642,6 +704,7 @@ return {
         nbt = "fe685eb987eb3cb37a6ebad125534d80",
         potionType = "splash",
         displayName = "Slowness+",
+        duration = "4:00",
         -- keep = 0,
     },
     {
@@ -653,6 +716,8 @@ return {
         nbt = "4fa963fabd6aa5b93dea50ebf19911f6",
         potionType = "splash",
         displayName = "Slowness IV",
+        duration = "0:20",
+        level = 4,
         -- keep = 0,
     },
     {
@@ -664,6 +729,7 @@ return {
         nbt = "d14bb0906ba67c76e8d3a1a6b9bdb993",
         potionType = "splash",
         displayName = "Turtle Master",
+        duration = "0:20",
         -- keep = 0,
     },
     {
@@ -675,6 +741,7 @@ return {
         nbt = "a9bb9b2a58970cd2fc9db7e13b0b4f3b",
         potionType = "splash",
         displayName = "Turtle Master+",
+        duration = "0:40",
         -- keep = 0,
     },
     {
@@ -686,6 +753,8 @@ return {
         nbt = "312db0d27bebe67a3084cbcff45c56cd",
         potionType = "splash",
         displayName = "Turtle Master II",
+        duration = "0:20",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -697,6 +766,7 @@ return {
         nbt = "6c1d0ec5fc6a54cb022e30f3f03f42ac",
         potionType = "splash",
         displayName = "Water Breathing",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -708,6 +778,7 @@ return {
         nbt = "d30903bfd13f49021b058083866d333a",
         potionType = "splash",
         displayName = "Water Breathing+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -719,6 +790,7 @@ return {
         nbt = "d3b61c763509f56de2ceaa009b5d614b",
         potionType = "splash",
         displayName = "Healing",
+        instant = true,
         -- keep = 0,
     },
     {
@@ -730,6 +802,8 @@ return {
         nbt = "d2821522a06dc3a77780b3341bb9cd0d",
         potionType = "splash",
         displayName = "Healing II",
+        instant = true,
+        level = 2,
         -- keep = 0,
     },
     {
@@ -741,6 +815,7 @@ return {
         nbt = "d15b871490c1653f5d18c25753bc0f64",
         potionType = "splash",
         displayName = "Harming",
+        instant = true,
         -- keep = 0,
     },
     {
@@ -752,6 +827,8 @@ return {
         nbt = "7002fcb7eee67990425c3e2acbc92a26",
         potionType = "splash",
         displayName = "Harming II",
+        instant = true,
+        level = 2,
         -- keep = 0,
     },
     {
@@ -763,6 +840,7 @@ return {
         nbt = "01f6a8923f5cd0440d6d4a1404000bdc",
         potionType = "splash",
         displayName = "Poison",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -774,6 +852,7 @@ return {
         nbt = "347700b83a7f5fdc7f32a1821b1c3c64",
         potionType = "splash",
         displayName = "Poison+",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -785,6 +864,8 @@ return {
         nbt = "a6d61c05747fd050044d936af6a65484",
         potionType = "splash",
         displayName = "Poison II",
+        duration = "0:21",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -796,6 +877,7 @@ return {
         nbt = "0c284bac973ce3d74a033d26e97fb4e2",
         potionType = "splash",
         displayName = "Regeneration",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -807,6 +889,7 @@ return {
         nbt = "750f67c4e04540dd376d65de258cf83a",
         potionType = "splash",
         displayName = "Regeneration+",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -818,6 +901,8 @@ return {
         nbt = "dd185b385cb1a0bf44aa319217d21944",
         potionType = "splash",
         displayName = "Regeneration II",
+        duration = "0:22",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -829,6 +914,7 @@ return {
         nbt = "03d2a4a1b8486408a6a69ad3af8cc4d5",
         potionType = "splash",
         displayName = "Strength",
+        duration = "3:00",
         -- keep = 0,
     },
     {
@@ -840,6 +926,7 @@ return {
         nbt = "651dcaa96623a1fe39bceb700adb3833",
         potionType = "splash",
         displayName = "Strength+",
+        duration = "8:00",
         -- keep = 0,
     },
     {
@@ -851,6 +938,8 @@ return {
         nbt = "b51df730a552d6f5f6b0707b9e4a92ab",
         potionType = "splash",
         displayName = "Strength II",
+        duration = "1:30",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -862,6 +951,7 @@ return {
         nbt = "a2639fdeb17a5487f66606d115c1862a",
         potionType = "splash",
         displayName = "Weakness",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -873,6 +963,7 @@ return {
         nbt = "578a27ac719ffc69d5288d97a366fb8e",
         potionType = "splash",
         displayName = "Weakness+",
+        duration = "4:00",
         -- keep = 0,
     },
     {
@@ -884,6 +975,7 @@ return {
         nbt = "108b859a0bacaae84dc3dc3b5700e9d0",
         potionType = "splash",
         displayName = "Slow Falling",
+        duration = "1:30",
         -- keep = 0,
     },
     {
@@ -895,8 +987,10 @@ return {
         nbt = "03a9d99bdf9566cac249289476e7cfcc",
         potionType = "splash",
         displayName = "Slow Falling+",
+        duration = "4:00",
         -- keep = 0,
     },
+    -- Lingering Potions
     {
         basePotionId = "water_splash",
         potion = "minecraft:water",
@@ -950,6 +1044,7 @@ return {
         nbt = "7b927966e9fb8bf63707e047d1115bf6",
         potionType = "lingering",
         displayName = "Night Vision",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -961,6 +1056,7 @@ return {
         nbt = "49e637ce643534edf76760276a256f83",
         potionType = "lingering",
         displayName = "Night Vision+",
+        duration = "2:00",
         -- keep = 0,
     },
     {
@@ -972,6 +1068,7 @@ return {
         nbt = "4819bff5a3ef5729b80b029db4197d1e",
         potionType = "lingering",
         displayName = "Invisibility",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -983,6 +1080,7 @@ return {
         nbt = "c0ababf814d554fdaf18666f4af13a59",
         potionType = "lingering",
         displayName = "Invisibility+",
+        duration = "2:00",
         -- keep = 0,
     },
     {
@@ -994,6 +1092,7 @@ return {
         nbt = "23a2e7a760bef7f699b61346d102e27d",
         potionType = "lingering",
         displayName = "Leaping",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -1005,6 +1104,7 @@ return {
         nbt = "11511284100f60397b173cbc5170411b",
         potionType = "lingering",
         displayName = "Leaping+",
+        duration = "2:00",
         -- keep = 0,
     },
     {
@@ -1016,6 +1116,8 @@ return {
         nbt = "8b633c4bc7b7593e77b4b40017d17deb",
         potionType = "lingering",
         displayName = "Leaping II",
+        duration = "0:22",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1027,6 +1129,7 @@ return {
         nbt = "4c2bc6cbe1e099ed20b9b46aca691ff0",
         potionType = "lingering",
         displayName = "Fire Resistance",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -1038,6 +1141,7 @@ return {
         nbt = "52c71f193bdd6ca60eb1a38ea256d6bc",
         potionType = "lingering",
         displayName = "Fire Resistance+",
+        duration = "2:00",
         -- keep = 0,
     },
     {
@@ -1049,6 +1153,7 @@ return {
         nbt = "f9cca098e635cfaaf82752b4bf83323c",
         potionType = "lingering",
         displayName = "Swiftness",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -1060,6 +1165,7 @@ return {
         nbt = "b52612c4159f570ecc4e89a69e5d69d6",
         potionType = "lingering",
         displayName = "Swiftness+",
+        duration = "2:00",
         -- keep = 0,
     },
     {
@@ -1071,6 +1177,8 @@ return {
         nbt = "53463ce0188ef51518efa21503c0b78f",
         potionType = "lingering",
         displayName = "Swiftness II",
+        duration = "0:22",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1082,6 +1190,7 @@ return {
         nbt = "e281fdf176331217c01f59aef8110bb3",
         potionType = "lingering",
         displayName = "Slowness",
+        duration = "0:22",
         -- keep = 0,
     },
     {
@@ -1093,6 +1202,7 @@ return {
         nbt = "fe685eb987eb3cb37a6ebad125534d80",
         potionType = "lingering",
         displayName = "Slowness+",
+        duration = "1:00",
         -- keep = 0,
     },
     {
@@ -1104,6 +1214,8 @@ return {
         nbt = "4fa963fabd6aa5b93dea50ebf19911f6",
         potionType = "lingering",
         displayName = "Slowness IV",
+        duration = "0:05",
+        level = 4,
         -- keep = 0,
     },
     {
@@ -1115,6 +1227,7 @@ return {
         nbt = "d14bb0906ba67c76e8d3a1a6b9bdb993",
         potionType = "lingering",
         displayName = "Turtle Master",
+        duration = "0:05",
         -- keep = 0,
     },
     {
@@ -1126,6 +1239,7 @@ return {
         nbt = "a9bb9b2a58970cd2fc9db7e13b0b4f3b",
         potionType = "lingering",
         displayName = "Turtle Master+",
+        duration = "0:10",
         -- keep = 0,
     },
     {
@@ -1137,6 +1251,8 @@ return {
         nbt = "312db0d27bebe67a3084cbcff45c56cd",
         potionType = "lingering",
         displayName = "Turtle Master II",
+        duration = "0:05",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1148,6 +1264,7 @@ return {
         nbt = "6c1d0ec5fc6a54cb022e30f3f03f42ac",
         potionType = "lingering",
         displayName = "Water Breathing",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -1159,6 +1276,7 @@ return {
         nbt = "d30903bfd13f49021b058083866d333a",
         potionType = "lingering",
         displayName = "Water Breathing+",
+        duration = "2:00",
         -- keep = 0,
     },
     {
@@ -1170,6 +1288,7 @@ return {
         nbt = "d3b61c763509f56de2ceaa009b5d614b",
         potionType = "lingering",
         displayName = "Healing",
+        instant = true,
         -- keep = 0,
     },
     {
@@ -1181,6 +1300,8 @@ return {
         nbt = "d2821522a06dc3a77780b3341bb9cd0d",
         potionType = "lingering",
         displayName = "Healing II",
+        instant = true,
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1192,6 +1313,7 @@ return {
         nbt = "d15b871490c1653f5d18c25753bc0f64",
         potionType = "lingering",
         displayName = "Harming",
+        instant = true,
         -- keep = 0,
     },
     {
@@ -1203,6 +1325,8 @@ return {
         nbt = "7002fcb7eee67990425c3e2acbc92a26",
         potionType = "lingering",
         displayName = "Harming II",
+        instant = true,
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1214,6 +1338,7 @@ return {
         nbt = "01f6a8923f5cd0440d6d4a1404000bdc",
         potionType = "lingering",
         displayName = "Poison",
+        duration = "0:11",
         -- keep = 0,
     },
     {
@@ -1225,6 +1350,7 @@ return {
         nbt = "347700b83a7f5fdc7f32a1821b1c3c64",
         potionType = "lingering",
         displayName = "Poison+",
+        duration = "0:22",
         -- keep = 0,
     },
     {
@@ -1236,6 +1362,8 @@ return {
         nbt = "a6d61c05747fd050044d936af6a65484",
         potionType = "lingering",
         displayName = "Poison II",
+        duration = "0:05",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1247,6 +1375,7 @@ return {
         nbt = "0c284bac973ce3d74a033d26e97fb4e2",
         potionType = "lingering",
         displayName = "Regeneration",
+        duration = "0:11",
         -- keep = 0,
     },
     {
@@ -1258,6 +1387,7 @@ return {
         nbt = "750f67c4e04540dd376d65de258cf83a",
         potionType = "lingering",
         displayName = "Regeneration+",
+        duration = "0:22",
         -- keep = 0,
     },
     {
@@ -1269,6 +1399,8 @@ return {
         nbt = "dd185b385cb1a0bf44aa319217d21944",
         potionType = "lingering",
         displayName = "Regeneration II",
+        duration = "0:05",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1280,6 +1412,7 @@ return {
         nbt = "03d2a4a1b8486408a6a69ad3af8cc4d5",
         potionType = "lingering",
         displayName = "Strength",
+        duration = "0:45",
         -- keep = 0,
     },
     {
@@ -1291,6 +1424,7 @@ return {
         nbt = "651dcaa96623a1fe39bceb700adb3833",
         potionType = "lingering",
         displayName = "Strength+",
+        duration = "2:00",
         -- keep = 0,
     },
     {
@@ -1302,6 +1436,8 @@ return {
         nbt = "b51df730a552d6f5f6b0707b9e4a92ab",
         potionType = "lingering",
         displayName = "Strength II",
+        duration = "0:22",
+        level = 2,
         -- keep = 0,
     },
     {
@@ -1313,6 +1449,7 @@ return {
         nbt = "a2639fdeb17a5487f66606d115c1862a",
         potionType = "lingering",
         displayName = "Weakness",
+        duration = "0:22",
         -- keep = 0,
     },
     {
@@ -1324,6 +1461,7 @@ return {
         nbt = "578a27ac719ffc69d5288d97a366fb8e",
         potionType = "lingering",
         displayName = "Weakness+",
+        duration = "1:00",
         -- keep = 0,
     },
     {
@@ -1335,6 +1473,7 @@ return {
         nbt = "108b859a0bacaae84dc3dc3b5700e9d0",
         potionType = "lingering",
         displayName = "Slow Falling",
+        duration = "0:22",
         -- keep = 0,
     },
     {
@@ -1346,6 +1485,7 @@ return {
         nbt = "03a9d99bdf9566cac249289476e7cfcc",
         potionType = "lingering",
         displayName = "Slow Falling+",
+        duration = "1:00",
         -- keep = 0,
     },
 }

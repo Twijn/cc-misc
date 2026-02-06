@@ -391,6 +391,20 @@ function getRecipeCost(recipe, carriedCost)
     return carriedCost
 end
 
+-- Potion duration/strength info based on Minecraft values
+-- These are approximate base values in seconds
+-- Get potion duration and strength info from recipe fields
+local function getPotionInfo(recipe)
+    if not recipe then return nil, nil, nil end
+    
+    -- Read directly from recipe fields
+    local duration = recipe.duration  -- String like "3:00" or nil
+    local level = recipe.level or 1
+    local instant = recipe.instant or false
+    
+    return duration, level, instant
+end
+
 -- Stock calculation
 local function getPotionKey(potion, potionType)
     return string.format("%s-%s", potion, potionType)
@@ -776,8 +790,8 @@ function drawMonitor()
 
     setColor(colors.blue, colors.white)
 
-    local confY = my - 7
-    for y = confY, confY + 4 do
+    local confY = my - 8
+    for y = confY, confY + 5 do
         mon.setCursorPos(startX, y)
         mon.write(string.rep(" ", columnWidth + 5))
 
@@ -787,10 +801,36 @@ function drawMonitor()
                 mon.write(" " .. currentRecipe.displayName)
             elseif y == confY + 2 then
                 mon.setTextColor(colors.lightGray)
-                mon.write(" " .. currentRecipe.potionType)
+                -- Show potion type and duration/strength from recipe fields
+                local duration, level, instant = getPotionInfo(currentRecipe)
+                local infoStr = currentRecipe.potionType
+                if duration or (level and level > 1) then
+                    local parts = {}
+                    if level and level > 1 then
+                        table.insert(parts, "Lvl " .. level)
+                    end
+                    if duration then
+                        table.insert(parts, duration)
+                    end
+                    infoStr = infoStr .. " (" .. table.concat(parts, ", ") .. ")"
+                elseif instant then
+                    infoStr = infoStr .. " (instant)"
+                end
+                mon.write(" " .. infoStr)
             elseif y == confY + 3 then
                 mon.setTextColor(colors.gray)
                 mon.write(" 3 pots for " .. getRecipeCost(currentRecipe) .. " KRO")
+            elseif y == confY + 4 then
+                -- Show stock info
+                local stock = getRecipeStock(currentRecipe)
+                local stockColor = colors.cyan
+                if stock == 0 then
+                    stockColor = colors.red
+                elseif stock < 6 then
+                    stockColor = colors.yellow
+                end
+                mon.setTextColor(stockColor)
+                mon.write(" Stock: " .. stock .. " available")
             end
         elseif y == confY + 2 then
             mon.setCursorPos(startX, y)
