@@ -1004,6 +1004,7 @@ local function brewJob(name, stand)
         return true
     end
 
+    -- Dispense to output chest (for customer purchases)
     local function dispenseToOutput()
         local outputInv, outputName = getOutputInventory()
         if not outputInv then
@@ -1022,6 +1023,12 @@ local function brewJob(name, stand)
                 end
             end
         end
+        return true
+    end
+
+    -- Dispense to storage (for stock maintenance jobs)
+    local function dispenseToStorage()
+        clearPotionSlots()
         return true
     end
 
@@ -1143,7 +1150,13 @@ local function brewJob(name, stand)
         end
 
         updateJobStatus(id, JOB_STATUS.DISPENSING, "Dispensing...")
-        dispenseToOutput()
+        
+        -- Stock maintenance jobs go to storage, customer jobs go to output
+        if job.meta and job.meta.isStockJob then
+            dispenseToStorage()
+        else
+            dispenseToOutput()
+        end
 
         -- Refresh item cache after brewing
         getAllItems(true)
@@ -1197,13 +1210,64 @@ local function refundTimerLoop()
     end
 end
 
+-- Stock maintenance loop - keeps intermediate potions stocked
+local STOCK_CHECK_INTERVAL = 30  -- seconds between stock checks
+
+local function stockMaintenanceLoop()
+    sleep(10)  -- Initial delay to let everything initialize
+    
+    while true do
+        -- Refresh inventory cache
+        getAllItems(true)
+        
+        -- Check each recipe for keep requirements
+        for _, recipe in pairs(recipes) do
+            if recipe.keep and recipe.keep > 0 then
+                local currentStock = getBrewedPotionStock(recipe.potion, recipe.potionType)
+                local deficit = recipe.keep - currentStock
+                
+                if deficit > 0 then
+                    -- Calculate how many batches needed (each batch = 3 potions)
+                    local batchesNeeded = math.ceil(deficit / 3)
+                    
+                    -- Check if we have the ingredients to brew
+                    local canBrew = true
+                    if recipe.ingredient then
+                        local ingredientStock = getIngredientStock(recipe.ingredient)
+                        if ingredientStock < batchesNeeded then
+                            batchesNeeded = ingredientStock
+                            if batchesNeeded == 0 then
+                                canBrew = false
+                            end
+                        end
+                    end
+                    
+                    if canBrew and batchesNeeded > 0 then
+                        log.info(string.format("Stock maintenance: Queuing %d batch(es) of %s (current: %d, keep: %d)",
+                            batchesNeeded, recipe.displayName, currentStock, recipe.keep))
+                        
+                        -- Add stock jobs (no transaction, no payer - these are internal)
+                        for i = 1, batchesNeeded do
+                            addJob(recipe, nil, { isStockJob = true })
+                        end
+                        drawMonitor()
+                    end
+                end
+            end
+        end
+        
+        sleep(STOCK_CHECK_INTERVAL)
+    end
+end
+
 parallel.waitForAll(
     safe(drawMonitorLoop, "drawMonitorLoop", 1),
     safe(calcStockLoop, "calcStockLoop", 1),
     safe(monitorTouchLoop, "monitorTouchLoop", 1),
     safe(shopkLoop, "shopkLoop", 5),
     safe(startBrewJobs, "startBrewJobs", 1),
-    safe(refundTimerLoop, "refundTimerLoop", 1)
+    safe(refundTimerLoop, "refundTimerLoop", 1),
+    safe(stockMaintenanceLoop, "stockMaintenanceLoop", 1)
 )
 
 shopkClose()

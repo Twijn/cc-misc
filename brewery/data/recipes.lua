@@ -16,7 +16,7 @@ return {
         ingredient = "minecraft:nether_wart",
         nbt = "7f0aae7befcab8b4190cc6db04dc116a",
         displayName = "Awkward Potion",
-        -- keep = 27,
+        keep = 27,
     },
     {
         basePotionId = "water",
