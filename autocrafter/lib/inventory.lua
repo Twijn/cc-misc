@@ -1290,7 +1290,7 @@ function inventory.hasManipulator()
 end
 
 ---Withdraw items to player inventory
----Uses parallel transfers for speed
+---Uses sequential transfers to avoid conflicts (player inventory has limited slots)
 ---@param item string Item ID
 ---@param count number Amount
 ---@param playerName string Player name (unused, uses manipulator target)
@@ -1306,58 +1306,50 @@ function inventory.withdrawToPlayer(item, count, playerName)
     local locs = inventory.findItem(item, true)
     if #locs == 0 then return 0, "Item not found" end
     
-    -- Sort by count descending
+    -- Sort by count descending (withdraw from fullest stacks first)
     table.sort(locs, function(a, b) return a.count > b.count end)
     
-    -- Build parallel tasks
-    local tasks = {}
-    local meta = {}
+    local withdrawn = 0
     local remaining = count
     
+    -- Sequential transfers to player inventory
+    -- Parallel transfers don't work well because:
+    -- 1. Player inventory has limited slots (36)
+    -- 2. Multiple parallel pullItems can conflict trying to use the same slot
+    -- 3. This causes partial transfers and weird amounts
     for _, loc in ipairs(locs) do
         if remaining <= 0 then break end
         
-        local capturedInv = loc.inv
-        local capturedSlot = loc.slot
-        local capturedAmount = math.min(remaining, loc.count)
-        remaining = remaining - capturedAmount
+        local toTransfer = math.min(remaining, loc.count)
+        local ok2, xfer = pcall(playerInv.pullItems, loc.inv, loc.slot, toTransfer)
+        xfer = ok2 and (xfer or 0) or 0
         
-        meta[#meta + 1] = {inv = capturedInv, slot = capturedSlot, amount = capturedAmount}
-        tasks[#tasks + 1] = function()
-            local ok2, xfer = pcall(playerInv.pullItems, capturedInv, capturedSlot, capturedAmount)
-            return ok2 and xfer or 0
-        end
-    end
-    
-    if #tasks == 0 then return 0, "Item not found" end
-    
-    -- Execute in parallel batches
-    local results = {}
-    local taskFns = {}
-    for i, task in ipairs(tasks) do
-        local idx = i
-        taskFns[#taskFns + 1] = function()
-            results[idx] = task()
-        end
-    end
-    
-    local batchSize = 8
-    for batch = 1, #taskFns, batchSize do
-        local batchEnd = math.min(batch + batchSize - 1, #taskFns)
-        local batchFns = {}
-        for i = batch, batchEnd do
-            batchFns[#batchFns + 1] = taskFns[i]
-        end
-        parallel.waitForAll(table.unpack(batchFns))
-    end
-    
-    -- Sum results and update cache
-    local withdrawn = 0
-    for i, result in ipairs(results) do
-        local xfer = result or 0
         if xfer > 0 then
             withdrawn = withdrawn + xfer
-            cacheRemove(meta[i].inv, meta[i].slot, item, xfer)
+            remaining = remaining - xfer
+            cacheRemove(loc.inv, loc.slot, item, xfer)
+        end
+        
+        -- If we got less than expected, the player inventory might be full
+        if xfer < toTransfer then
+            -- Try once more in case it was a temporary issue
+            if remaining > 0 then
+                local retryAmt = math.min(remaining, loc.count - xfer)
+                if retryAmt > 0 then
+                    local ok3, xfer2 = pcall(playerInv.pullItems, loc.inv, loc.slot, retryAmt)
+                    xfer2 = ok3 and (xfer2 or 0) or 0
+                    if xfer2 > 0 then
+                        withdrawn = withdrawn + xfer2
+                        remaining = remaining - xfer2
+                        cacheRemove(loc.inv, loc.slot, item, xfer2)
+                    end
+                end
+            end
+            
+            -- If still getting partial transfers, player inventory is likely full
+            if remaining > 0 and xfer == 0 then
+                break
+            end
         end
     end
     
