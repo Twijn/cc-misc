@@ -48,6 +48,9 @@ local log = require("log")
 local config = require("data.config")
 
 local mon = s.peripheral("peripheral.monitor", "monitor")
+local shopsyncModem = s.peripheral("peripheral.shopsync", "modem")
+
+local SHOPSYNC_CHANNEL = 9773
 
 local BOT_NAME = "&9Twin&7Brewery"
 
@@ -62,10 +65,95 @@ local addJobs
 local refundJob  -- refund function set by shopkLoop, used by job processor
 local checkPendingRefunds  -- timer callback for batched refunds
 local getPendingTimers  -- get pending timer mappings
+local broadcastShopSync  -- ShopSync broadcast function
 
--- shopk
 local client = nil
 local kromerAddress = nil
+
+-- ShopSync broadcast function
+local function buildShopSyncData()
+    if not kromerAddress then return nil end
+    
+    local items = {}
+    
+    -- Add all recipes as shop items
+    for _, recipe in pairs(recipes) do
+        if recipe.id ~= "water" then  -- Don't list water bottles
+            local stock = getRecipeStock(recipe)
+            local cost = getRecipeCost(recipe)
+            
+            -- Build potion item name based on type
+            local itemName = "minecraft:potion"
+            if recipe.potionType == "splash" then
+                itemName = "minecraft:splash_potion"
+            elseif recipe.potionType == "lingering" then
+                itemName = "minecraft:lingering_potion"
+            end
+            
+            table.insert(items, {
+                prices = {
+                    {
+                        value = cost,
+                        currency = "KRO",
+                        address = kromerAddress,
+                        requiredMeta = recipe.id,
+                    }
+                },
+                item = {
+                    name = itemName,
+                    nbt = recipe.nbt,
+                    displayName = recipe.displayName,
+                    description = recipe.potionType ~= "normal" and (recipe.potionType .. " potion") or nil,
+                },
+                dynamicPrice = false,
+                stock = math.floor(stock / 3) * 3,  -- Stock in terms of actual potions (batches of 3)
+                madeOnDemand = true,  -- Potions are brewed on demand
+                requiresInteraction = false,
+            })
+        end
+    end
+
+    local location = nil
+    local x, y, z = gps.locate(2)  -- 2 second timeout
+    if x then
+        location = {
+            coordinates = { math.floor(x), math.floor(y), math.floor(z) },
+            dimension = "overworld",
+        }
+    end
+    
+    return {
+        type = "ShopSync",
+        version = 1,
+        info = {
+            name = "Twijn Brewery",
+            description = "Automated potion brewery",
+            owner = "Twijn",
+            computerID = os.getComputerID(),
+            multiShop = nil,
+            software = {
+                name = "cc-misc/brewery.lua",
+                version = "1.0.0",
+            },
+            location = location,
+        },
+        items = items,
+    }
+end
+
+broadcastShopSync = function()
+    if not shopsyncModem then return end
+    if not kromerAddress then return end
+    
+    local data = buildShopSyncData()
+    if not data then return end
+    
+    shopsyncModem.open(SHOPSYNC_CHANNEL)
+    shopsyncModem.transmit(SHOPSYNC_CHANNEL, os.getComputerID() % 65536, data)
+    log.debug("Broadcasted ShopSync data with " .. #data.items .. " items")
+end
+
+-- shopk
 
 local function shopkClose()
     if client and client.close then
@@ -239,6 +327,7 @@ local function shopkLoop()
             kromerAddress = data.address.address
             log.info("Connected to Kromer as " .. kromerAddress)
             drawMonitor()
+            -- ShopSync will broadcast from stockMaintenanceLoop after 10 sec delay
         end)
     end)
 
@@ -311,6 +400,17 @@ local function getPotionKey(potion, potionType)
     return string.format("%s-%s", potion, potionType)
 end
 
+-- Get the minecraft item name for a potion based on its type
+local function getPotionItemName(potionType)
+    if potionType == "splash" then
+        return "minecraft:splash_potion"
+    elseif potionType == "lingering" then
+        return "minecraft:lingering_potion"
+    else
+        return "minecraft:potion"
+    end
+end
+
 local cachedItems = nil
 local function getAllItems(forceRefresh)
     if cachedItems and not forceRefresh then return cachedItems end
@@ -320,10 +420,18 @@ local function getAllItems(forceRefresh)
         for slot, item in pairs(chest.list()) do
             local key = item.name
 
-            if item.name == "minecraft:potion" then
+            -- Handle all potion types (normal, splash, lingering)
+            if item.name == "minecraft:potion" or item.name == "minecraft:splash_potion" or item.name == "minecraft:lingering_potion" then
                 local detail = chest.getItemDetail(slot)
                 if detail and detail.potion then
-                    key = getPotionKey(detail.potion, detail.potionType)
+                    -- Determine potionType from item name
+                    local potionType = "normal"
+                    if item.name == "minecraft:splash_potion" then
+                        potionType = "splash"
+                    elseif item.name == "minecraft:lingering_potion" then
+                        potionType = "lingering"
+                    end
+                    key = getPotionKey(detail.potion, potionType)
                 end
             elseif item.nbt then
                 key = string.format("%s-%s", key, item.nbt)
@@ -983,7 +1091,8 @@ local function brewJob(name, stand)
             error("Cannot find base recipe: " .. tostring(recipe.basePotionId))
         end
 
-        local potionName = "minecraft:potion"
+        -- Determine the correct item name based on base recipe's potion type
+        local potionName = getPotionItemName(baseRecipe.potionType)
         local potionNbt = baseRecipe.nbt
 
         -- Load 3 base potions into the brewing stand
@@ -1098,8 +1207,9 @@ local function brewJob(name, stand)
         -- If we can start from an intermediate step, load those potions
         if startIndex > 1 and startIndex <= #chain then
             local prevRecipe = chain[startIndex - 1]
+            local potionName = getPotionItemName(prevRecipe.potionType)
             for _, slot in ipairs(POTION_SLOTS) do
-                itemsIn(slot, "minecraft:potion", prevRecipe.nbt, 1)
+                itemsIn(slot, potionName, prevRecipe.nbt, 1)
             end
         elseif startIndex == 1 then
             -- Load water bottles as the base
@@ -1219,6 +1329,9 @@ local function stockMaintenanceLoop()
     while true do
         -- Refresh inventory cache
         getAllItems(true)
+        
+        -- Broadcast ShopSync data (also happens on inventory changes)
+        broadcastShopSync()
         
         -- Check each recipe for keep requirements
         for _, recipe in pairs(recipes) do
