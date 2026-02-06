@@ -492,6 +492,41 @@ end
 -- Job Queue
 -------------------------------------------------
 
+local BREW_TIME_PER_STEP = 20  -- seconds per brewing step
+
+-- Calculate number of brewing steps needed for a recipe
+local function getRecipeBrewSteps(recipe)
+    if not recipe or recipe.id == "water" then return 0 end
+    local steps = 0
+    local current = recipe
+    while current and current.id ~= "water" do
+        -- Check if we have this intermediate potion on hand
+        local _, onHand = getRecipeStock(current)
+        if onHand >= 3 and current.id ~= recipe.id then
+            -- We have this intermediate, so we can start from here
+            break
+        end
+        steps = steps + 1
+        current = getRecipeById(current.basePotionId)
+    end
+    return steps
+end
+
+-- Format time in a readable way
+local function formatTime(seconds)
+    if seconds < 60 then
+        return string.format("%ds", seconds)
+    else
+        local mins = math.floor(seconds / 60)
+        local secs = seconds % 60
+        if secs > 0 then
+            return string.format("%dm%ds", mins, secs)
+        else
+            return string.format("%dm", mins)
+        end
+    end
+end
+
 local nextId = 1
 
 local JOB_STATUS = {
@@ -667,7 +702,31 @@ function drawMonitor()
 
     setColor(colors.white, colors.black)
 
+    -- Draw column headers showing the base potion name
+    local rightPanelStart = mx - columnWidth
     for col, recipeId in pairs(navigation) do
+        local baseRecipe = getRecipeById(recipeId)
+        local colStartX = (col - 1) * columnWidth + 1
+        
+        -- Only draw header if it won't overlap with the right panel
+        if baseRecipe and colStartX + columnWidth <= rightPanelStart then
+            local headerName = baseRecipe.displayName or recipeId
+            
+            -- Highlight if this is the current selection path
+            if currentRecipe and (currentRecipe.basePotionId == recipeId or currentRecipe.id == recipeId) then
+                setColor(colors.yellow, colors.black)
+            else
+                setColor(colors.lightGray, colors.gray)
+            end
+            
+            mon.setCursorPos(colStartX + 1, 1)
+            mon.write(string.rep(" ", columnWidth - 2))
+            mon.setCursorPos(colStartX + math.floor((columnWidth / 2) - (#headerName / 2)), 1)
+            mon.write(headerName)
+            
+            setColor(colors.white, colors.black)
+        end
+        
         for num, recipe in pairs(getRecipesWithBase(recipeId)) do
             drawRecipe(recipe, col, num)
         end
@@ -798,10 +857,14 @@ drawJobQueueUI = function()
     end
     mon.setCursorPos(2, 3)
     mon.write("ID")
-    mon.setCursorPos(7, 3)
+    mon.setCursorPos(6, 3)
+    mon.write("Type")
+    mon.setCursorPos(11, 3)
     mon.write("Potion")
-    mon.setCursorPos(24, 3)
+    mon.setCursorPos(27, 3)
     mon.write("Status")
+    mon.setCursorPos(mx - 6, 3)
+    mon.write("ETA")
 
     -- Job list
     local row = 4
@@ -816,6 +879,7 @@ drawJobQueueUI = function()
 
         local bgColor = colors.black
         local statusColor = colors.white
+        local isStockJob = job.meta and job.meta.isStockJob
 
         if job.status == JOB_STATUS.BREWING then
             bgColor = colors.blue
@@ -840,16 +904,47 @@ drawJobQueueUI = function()
         mon.setCursorPos(2, row)
         mon.write(string.format("#%d", job.id))
 
-        mon.setCursorPos(7, row)
+        -- Job type indicator (stock vs purchase)
+        mon.setCursorPos(6, row)
+        if isStockJob then
+            mon.setTextColor(colors.cyan)
+            mon.write("STK")
+        else
+            mon.setTextColor(colors.lime)
+            mon.write("BUY")
+        end
+        mon.setTextColor(colors.white)
+
+        mon.setCursorPos(11, row)
         local potionName = job.recipe.displayName or "Unknown"
-        if #potionName > 15 then
-            potionName = potionName:sub(1, 13) .. ".."
+        if #potionName > 14 then
+            potionName = potionName:sub(1, 12) .. ".."
         end
         mon.write(potionName)
 
-        mon.setCursorPos(24, row)
+        mon.setCursorPos(27, row)
         mon.setTextColor(statusColor)
-        mon.write(job.statusMessage or job.status)
+        local statusText = job.statusMessage or job.status
+        if #statusText > (mx - 35) then
+            statusText = statusText:sub(1, mx - 38) .. ".."
+        end
+        mon.write(statusText)
+
+        -- Time estimate
+        mon.setCursorPos(mx - 6, row)
+        mon.setTextColor(colors.lightGray)
+        if job.status == JOB_STATUS.COMPLETE then
+            mon.write("Done")
+        elseif job.status == JOB_STATUS.FAILED then
+            mon.write("--")
+        elseif job.status == JOB_STATUS.DISPENSING then
+            mon.write("<5s")
+        else
+            -- Estimate based on brew steps
+            local steps = getRecipeBrewSteps(job.recipe)
+            local eta = steps * BREW_TIME_PER_STEP
+            mon.write(formatTime(eta))
+        end
 
         row = row + 1
     end
