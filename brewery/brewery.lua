@@ -3,10 +3,6 @@ local brewingStands = table.pack(peripheral.find("minecraft:brewing_stand"))
 assert(brewingStands.n > 0, "No brewing stands found!")
 print(string.format("Found %d brewing stands", brewingStands.n))
 
-local ignoredStorageChests = {
-    --"minecraft:chest_368",
-}
-
 local recipes = require("/data/recipes")
 local prices = require("/data/prices")
 
