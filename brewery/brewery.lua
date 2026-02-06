@@ -1319,6 +1319,17 @@ end
 -- Stock maintenance loop - keeps intermediate potions stocked
 local STOCK_CHECK_INTERVAL = 30  -- seconds between stock checks
 
+-- Count how many jobs are queued for a specific recipe (for stock maintenance calculations)
+local function getQueuedBatchesForRecipe(recipeId)
+    local count = 0
+    for _, job in pairs(jobQueue) do
+        if job.recipe and job.recipe.id == recipeId then
+            count = count + 1
+        end
+    end
+    return count
+end
+
 local function stockMaintenanceLoop()
     sleep(10)  -- Initial delay to let everything initialize
     
@@ -1333,7 +1344,13 @@ local function stockMaintenanceLoop()
         for _, recipe in pairs(recipes) do
             if recipe.keep and recipe.keep > 0 then
                 local currentStock = getBrewedPotionStock(recipe.potion, recipe.potionType)
-                local deficit = recipe.keep - currentStock
+                
+                -- Account for batches already in queue (each batch = 3 potions)
+                local queuedBatches = getQueuedBatchesForRecipe(recipe.id)
+                local pendingPotions = queuedBatches * 3
+                local effectiveStock = currentStock + pendingPotions
+                
+                local deficit = recipe.keep - effectiveStock
                 
                 if deficit > 0 then
                     -- Calculate how many batches needed (each batch = 3 potions)
@@ -1352,8 +1369,8 @@ local function stockMaintenanceLoop()
                     end
                     
                     if canBrew and batchesNeeded > 0 then
-                        log.info(string.format("Stock maintenance: Queuing %d batch(es) of %s (current: %d, keep: %d)",
-                            batchesNeeded, recipe.displayName, currentStock, recipe.keep))
+                        log.info(string.format("Stock maintenance: Queuing %d batch(es) of %s (current: %d, queued: %d, keep: %d)",
+                            batchesNeeded, recipe.displayName, currentStock, queuedBatches, recipe.keep))
                         
                         -- Add stock jobs (no transaction, no payer - these are internal)
                         for i = 1, batchesNeeded do
