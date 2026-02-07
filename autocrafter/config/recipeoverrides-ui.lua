@@ -25,7 +25,7 @@ function ui.mainMenu()
     local clearBtn = form:button("Clear All (Danger!)")
     local backBtn = form:button("Back")
     
-    form:show()
+    form:run()
     
     if addBtn() then
         ui.addRecipeMenu()
@@ -62,7 +62,7 @@ function ui.confirmClear()
     local yesBtn = form:button("Yes, Delete All")
     local noBtn = form:button("No, Cancel")
     
-    form:show()
+    form:run()
     return yesBtn()
 end
 
@@ -83,7 +83,7 @@ function ui.addRecipeMenu()
     local shapelessBtn = form:button("Shapeless Recipe")
     local backBtn = form:button("Back")
     
-    form:show()
+    form:run()
     
     if shapedBtn() then
         ui.addShapedRecipe()
@@ -119,7 +119,7 @@ function ui.addShapelessRecipe()
     local saveBtn = form:button("Save Recipe")
     local backBtn = form:button("Cancel")
     
-    form:show()
+    form:run()
     
     if saveBtn() then
         local output = outputField()
@@ -202,7 +202,7 @@ function ui.addShapedRecipe()
     local saveBtn = form:button("Save Recipe")
     local backBtn = form:button("Cancel")
     
-    form:show()
+    form:run()
     
     if saveBtn() then
         local output = outputField()
@@ -305,7 +305,7 @@ function ui.listRecipes()
     form:label("")
     local backBtn = form:button("Back")
     
-    form:show()
+    form:run()
     ui.mainMenu()
 end
 
