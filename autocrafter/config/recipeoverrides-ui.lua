@@ -103,17 +103,16 @@ function ui.addShapelessRecipe()
     form:label("")
     
     local outputField = form:text("Output Item", "minecraft:")
-    local countField = form:number("Output Count", 1, 1, 64)
-    local priorityField = form:number("Priority (lower=higher)", 100, 1, 999)
+    local countField = form:number("Output Count", 1, formui.validation.number_range(1, 64))
+    local priorityField = form:number("Priority", 100, formui.validation.number_range(1, 999))
     
     form:label("")
     form:label("--- Ingredients ---")
-    form:label("Enter items one per line:")
-    form:label("Format: item:id count")
+    form:label("Add items (format: item:id count)")
     form:label("Example: minecraft:stick 2")
     form:label("Or use tags: #c:iron_ingots 3")
     
-    local ingredientsField = form:longText("Ingredients", "", 6)
+    local ingredientsField = form:list("Ingredients", {}, "string")
     
     form:label("")
     local saveBtn = form:button("Save Recipe")
@@ -125,11 +124,11 @@ function ui.addShapelessRecipe()
         local output = outputField()
         local count = countField()
         local priority = priorityField()
-        local ingredientsText = ingredientsField()
+        local ingredientsList = ingredientsField()
         
-        -- Parse ingredients
+        -- Parse ingredients from list
         local ingredients = {}
-        for line in ingredientsText:gmatch("[^\r\n]+") do
+        for _, line in ipairs(ingredientsList) do
             local item, itemCount = line:match("^(%S+)%s+(%d+)$")
             if item and itemCount then
                 table.insert(ingredients, {
@@ -178,8 +177,8 @@ function ui.addShapedRecipe()
     form:label("")
     
     local outputField = form:text("Output Item", "minecraft:")
-    local countField = form:number("Output Count", 1, 1, 64)
-    local priorityField = form:number("Priority (lower=higher)", 100, 1, 999)
+    local countField = form:number("Output Count", 1, formui.validation.number_range(1, 64))
+    local priorityField = form:number("Priority", 100, formui.validation.number_range(1, 999))
     
     form:label("")
     form:label("--- Pattern (3x3 max) ---")
@@ -192,11 +191,9 @@ function ui.addShapedRecipe()
     
     form:label("")
     form:label("--- Key Mapping ---")
-    form:label("Map letters to items:")
-    form:label("Format: A=minecraft:item")
-    form:label("One per line")
+    form:label("Add mappings (format: A=item:id)")
     
-    local keyField = form:longText("Key Mappings", "", 5)
+    local keyField = form:list("Key Mappings", {}, "string")
     
     form:label("")
     local saveBtn = form:button("Save Recipe")
@@ -226,10 +223,10 @@ function ui.addShapedRecipe()
             return
         end
         
-        -- Parse key mappings
+        -- Parse key mappings from list
         local key = {}
-        local keyText = keyField()
-        for line in keyText:gmatch("[^\r\n]+") do
+        local keyList = keyField()
+        for _, line in ipairs(keyList) do
             local char, item = line:match("^(%S)=(%S+)$")
             if char and item then
                 key[char] = item
