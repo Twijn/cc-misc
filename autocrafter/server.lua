@@ -2269,16 +2269,45 @@ local commands = {
                 end
                 
             elseif subCmd == "edit" then
-                -- Edit an existing task's configuration
+                -- Interactive FormUI editor for a worker task
                 local taskId = args[2]
-                local field = args[3]
-                local value = args[4]
                 
                 if not taskId then
-                    ctx.err("Usage: workers edit <taskId> <field> <value>")
-                    print("")
-                    print("Fields: direction, threshold, target, item, inputItem")
-                    return
+                    -- Show a select form to pick a task
+                    local tasks = workerConfig.getAllTasks()
+                    local taskIds = {}
+                    local taskLabels = {}
+                    for id, task in pairs(tasks) do
+                        taskIds[#taskIds + 1] = id
+                        local typeInfo = workerConfig.TASK_TYPES[task.type]
+                        local typeLabel = typeInfo and typeInfo.label or task.type
+                        taskLabels[#taskLabels + 1] = id .. " (" .. typeLabel .. " - " .. (task.item or "?"):gsub("minecraft:", "") .. ")"
+                    end
+                    
+                    if #taskIds == 0 then
+                        ctx.err("No worker tasks configured")
+                        ctx.mess("Use 'workers add' to create a task first")
+                        return
+                    end
+                    
+                    local selectForm = FormUI.new("Select Task to Edit")
+                    local taskField = selectForm:select("Task", taskLabels, 1)
+                    selectForm:addSubmitCancel()
+                    
+                    local selectResult = selectForm:run()
+                    if not selectResult then
+                        ctx.mess("Cancelled")
+                        return
+                    end
+                    
+                    -- Find selected task ID from label
+                    local selectedLabel = taskField()
+                    for i, label in ipairs(taskLabels) do
+                        if label == selectedLabel then
+                            taskId = taskIds[i]
+                            break
+                        end
+                    end
                 end
                 
                 local task = workerConfig.getTask(taskId)
@@ -2287,59 +2316,79 @@ local commands = {
                     return
                 end
                 
-                if not field then
-                    -- Show current task config
-                    local typeInfo = workerConfig.TASK_TYPES[task.type]
-                    local typeLabel = typeInfo and typeInfo.label or task.type
-                    print("")
-                    print("Task: " .. taskId)
-                    print("  Type: " .. typeLabel .. " (" .. task.type .. ")")
-                    print("  Item: " .. task.item)
-                    print("  Threshold: " .. task.stockThreshold)
-                    print("  Target: " .. task.stockTarget)
-                    print("  Direction: " .. (task.config.breakDirection or task.config.farmDirection or "front"))
-                    if task.config.inputItem then
-                        print("  Input Item: " .. task.config.inputItem)
-                    end
-                    print("")
-                    print("Use: workers edit " .. taskId .. " <field> <value>")
+                local typeInfo = workerConfig.TASK_TYPES[task.type]
+                local typeLabel = typeInfo and typeInfo.label or task.type
+                local isFarming = task.type == "farming"
+                local isConcrete = task.type == "concrete"
+                
+                -- Build the form
+                local form = FormUI.new("Edit Task: " .. taskId)
+                form:label("Type: " .. typeLabel)
+                
+                local itemField = form:text("Item", (task.item or ""):gsub("minecraft:", ""))
+                local thresholdField = form:number("Threshold", task.stockThreshold or 64)
+                local targetField = form:number("Target", task.stockTarget or 256)
+                
+                -- Direction field
+                local dirOptions = {"front", "up", "down"}
+                local currentDir = task.config and (task.config.breakDirection or task.config.farmDirection) or "front"
+                local dirDefault = 1
+                for i, d in ipairs(dirOptions) do
+                    if d == currentDir then dirDefault = i break end
+                end
+                local dirField = form:select(isFarming and "Farm Direction" or "Break Direction", dirOptions, dirDefault)
+                
+                -- Input item for concrete
+                local inputField
+                if isConcrete then
+                    inputField = form:text("Input Item", (task.config.inputItem or ""):gsub("minecraft:", ""))
+                end
+                
+                local enabledField = form:checkbox("Enabled", task.enabled ~= false)
+                local priorityField = form:number("Priority", task.priority or 0)
+                
+                form:addSubmitCancel()
+                
+                local result = form:run()
+                if not result then
+                    ctx.mess("Cancelled")
                     return
                 end
                 
-                if not value then
-                    ctx.err("Value required for field: " .. field)
-                    return
+                -- Apply changes
+                local newItem = itemField()
+                if not newItem:find(":") then
+                    newItem = "minecraft:" .. newItem
                 end
                 
-                -- Update the field
-                if field == "direction" or field == "dir" then
-                    if value ~= "front" and value ~= "up" and value ~= "down" then
-                        ctx.err("Invalid direction: " .. value .. " (use: front, up, down)")
-                        return
-                    end
-                    task.config.breakDirection = value
-                elseif field == "threshold" then
-                    task.stockThreshold = tonumber(value) or task.stockThreshold
-                elseif field == "target" then
-                    task.stockTarget = tonumber(value) or task.stockTarget
-                elseif field == "item" then
-                    if not value:find(":") then
-                        value = "minecraft:" .. value
-                    end
-                    task.item = value
-                elseif field == "inputItem" or field == "input" then
-                    if not value:find(":") then
-                        value = "minecraft:" .. value
-                    end
-                    task.config.inputItem = value
+                local newDir = dirField()
+                
+                task.item = newItem
+                task.stockThreshold = thresholdField()
+                task.stockTarget = targetField()
+                task.enabled = enabledField()
+                task.priority = priorityField()
+                
+                if isFarming then
+                    task.config.farmDirection = newDir
                 else
-                    ctx.err("Unknown field: " .. field)
-                    print("Fields: direction, threshold, target, item, inputItem")
-                    return
+                    task.config.breakDirection = newDir
+                end
+                
+                if isConcrete and inputField then
+                    local newInput = inputField()
+                    if not newInput:find(":") then
+                        newInput = "minecraft:" .. newInput
+                    end
+                    task.config.inputItem = newInput
                 end
                 
                 workerConfig.setTask(taskId, task.type, task)
-                ctx.succ("Updated " .. taskId .. ": " .. field .. " = " .. tostring(value))
+                ctx.succ("Updated task: " .. taskId)
+                print("  Item: " .. task.item:gsub("minecraft:", ""))
+                print("  Threshold: " .. task.stockThreshold .. " / Target: " .. task.stockTarget)
+                print("  Direction: " .. (task.config.breakDirection or task.config.farmDirection or "front"))
+                print("  Enabled: " .. tostring(task.enabled))
                 
             elseif subCmd == "remove" then
                 local taskId = args[2]
@@ -2498,6 +2547,141 @@ local commands = {
                 end
                 ctx.succ("Set worker #" .. workerId .. " label to '" .. newLabel .. "'")
                 
+            elseif subCmd == "config" then
+                -- Interactive FormUI editor for a worker
+                local workerIdStr = args[2]
+                
+                if not workerIdStr then
+                    -- Show a select form to pick a worker
+                    local allWorkers = workerManager.getWorkers()
+                    if #allWorkers == 0 then
+                        ctx.err("No workers registered")
+                        return
+                    end
+                    
+                    local workerNames = {}
+                    for _, w in ipairs(allWorkers) do
+                        workerNames[#workerNames + 1] = string.format("#%d %s", w.id, w.label)
+                    end
+                    
+                    local selectForm = FormUI.new("Select Worker to Edit")
+                    local workerField = selectForm:select("Worker", workerNames, 1)
+                    selectForm:addSubmitCancel()
+                    
+                    local selectResult = selectForm:run()
+                    if not selectResult then
+                        ctx.mess("Cancelled")
+                        return
+                    end
+                    
+                    -- Select returns the option string like "#5 Worker 5", extract the ID
+                    local selectedStr = workerField()
+                    workerIdStr = selectedStr:match("#(%d+)")
+                end
+                
+                local workerId = tonumber(workerIdStr)
+                if not workerId then
+                    ctx.err("Worker ID must be a number")
+                    return
+                end
+                
+                local workerData = workerConfig.getWorker(workerId)
+                if not workerData then
+                    ctx.err("Worker #" .. workerId .. " not found")
+                    return
+                end
+                
+                -- Build task type options list and default selections
+                local taskTypeNames = {}
+                local taskTypeLabels = {}
+                for name, info in pairs(workerConfig.TASK_TYPES) do
+                    taskTypeNames[#taskTypeNames + 1] = name
+                end
+                table.sort(taskTypeNames)
+                
+                for _, name in ipairs(taskTypeNames) do
+                    local info = workerConfig.TASK_TYPES[name]
+                    taskTypeLabels[#taskTypeLabels + 1] = name .. " (" .. info.label .. ")"
+                end
+                
+                -- Determine which capabilities are currently selected
+                local currentCaps = workerData.capabilities or {}
+                local currentCapSet = {}
+                for _, cap in ipairs(currentCaps) do
+                    currentCapSet[cap] = true
+                end
+                
+                local defaultIndices = {}
+                for i, name in ipairs(taskTypeNames) do
+                    if currentCapSet[name] then
+                        defaultIndices[#defaultIndices + 1] = i
+                    end
+                end
+                
+                -- Build the form
+                local form = FormUI.new("Edit Worker #" .. workerId)
+                form:label("Worker ID: " .. workerId)
+                local labelField = form:text("Label", workerData.label or ("Worker " .. workerId))
+                local capsField = form:multiselect("Capabilities", taskTypeLabels, defaultIndices)
+                -- Allow selecting none (worker just won't get tasks)
+                form.fields[#form.fields].validate = nil
+                form:addSubmitCancel()
+                
+                local result = form:run()
+                if not result then
+                    ctx.mess("Cancelled")
+                    return
+                end
+                
+                -- Apply label
+                local newLabel = labelField()
+                if newLabel and newLabel ~= "" then
+                    workerConfig.registerWorker(workerId, newLabel)
+                    local liveWorker = workerManager.getWorker(workerId)
+                    if liveWorker then
+                        liveWorker.label = newLabel
+                    end
+                end
+                
+                -- Apply capabilities from multiselect
+                -- capsField() returns an array of selected label strings
+                local selectedLabels = capsField()
+                local newCaps = {}
+                
+                -- Map selected label strings back to task type names
+                local labelToType = {}
+                for i, name in ipairs(taskTypeNames) do
+                    labelToType[taskTypeLabels[i]] = name
+                end
+                
+                for _, label in ipairs(selectedLabels) do
+                    local typeName = labelToType[label]
+                    if typeName then
+                        newCaps[#newCaps + 1] = typeName
+                    end
+                end
+                
+                workerConfig.setCapabilities(workerId, newCaps)
+                local liveWorker = workerManager.getWorker(workerId)
+                if liveWorker then
+                    liveWorker.capabilities = newCaps
+                    liveWorker.label = newLabel
+                end
+                
+                -- Show summary
+                ctx.succ("Updated worker #" .. workerId)
+                print("  Label: " .. newLabel)
+                if #newCaps > 0 then
+                    local capDisplays = {}
+                    for _, cap in ipairs(newCaps) do
+                        local info = workerConfig.TASK_TYPES[cap]
+                        capDisplays[#capDisplays + 1] = info and info.label or cap
+                    end
+                    print("  Capabilities: " .. table.concat(capDisplays, ", "))
+                else
+                    print("  Capabilities: none (will not receive tasks)")
+                end
+                
             else
                 -- Default: list workers
                 local allWorkers = workerManager.getWorkers()
@@ -2603,14 +2787,15 @@ local commands = {
                 end
                 p.print("")
                 p.setTextColor(colors.lightBlue)
-                p.print("Subcommands: tasks, add, edit, remove, enable, disable, cap, label")
+                p.print("Subcommands: tasks, add, edit, remove, enable, disable, config, cap, label")
+                p.print("Use 'workers edit [taskId]' to edit a task, 'workers config [id]' for worker setup")
                 p.show()
             end
         end,
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"tasks", "add", "edit", "remove", "enable", "disable", "cap", "label"}
+                local options = {"tasks", "add", "edit", "remove", "enable", "disable", "config", "cap", "label"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) == 1 then
@@ -2638,7 +2823,7 @@ local commands = {
                     end
                 end
                 return matches
-            elseif #args == 2 and (args[1] == "cap" or args[1] == "capabilities" or args[1] == "label") then
+            elseif #args == 2 and (args[1] == "cap" or args[1] == "capabilities" or args[1] == "label" or args[1] == "config") then
                 -- Complete worker IDs
                 local query = (args[2] or ""):lower()
                 local allWorkers = workerManager.getWorkers()
@@ -2666,28 +2851,6 @@ local commands = {
                 for typeName, _ in pairs(workerConfig.TASK_TYPES) do
                     if typeName:find(query, 1, true) == 1 then
                         table.insert(matches, typeName)
-                    end
-                end
-                return matches
-            elseif #args == 3 and args[1] == "edit" then
-                -- Complete field names
-                local query = (args[3] or ""):lower()
-                local fields = {"direction", "threshold", "target", "item", "inputItem"}
-                local matches = {}
-                for _, field in ipairs(fields) do
-                    if field:lower():find(query, 1, true) == 1 then
-                        table.insert(matches, field)
-                    end
-                end
-                return matches
-            elseif #args == 4 and args[1] == "edit" and (args[3] == "direction" or args[3] == "dir") then
-                -- Complete direction values
-                local query = (args[4] or ""):lower()
-                local directions = {"front", "up", "down"}
-                local matches = {}
-                for _, dir in ipairs(directions) do
-                    if dir:find(query, 1, true) == 1 then
-                        table.insert(matches, dir)
                     end
                 end
                 return matches
