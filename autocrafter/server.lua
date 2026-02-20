@@ -2410,113 +2410,6 @@ local commands = {
                 workerConfig.setTaskEnabled(taskId, subCmd == "enable")
                 ctx.succ((subCmd == "enable" and "Enabled" or "Disabled") .. " task: " .. taskId)
                 
-            elseif subCmd == "cap" or subCmd == "capabilities" then
-                -- Manage worker capabilities
-                local workerIdStr = args[2]
-                local capAction = args[3]
-                local capType = args[4]
-                
-                if not workerIdStr then
-                    ctx.err("Usage: workers cap <workerId> [add|remove|clear] [taskType]")
-                    print("")
-                    print("Examples:")
-                    print("  workers cap 5              - Show worker 5's capabilities")
-                    print("  workers cap 5 add farming  - Allow worker 5 to do farming tasks")
-                    print("  workers cap 5 remove concrete - Remove concrete capability")
-                    print("  workers cap 5 clear        - Remove all capabilities")
-                    print("")
-                    print("Task types: " .. table.concat((function()
-                        local types = {}
-                        for name, _ in pairs(workerConfig.TASK_TYPES) do
-                            types[#types + 1] = name
-                        end
-                        table.sort(types)
-                        return types
-                    end)(), ", "))
-                    return
-                end
-                
-                local workerId = tonumber(workerIdStr)
-                if not workerId then
-                    ctx.err("Worker ID must be a number")
-                    return
-                end
-                
-                local workerData = workerConfig.getWorker(workerId)
-                if not workerData then
-                    ctx.err("Worker #" .. workerId .. " not found")
-                    return
-                end
-                
-                if not capAction then
-                    -- Show current capabilities
-                    local caps = workerConfig.getCapabilities(workerId)
-                    print("")
-                    ctx.mess("=== Worker #" .. workerId .. " Capabilities ===")
-                    if #caps == 0 then
-                        print("  No capabilities assigned")
-                        print("  This worker will NOT receive any tasks")
-                    else
-                        for _, cap in ipairs(caps) do
-                            local typeInfo = workerConfig.TASK_TYPES[cap]
-                            local label = typeInfo and typeInfo.label or cap
-                            print("  " .. cap .. " (" .. label .. ")")
-                        end
-                    end
-                    print("")
-                    ctx.mess("Use 'workers cap " .. workerId .. " add <type>' to add capability")
-                    return
-                end
-                
-                if capAction == "add" then
-                    if not capType then
-                        ctx.err("Usage: workers cap " .. workerId .. " add <taskType>")
-                        return
-                    end
-                    local resolved, typeInfo = workerConfig.resolveTaskType(capType)
-                    if not typeInfo then
-                        ctx.err("Unknown task type: " .. capType)
-                        return
-                    end
-                    if workerConfig.addCapability(workerId, resolved) then
-                        ctx.succ("Added '" .. resolved .. "' capability to worker #" .. workerId)
-                    else
-                        ctx.mess("Worker #" .. workerId .. " already has '" .. resolved .. "' capability")
-                    end
-                    -- Refresh live state
-                    local liveWorker = workerManager.getWorker(workerId)
-                    if liveWorker then
-                        liveWorker.capabilities = workerConfig.getCapabilities(workerId)
-                    end
-                    
-                elseif capAction == "remove" or capAction == "rm" then
-                    if not capType then
-                        ctx.err("Usage: workers cap " .. workerId .. " remove <taskType>")
-                        return
-                    end
-                    local resolved = workerConfig.resolveTaskType(capType)
-                    if workerConfig.removeCapability(workerId, resolved) then
-                        ctx.succ("Removed '" .. resolved .. "' capability from worker #" .. workerId)
-                    else
-                        ctx.err("Worker #" .. workerId .. " doesn't have '" .. resolved .. "' capability")
-                    end
-                    local liveWorker = workerManager.getWorker(workerId)
-                    if liveWorker then
-                        liveWorker.capabilities = workerConfig.getCapabilities(workerId)
-                    end
-                    
-                elseif capAction == "clear" then
-                    workerConfig.setCapabilities(workerId, {})
-                    ctx.succ("Cleared all capabilities for worker #" .. workerId)
-                    local liveWorker = workerManager.getWorker(workerId)
-                    if liveWorker then
-                        liveWorker.capabilities = {}
-                    end
-                    
-                else
-                    ctx.err("Unknown action: " .. capAction .. " (use: add, remove, clear)")
-                end
-                
             elseif subCmd == "label" then
                 -- Set worker label
                 local workerIdStr = args[2]
@@ -2735,7 +2628,7 @@ local commands = {
                         p.print(table.concat(capLabels, ", "))
                     else
                         p.setTextColor(colors.red)
-                        p.print("     No capabilities (use 'workers cap " .. worker.id .. " add <type>')")
+                        p.print("     No capabilities (use 'workers config " .. worker.id .. "')")
                     end
                     
                     -- Progress line (if working) or stats
@@ -2795,7 +2688,7 @@ local commands = {
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"tasks", "add", "edit", "remove", "enable", "disable", "config", "cap", "label"}
+                local options = {"tasks", "add", "edit", "remove", "enable", "disable", "config", "label"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) == 1 then
@@ -2820,37 +2713,6 @@ local commands = {
                 for taskId, _ in pairs(tasks) do
                     if taskId:lower():find(query, 1, true) == 1 then
                         table.insert(matches, taskId)
-                    end
-                end
-                return matches
-            elseif #args == 2 and (args[1] == "cap" or args[1] == "capabilities" or args[1] == "label" or args[1] == "config") then
-                -- Complete worker IDs
-                local query = (args[2] or ""):lower()
-                local allWorkers = workerManager.getWorkers()
-                local matches = {}
-                for _, w in ipairs(allWorkers) do
-                    local idStr = tostring(w.id)
-                    if idStr:find(query, 1, true) == 1 then
-                        table.insert(matches, idStr)
-                    end
-                end
-                return matches
-            elseif #args == 3 and (args[1] == "cap" or args[1] == "capabilities") then
-                local query = (args[3] or ""):lower()
-                local options = {"add", "remove", "clear"}
-                local matches = {}
-                for _, opt in ipairs(options) do
-                    if opt:find(query, 1, true) == 1 then
-                        table.insert(matches, opt)
-                    end
-                end
-                return matches
-            elseif #args == 4 and (args[1] == "cap" or args[1] == "capabilities") and (args[3] == "add" or args[3] == "remove" or args[3] == "rm") then
-                local query = (args[4] or ""):lower()
-                local matches = {}
-                for typeName, _ in pairs(workerConfig.TASK_TYPES) do
-                    if typeName:find(query, 1, true) == 1 then
-                        table.insert(matches, typeName)
                     end
                 end
                 return matches
