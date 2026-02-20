@@ -168,10 +168,9 @@ function manager.drawStatus(data)
     local isTall = h >= 30
     
     -- === COMPACT STATUS BAR (line 3) ===
-    -- Storage: 85% | Q: 3/2 | C: 4/4
     monitor.setCursorPos(2, y)
     monitor.setTextColor(colors.lightGray)
-    monitor.write("Sto:")
+    monitor.write("% Full:")
     
     if data.storage then
         local pct = data.storage.percentFull or 0
@@ -189,7 +188,7 @@ function manager.drawStatus(data)
     monitor.write(" | ")
     
     monitor.setTextColor(colors.lightGray)
-    monitor.write("Q:")
+    monitor.write("Queue:")
     if data.queue then
         local pending = data.queue.pending or 0
         local active = (data.queue.assigned or 0) + (data.queue.crafting or 0)
@@ -207,7 +206,7 @@ function manager.drawStatus(data)
     monitor.write(" | ")
     
     monitor.setTextColor(colors.lightGray)
-    monitor.write("C:")
+    monitor.write("Crafters:")
     if data.crafters then
         local online = data.crafters.online or 0
         local total = data.crafters.total or 0
@@ -223,7 +222,7 @@ function manager.drawStatus(data)
     
     y = y + 1
     
-    -- Storage bar (compact)
+    -- Storage bar
     if data.storage then
         local barWidth = math.min(w - 4, 20)
         local fillPct = (data.storage.percentFull or 0) / 100
