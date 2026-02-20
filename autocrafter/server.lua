@@ -392,6 +392,12 @@ local function messageHandler()
                     deposited = deposited,
                 }, sender)
                 
+                -- Invalidate cache so the next periodic scan picks up
+                -- the new storage locations sooner
+                if deposited > 0 then
+                    storageManager.invalidateCache()
+                end
+                
             elseif msgType == config.messageTypes.REQUEST_CLEAR_SLOTS then
                 -- Crafter wants to clear specific slots (legacy method)
                 logger.debug(string.format("REQUEST_CLEAR_SLOTS from %s: sourceInv=%s, slots=%s", 
@@ -434,6 +440,13 @@ local function messageHandler()
                     results = results,
                     totalPulled = totalPulled,
                 }, sender)
+                
+                -- Invalidate cache so the next periodic scan picks up
+                -- the new storage locations sooner (stock totals are already
+                -- updated incrementally by pullSlotsBatch)
+                if totalPulled > 0 then
+                    storageManager.invalidateCache()
+                end
                 
             elseif msgType == config.messageTypes.SERVER_QUERY then
                 -- Client asking if server exists

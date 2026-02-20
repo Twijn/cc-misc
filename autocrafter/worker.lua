@@ -150,70 +150,141 @@ local function saveTask()
     end
 end
 
----Request items to deposit into storage
----@param item string Item ID
----@param count number Amount to deposit
----@param slot number Turtle slot
----@return number deposited Amount actually deposited
-local function requestDeposit(item, count, slot)
+---Check if the turtle inventory is empty
+---@return boolean isEmpty Whether all slots are empty
+local function isInventoryEmpty()
+    for slot = 1, 16 do
+        if turtle.getItemCount(slot) > 0 then
+            return false
+        end
+    end
+    return true
+end
+
+---Get slot details using local turtle API (always works)
+---@param slot number The slot to check
+---@return table|nil details {name, count, nbt} or nil if empty
+local function getSlotContents(slot)
+    local count = turtle.getItemCount(slot)
+    if count <= 0 then
+        return nil
+    end
+    local detail = turtle.getItemDetail(slot)
+    if not detail then
+        return { name = "unknown", count = count, nbt = nil }
+    end
+    return {
+        name = detail.name,
+        count = count,
+        nbt = detail.nbt,
+    }
+end
+
+---Deposit all items from inventory to storage using batch protocol.
+---Uses REQUEST_PULL_SLOTS_BATCH for a single round-trip instead of
+---one REQUEST_DEPOSIT per slot, which avoids response cross-talk and
+---eliminates redundant full storage rescans on the server.
+---@param maxRetries? number Maximum retry attempts (default 3)
+---@return number deposited Total items deposited
+local function depositInventory(maxRetries)
+    maxRetries = maxRetries or 3
     local _, _, turtleName = getModem()
     if not turtleName then
         return 0
     end
     
-    comms.send(config.messageTypes.REQUEST_DEPOSIT, {
-        item = item,
-        count = count,
-        sourceInv = turtleName,
-        sourceSlot = slot,
-    })
-    
-    -- Wait for response
-    local response = comms.receive(5, config.messageTypes.RESPONSE_DEPOSIT)
-    if response and response.data then
-        return response.data.deposited or 0
+    -- Quick check if already empty
+    if isInventoryEmpty() then
+        return 0
     end
     
-    return 0
-end
-
----Deposit all items from inventory to storage
----@return number deposited Total items deposited
-local function depositInventory()
-    local _, _, turtleName = getModem()
-    if not turtleName then
+    -- Enumerate inventory using LOCAL turtle API (always reliable)
+    local slotContents = {}
+    local totalItems = 0
+    
+    for slot = 1, 16 do
+        local contents = getSlotContents(slot)
+        if contents then
+            totalItems = totalItems + contents.count
+            table.insert(slotContents, {
+                slot = slot,
+                name = contents.name,
+                count = contents.count,
+                nbt = contents.nbt,
+            })
+        end
+    end
+    
+    if #slotContents == 0 then
         return 0
     end
     
     local totalDeposited = 0
     
-    for slot = 1, 16 do
-        local detail = turtle.getItemDetail(slot)
-        if detail then
-            local deposited = requestDeposit(detail.name, detail.count, slot)
-            totalDeposited = totalDeposited + deposited
+    for attempt = 1, maxRetries do
+        logger.debug(string.format("depositInventory: batch pull attempt %d/%d, %d slots",
+            attempt, maxRetries, #slotContents))
+        
+        comms.broadcast(config.messageTypes.REQUEST_PULL_SLOTS_BATCH, {
+            sourceInv = turtleName,
+            slotContents = slotContents,
+        })
+        
+        local message = comms.receive(5, config.messageTypes.RESPONSE_PULL_SLOTS_BATCH)
+        if message then
+            local results = message.data.results or {}
+            local batchPulled = message.data.totalPulled or 0
+            totalDeposited = totalDeposited + batchPulled
             
-            -- Check if slot is now empty
-            local remaining = turtle.getItemCount(slot)
-            if remaining > 0 then
-                logger.warn(string.format("Failed to deposit all %s from slot %d (%d remaining)",
-                    detail.name, slot, remaining))
+            logger.debug(string.format("depositInventory: batch response, %d items pulled", batchPulled))
+            
+            -- Check which slots still have items
+            slotContents = {}
+            local hasStorageFull = false
+            
+            for _, result in ipairs(results) do
+                local remaining = turtle.getItemCount(result.slot)
+                if remaining > 0 then
+                    local contents = getSlotContents(result.slot)
+                    if contents then
+                        table.insert(slotContents, {
+                            slot = result.slot,
+                            name = contents.name,
+                            count = contents.count,
+                            nbt = contents.nbt,
+                        })
+                    end
+                    if result.error == "no_storage" or result.error == "no_valid_storage" then
+                        hasStorageFull = true
+                    end
+                end
+            end
+            
+            if #slotContents == 0 then
+                break  -- All slots cleared
+            end
+            
+            if hasStorageFull then
+                logger.warn("depositInventory: storage full, stopping retry")
+                break
+            end
+            
+            if attempt < maxRetries then
+                sleep(0.2)
+            end
+        else
+            logger.debug(string.format("depositInventory: batch timeout, attempt %d/%d", attempt, maxRetries))
+            if attempt < maxRetries then
+                sleep(0.3)
             end
         end
     end
     
-    return totalDeposited
-end
-
----Check if inventory is full
----@return boolean isFull
-local function isInventoryFull()
-    for slot = 1, 16 do
-        if turtle.getItemCount(slot) == 0 then
-            return false
-        end
+    if not isInventoryEmpty() then
+        logger.warn(string.format("depositInventory: incomplete, deposited %d/%d items", totalDeposited, totalItems))
     end
-    return true
+    
+    return totalDeposited
 end
 
 ---Get free inventory slots
@@ -226,6 +297,12 @@ local function getFreeSlots()
         end
     end
     return free
+end
+
+---Check if inventory is full
+---@return boolean isFull
+local function isInventoryFull()
+    return not isInventoryEmpty() and getFreeSlots() == 0
 end
 
 ---Execute cobblestone generation task

@@ -632,12 +632,15 @@ function inventory.deposit(sourceInv, itemFilter)
         local pulled = result[1] or 0
         if pulled > 0 then
             deposited = deposited + pulled
+            -- Update stock totals incrementally instead of doing a full rescan.
+            -- We don't know the exact destination slot in storage, but stock
+            -- totals stay accurate.  The periodic scan will fix location cache.
+            local itemInfo = sourceSlots[meta[i].slot]
+            if type(itemInfo) == "table" and itemInfo.name then
+                local itemKey = key(itemInfo.name, itemInfo.nbt)
+                stock[itemKey] = (stock[itemKey] or 0) + pulled
+            end
         end
-    end
-    
-    -- Rescan affected storage
-    if deposited > 0 then
-        inventory.scan()
     end
     
     return deposited
@@ -766,10 +769,13 @@ function inventory.pullSlotsBatch(sourceInv, slotContents)
             pulled = pulled,
             error = pulled < slotInfo.count and "partial" or nil
         }
-    end
-    
-    if totalPulled > 0 then
-        inventory.scan()
+        -- Update stock totals incrementally instead of doing a full rescan.
+        -- We don't know the exact destination slot in storage, but stock
+        -- totals stay accurate.  The periodic scan will fix location cache.
+        if pulled > 0 and slotInfo.name and slotInfo.name ~= "unknown" then
+            local itemKey = key(slotInfo.name, slotInfo.nbt)
+            stock[itemKey] = (stock[itemKey] or 0) + pulled
+        end
     end
     
     return results, totalPulled
