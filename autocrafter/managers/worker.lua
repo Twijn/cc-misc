@@ -277,8 +277,8 @@ function manager.dispatchWork(stockLevels)
             goto nextTask
         end
         
-        -- Calculate batch size (don't request more than needed)
-        local batchSize = math.min(taskInfo.needed, 64)  -- Max 64 per batch
+        -- Calculate batch size (don't request more than needed, min 1 to prevent negatives)
+        local batchSize = math.max(1, math.min(taskInfo.needed, 64))
         
         if manager.sendWorkRequest(worker.id, taskInfo.task, batchSize) then
             workers[worker.id].status = "working"

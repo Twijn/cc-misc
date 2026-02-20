@@ -170,13 +170,24 @@ function module.setTask(taskId, taskType, config)
         return false
     end
     
+    local stockTarget = config.stockTarget or taskTypeInfo.defaultTarget
+    local stockThreshold = config.stockThreshold or taskTypeInfo.defaultThreshold
+    
+    -- Ensure threshold does not exceed target to prevent negative dispatch quantities.
+    -- If threshold > target, clamp threshold to target.
+    if stockThreshold > stockTarget then
+        logger.warn(string.format("Task %s: threshold (%d) > target (%d), clamping threshold to target",
+            taskId, stockThreshold, stockTarget))
+        stockThreshold = stockTarget
+    end
+    
     tasks[taskId] = {
         id = taskId,
         type = resolvedType,
         enabled = config.enabled ~= false,
         item = config.item or taskTypeInfo.item,
-        stockTarget = config.stockTarget or taskTypeInfo.defaultTarget,
-        stockThreshold = config.stockThreshold or taskTypeInfo.defaultThreshold,
+        stockTarget = stockTarget,
+        stockThreshold = stockThreshold,
         priority = config.priority or 0,
         config = config.config or {},
     }
@@ -241,10 +252,13 @@ function module.getTasksNeedingWork(stockLevels)
     for _, task in ipairs(enabledTasks) do
         local currentStock = stockLevels[task.item] or 0
         if currentStock < task.stockThreshold then
+            -- Clamp needed to at least 1 to prevent negative quantities
+            -- (can happen when stockThreshold > stockTarget and stock exceeds target)
+            local needed = math.max(1, task.stockTarget - currentStock)
             table.insert(result, {
                 task = task,
                 currentStock = currentStock,
-                needed = task.stockTarget - currentStock,
+                needed = needed,
             })
         end
     end
