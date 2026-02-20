@@ -2716,6 +2716,18 @@ local commands = {
                     end
                 end
                 return matches
+            elseif #args == 2 and (args[1] == "config" or args[1] == "label") then
+                -- Complete worker IDs
+                local query = (args[2] or ""):lower()
+                local allWorkers = workerManager.getWorkers()
+                local matches = {}
+                for _, w in ipairs(allWorkers) do
+                    local idStr = tostring(w.id)
+                    if idStr:find(query, 1, true) == 1 then
+                        table.insert(matches, idStr)
+                    end
+                end
+                return matches
             end
             return {}
         end

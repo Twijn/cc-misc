@@ -882,11 +882,9 @@ local function displayLoop()
             write("Idle")
         elseif status == "working" then
             term.setTextColor(colors.orange)
-            write("Working")
-            if currentTask then
-                term.setTextColor(colors.white)
-                write(" (" .. currentTask.type .. ")")
-            end
+            write(currentTask and currentTask.type or "working")
+            term.setTextColor(colors.yellow)
+            write("...")
         end
         
         term.setTextColor(colors.gray)
