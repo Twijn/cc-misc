@@ -1241,12 +1241,19 @@ function inventory.getCacheStats()
     local itemCount = 0
     for _ in pairs(stock) do itemCount = itemCount + 1 end
     
+    local peripheralCount = 0
+    for _ in pairs(peripherals) do peripheralCount = peripheralCount + 1 end
+    
+    local lastScan = stockCache.get("lastScan") or 0
+    
     return {
         inventories = invCount,
         itemDetails = detailCount,
         stockItems = itemCount,
         storageCount = #storage,
-        lastScan = stockCache.get("lastScan") or 0
+        lastScan = lastScan,
+        wrappedPeripherals = peripheralCount,
+        timeSinceScan = os.clock() - lastScan
     }
 end
 
