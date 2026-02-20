@@ -16,7 +16,7 @@ local module = {}
 
 ---@class WorkerTask
 ---@field id string Unique task identifier
----@field type string Task type (cobblestone, concrete, custom)
+---@field type string Task type (cobblegen, concrete, farming, blockbreak)
 ---@field enabled boolean Whether the task is active
 ---@field item string The item being generated
 ---@field stockTarget number Target stock level (generate when below this)
@@ -26,8 +26,9 @@ local module = {}
 
 ---Worker task types and their default configurations
 module.TASK_TYPES = {
-    cobblestone = {
-        description = "Cobblestone Generator",
+    cobblegen = {
+        label = "Cobblestone Generator",
+        description = "Mines cobblestone from a generator",
         item = "minecraft:cobblestone",
         defaultThreshold = 1000,
         defaultTarget = 2000,
@@ -35,15 +36,17 @@ module.TASK_TYPES = {
         configFields = {"breakDirection"},
     },
     concrete = {
-        description = "Concrete Powder -> Concrete",
+        label = "Concrete Maker",
+        description = "Converts concrete powder to concrete via water",
         -- item: the concrete color to make (e.g., "minecraft:white_concrete")
         -- inputItem: the powder (e.g., "minecraft:white_concrete_powder")
         defaultThreshold = 64,
         defaultTarget = 256,
         configFields = {"inputItem", "breakDirection"},
     },
-    crop_farm = {
-        description = "Crop Farm (wheat, carrots, potatoes, beetroot, nether wart)",
+    farming = {
+        label = "Crop Farm",
+        description = "Grows and harvests crops (wheat, carrots, potatoes, beetroot, nether wart)",
         -- item: the crop to farm (e.g., "minecraft:wheat", "minecraft:carrot", "minecraft:potato")
         -- Uses bonemeal from storage to grow crops instantly on a single block
         -- Note: Nether wart cannot be bonemealed and must grow naturally
@@ -94,12 +97,22 @@ module.TASK_TYPES = {
             },
         },
     },
-    custom = {
-        description = "Custom block breaking task",
+    blockbreak = {
+        label = "Block Breaker",
+        description = "Generic block-breaking task for any block",
         defaultThreshold = 64,
         defaultTarget = 256,
         configFields = {"item", "breakDirection"},
     },
+}
+
+--- Legacy task type aliases (old name -> new name)
+--- Used for backward compatibility when loading existing configs
+module.TASK_TYPE_ALIASES = {
+    cobblestone = "cobblegen",
+    crop_farm = "farming",
+    custom = "blockbreak",
+    -- concrete stays the same
 }
 
 ---Get all task types
@@ -108,14 +121,50 @@ function module.getTaskTypes()
     return module.TASK_TYPES
 end
 
+---Resolve a task type name, handling legacy aliases
+---@param typeName string Task type name (may be legacy)
+---@return string resolvedName The current task type name
+---@return table|nil typeInfo The task type info, or nil if unknown
+function module.resolveTaskType(typeName)
+    local resolved = module.TASK_TYPE_ALIASES[typeName] or typeName
+    return resolved, module.TASK_TYPES[resolved]
+end
+
+---Generate a clean task ID from type and item
+---@param taskType string Task type
+---@param item string Item name
+---@return string taskId Clean task ID
+function module.generateTaskId(taskType, item)
+    local shortName = item:gsub("minecraft:", "")
+    
+    -- For cobblegen, just use "cobblegen" since item is always cobblestone
+    if taskType == "cobblegen" then
+        return "cobblegen"
+    end
+    
+    -- For farming, use "<crop>_farm" (e.g., "wheat_farm")
+    if taskType == "farming" then
+        return shortName .. "_farm"
+    end
+    
+    -- For concrete, just use the concrete name (e.g., "white_concrete")
+    if taskType == "concrete" then
+        return shortName
+    end
+    
+    -- For blockbreak, use the item name
+    return shortName
+end
+
 ---Add or update a task
 ---@param taskId string Unique task ID
----@param taskType string Task type (cobblestone, concrete, custom)
+---@param taskType string Task type (cobblegen, concrete, farming, blockbreak)
 ---@param config table Task configuration
 function module.setTask(taskId, taskType, config)
     local tasks = workers.get("tasks") or {}
     
-    local taskTypeInfo = module.TASK_TYPES[taskType]
+    -- Resolve legacy task type names
+    local resolvedType, taskTypeInfo = module.resolveTaskType(taskType)
     if not taskTypeInfo then
         logger.warn("Unknown task type: " .. taskType)
         return false
@@ -123,7 +172,7 @@ function module.setTask(taskId, taskType, config)
     
     tasks[taskId] = {
         id = taskId,
-        type = taskType,
+        type = resolvedType,
         enabled = config.enabled ~= false,
         item = config.item or taskTypeInfo.item,
         stockTarget = config.stockTarget or taskTypeInfo.defaultTarget,
@@ -133,7 +182,7 @@ function module.setTask(taskId, taskType, config)
     }
     
     workers.set("tasks", tasks)
-    logger.info(string.format("Set task %s: %s (%s)", taskId, taskType, config.item or taskTypeInfo.item or "custom"))
+    logger.info(string.format("Set task %s: %s (%s)", taskId, resolvedType, config.item or taskTypeInfo.item or "custom"))
     return true
 end
 
@@ -236,13 +285,16 @@ end
 ---@param workerId number Worker computer ID
 ---@param label? string Optional label
 ---@param taskId? string Optional assigned task
-function module.registerWorker(workerId, label, taskId)
+---@param capabilities? string[] Optional list of task types this worker can perform
+function module.registerWorker(workerId, label, taskId, capabilities)
     local workerList = workers.get("workers") or {}
+    local existing = workerList[tostring(workerId)]
     workerList[tostring(workerId)] = {
         id = workerId,
-        label = label or ("Worker " .. workerId),
-        taskId = taskId,
-        registered = os.epoch("utc"),
+        label = label or (existing and existing.label) or ("Worker " .. workerId),
+        taskId = taskId or (existing and existing.taskId),
+        capabilities = capabilities or (existing and existing.capabilities) or {},
+        registered = (existing and existing.registered) or os.epoch("utc"),
     }
     workers.set("workers", workerList)
     logger.info(string.format("Registered worker %d (%s)", workerId, label or ("Worker " .. workerId)))
@@ -281,6 +333,100 @@ function module.assignTask(workerId, taskId)
         workers.set("workers", workerList)
         logger.info(string.format("Assigned task %s to worker %d", taskId, workerId))
     end
+end
+
+---Get a worker's capabilities
+---@param workerId number Worker computer ID
+---@return string[] capabilities List of task types this worker can perform
+function module.getCapabilities(workerId)
+    local workerList = workers.get("workers") or {}
+    local worker = workerList[tostring(workerId)]
+    if worker then
+        return worker.capabilities or {}
+    end
+    return {}
+end
+
+---Set a worker's full capabilities list
+---@param workerId number Worker computer ID
+---@param capabilities string[] List of task types
+function module.setCapabilities(workerId, capabilities)
+    local workerList = workers.get("workers") or {}
+    if workerList[tostring(workerId)] then
+        workerList[tostring(workerId)].capabilities = capabilities
+        workers.set("workers", workerList)
+        logger.info(string.format("Set capabilities for worker %d: %s", workerId, table.concat(capabilities, ", ")))
+    end
+end
+
+---Add a capability to a worker
+---@param workerId number Worker computer ID
+---@param taskType string Task type to add
+---@return boolean added Whether it was added (false if already present)
+function module.addCapability(workerId, taskType)
+    local workerList = workers.get("workers") or {}
+    local worker = workerList[tostring(workerId)]
+    if not worker then return false end
+    
+    worker.capabilities = worker.capabilities or {}
+    for _, cap in ipairs(worker.capabilities) do
+        if cap == taskType then return false end
+    end
+    
+    table.insert(worker.capabilities, taskType)
+    workers.set("workers", workerList)
+    logger.info(string.format("Added capability '%s' to worker %d", taskType, workerId))
+    return true
+end
+
+---Remove a capability from a worker
+---@param workerId number Worker computer ID
+---@param taskType string Task type to remove
+---@return boolean removed Whether it was removed
+function module.removeCapability(workerId, taskType)
+    local workerList = workers.get("workers") or {}
+    local worker = workerList[tostring(workerId)]
+    if not worker or not worker.capabilities then return false end
+    
+    for i, cap in ipairs(worker.capabilities) do
+        if cap == taskType then
+            table.remove(worker.capabilities, i)
+            workers.set("workers", workerList)
+            logger.info(string.format("Removed capability '%s' from worker %d", taskType, workerId))
+            return true
+        end
+    end
+    return false
+end
+
+---Check if a worker has a specific capability
+---@param workerId number Worker computer ID
+---@param taskType string Task type to check
+---@return boolean hasCapability
+function module.hasCapability(workerId, taskType)
+    local caps = module.getCapabilities(workerId)
+    for _, cap in ipairs(caps) do
+        if cap == taskType then return true end
+    end
+    return false
+end
+
+---Get all workers that have a specific capability
+---@param taskType string Task type to filter by
+---@return table<string, table> workers Workers with this capability
+function module.getWorkersWithCapability(taskType)
+    local workerList = workers.get("workers") or {}
+    local result = {}
+    for id, worker in pairs(workerList) do
+        local caps = worker.capabilities or {}
+        for _, cap in ipairs(caps) do
+            if cap == taskType then
+                result[id] = worker
+                break
+            end
+        end
+    end
+    return result
 end
 
 ---Count workers

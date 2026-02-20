@@ -2149,12 +2149,14 @@ local commands = {
                         statusText = "DISABLED"
                     end
                     
-                    local dir = task.config and task.config.breakDirection or "front"
+                    local typeInfo = workerConfig.TASK_TYPES[task.type]
+                    local typeLabel = typeInfo and typeInfo.label or task.type
+                    local dir = task.config and (task.config.breakDirection or task.config.farmDirection) or "front"
                     
                     p.setTextColor(colors.white)
-                    p.write(id .. ": ")
+                    p.write(id .. " ")
                     p.setTextColor(colors.lightGray)
-                    p.write(task.type .. " ")
+                    p.write("(" .. typeLabel .. ") ")
                     p.setTextColor(colors.cyan)
                     p.write((task.item or "?"):gsub("minecraft:", "") .. " ")
                     p.setTextColor(colors.yellow)
@@ -2186,7 +2188,8 @@ local commands = {
                     return
                 end
                 
-                local typeInfo = workerConfig.TASK_TYPES[taskType]
+                -- Resolve type (handles legacy names)
+                local resolvedType, typeInfo = workerConfig.resolveTaskType(taskType)
                 if not typeInfo then
                     ctx.err("Unknown task type: " .. taskType)
                     return
@@ -2198,13 +2201,13 @@ local commands = {
                     return
                 end
                 
-                -- For cobblestone, item is preset
-                if taskType == "cobblestone" then
+                -- For cobblegen, item is preset
+                if resolvedType == "cobblegen" then
                     item = "minecraft:cobblestone"
-                elseif taskType == "crop_farm" then
+                elseif resolvedType == "farming" then
                     -- Validate crop type
                     if not item then
-                        ctx.err("Crop required for crop_farm task (wheat, carrot, potato, beetroot, nether_wart)")
+                        ctx.err("Crop required for farming task (wheat, carrot, potato, beetroot, nether_wart)")
                         return
                     end
                     if not item:find(":") then
@@ -2216,7 +2219,7 @@ local commands = {
                         return
                     end
                 elseif not item then
-                    ctx.err("Item required for task type: " .. taskType)
+                    ctx.err("Item required for task type: " .. resolvedType)
                     return
                 end
                 
@@ -2224,9 +2227,8 @@ local commands = {
                     item = "minecraft:" .. item
                 end
                 
-                -- Generate descriptive task ID from item name
-                local itemShortName = item:gsub("minecraft:", ""):gsub("[^%w]+", "_")
-                local taskId = taskType .. "_" .. itemShortName
+                -- Generate clean task ID
+                local taskId = workerConfig.generateTaskId(resolvedType, item)
                 
                 -- Handle duplicate IDs by adding a number suffix
                 local existingTasks = workerConfig.getAllTasks()
@@ -2238,7 +2240,7 @@ local commands = {
                     taskId = taskId .. "_" .. counter
                 end
                 
-                local taskConfig = {
+                local taskCfg = {
                     item = item,
                     stockThreshold = threshold or typeInfo.defaultThreshold,
                     stockTarget = target or typeInfo.defaultTarget,
@@ -2248,20 +2250,20 @@ local commands = {
                 }
                 
                 -- For concrete, set the input item
-                if taskType == "concrete" then
-                    taskConfig.config.inputItem = item:gsub("_concrete$", "_concrete_powder")
+                if resolvedType == "concrete" then
+                    taskCfg.config.inputItem = item:gsub("_concrete$", "_concrete_powder")
                 end
                 
-                -- For crop_farm, set farm direction and seed info
-                if taskType == "crop_farm" then
+                -- For farming, set farm direction and seed info
+                if resolvedType == "farming" then
                     local cropInfo = typeInfo.validCrops[item]
-                    taskConfig.config.farmDirection = direction
-                    taskConfig.config.seedItem = cropInfo.seed
-                    taskConfig.config.breakDirection = nil  -- Not used for crop farming
+                    taskCfg.config.farmDirection = direction
+                    taskCfg.config.seedItem = cropInfo.seed
+                    taskCfg.config.breakDirection = nil  -- Not used for crop farming
                 end
                 
-                if workerConfig.setTask(taskId, taskType, taskConfig) then
-                    ctx.succ(string.format("Added task %s: %s (dir: %s)", taskId, item:gsub("minecraft:", ""), direction))
+                if workerConfig.setTask(taskId, resolvedType, taskCfg) then
+                    ctx.succ(string.format("Added task '%s': %s (dir: %s)", taskId, item:gsub("minecraft:", ""), direction))
                 else
                     ctx.err("Failed to add task")
                 end
@@ -2287,13 +2289,15 @@ local commands = {
                 
                 if not field then
                     -- Show current task config
+                    local typeInfo = workerConfig.TASK_TYPES[task.type]
+                    local typeLabel = typeInfo and typeInfo.label or task.type
                     print("")
                     print("Task: " .. taskId)
-                    print("  Type: " .. task.type)
+                    print("  Type: " .. typeLabel .. " (" .. task.type .. ")")
                     print("  Item: " .. task.item)
                     print("  Threshold: " .. task.stockThreshold)
                     print("  Target: " .. task.stockTarget)
-                    print("  Direction: " .. (task.config.breakDirection or "front"))
+                    print("  Direction: " .. (task.config.breakDirection or task.config.farmDirection or "front"))
                     if task.config.inputItem then
                         print("  Input Item: " .. task.config.inputItem)
                     end
@@ -2357,6 +2361,143 @@ local commands = {
                 workerConfig.setTaskEnabled(taskId, subCmd == "enable")
                 ctx.succ((subCmd == "enable" and "Enabled" or "Disabled") .. " task: " .. taskId)
                 
+            elseif subCmd == "cap" or subCmd == "capabilities" then
+                -- Manage worker capabilities
+                local workerIdStr = args[2]
+                local capAction = args[3]
+                local capType = args[4]
+                
+                if not workerIdStr then
+                    ctx.err("Usage: workers cap <workerId> [add|remove|clear] [taskType]")
+                    print("")
+                    print("Examples:")
+                    print("  workers cap 5              - Show worker 5's capabilities")
+                    print("  workers cap 5 add farming  - Allow worker 5 to do farming tasks")
+                    print("  workers cap 5 remove concrete - Remove concrete capability")
+                    print("  workers cap 5 clear        - Remove all capabilities")
+                    print("")
+                    print("Task types: " .. table.concat((function()
+                        local types = {}
+                        for name, _ in pairs(workerConfig.TASK_TYPES) do
+                            types[#types + 1] = name
+                        end
+                        table.sort(types)
+                        return types
+                    end)(), ", "))
+                    return
+                end
+                
+                local workerId = tonumber(workerIdStr)
+                if not workerId then
+                    ctx.err("Worker ID must be a number")
+                    return
+                end
+                
+                local workerData = workerConfig.getWorker(workerId)
+                if not workerData then
+                    ctx.err("Worker #" .. workerId .. " not found")
+                    return
+                end
+                
+                if not capAction then
+                    -- Show current capabilities
+                    local caps = workerConfig.getCapabilities(workerId)
+                    print("")
+                    ctx.mess("=== Worker #" .. workerId .. " Capabilities ===")
+                    if #caps == 0 then
+                        print("  No capabilities assigned")
+                        print("  This worker will NOT receive any tasks")
+                    else
+                        for _, cap in ipairs(caps) do
+                            local typeInfo = workerConfig.TASK_TYPES[cap]
+                            local label = typeInfo and typeInfo.label or cap
+                            print("  " .. cap .. " (" .. label .. ")")
+                        end
+                    end
+                    print("")
+                    ctx.mess("Use 'workers cap " .. workerId .. " add <type>' to add capability")
+                    return
+                end
+                
+                if capAction == "add" then
+                    if not capType then
+                        ctx.err("Usage: workers cap " .. workerId .. " add <taskType>")
+                        return
+                    end
+                    local resolved, typeInfo = workerConfig.resolveTaskType(capType)
+                    if not typeInfo then
+                        ctx.err("Unknown task type: " .. capType)
+                        return
+                    end
+                    if workerConfig.addCapability(workerId, resolved) then
+                        ctx.succ("Added '" .. resolved .. "' capability to worker #" .. workerId)
+                    else
+                        ctx.mess("Worker #" .. workerId .. " already has '" .. resolved .. "' capability")
+                    end
+                    -- Refresh live state
+                    local liveWorker = workerManager.getWorker(workerId)
+                    if liveWorker then
+                        liveWorker.capabilities = workerConfig.getCapabilities(workerId)
+                    end
+                    
+                elseif capAction == "remove" or capAction == "rm" then
+                    if not capType then
+                        ctx.err("Usage: workers cap " .. workerId .. " remove <taskType>")
+                        return
+                    end
+                    local resolved = workerConfig.resolveTaskType(capType)
+                    if workerConfig.removeCapability(workerId, resolved) then
+                        ctx.succ("Removed '" .. resolved .. "' capability from worker #" .. workerId)
+                    else
+                        ctx.err("Worker #" .. workerId .. " doesn't have '" .. resolved .. "' capability")
+                    end
+                    local liveWorker = workerManager.getWorker(workerId)
+                    if liveWorker then
+                        liveWorker.capabilities = workerConfig.getCapabilities(workerId)
+                    end
+                    
+                elseif capAction == "clear" then
+                    workerConfig.setCapabilities(workerId, {})
+                    ctx.succ("Cleared all capabilities for worker #" .. workerId)
+                    local liveWorker = workerManager.getWorker(workerId)
+                    if liveWorker then
+                        liveWorker.capabilities = {}
+                    end
+                    
+                else
+                    ctx.err("Unknown action: " .. capAction .. " (use: add, remove, clear)")
+                end
+                
+            elseif subCmd == "label" then
+                -- Set worker label
+                local workerIdStr = args[2]
+                local newLabel = args[3]
+                
+                if not workerIdStr or not newLabel then
+                    ctx.err("Usage: workers label <workerId> <name>")
+                    return
+                end
+                
+                local workerId = tonumber(workerIdStr)
+                if not workerId then
+                    ctx.err("Worker ID must be a number")
+                    return
+                end
+                
+                -- Collect remaining args as label (allows spaces)
+                local labelParts = {}
+                for i = 3, #args do
+                    labelParts[#labelParts + 1] = args[i]
+                end
+                newLabel = table.concat(labelParts, " ")
+                
+                workerConfig.registerWorker(workerId, newLabel)
+                local liveWorker = workerManager.getWorker(workerId)
+                if liveWorker then
+                    liveWorker.label = newLabel
+                end
+                ctx.succ("Set worker #" .. workerId .. " label to '" .. newLabel .. "'")
+                
             else
                 -- Default: list workers
                 local allWorkers = workerManager.getWorkers()
@@ -2396,7 +2537,24 @@ local commands = {
                     end
                     p.print("")
                     
-                    -- Second line: Progress (if working) or stats
+                    -- Capabilities line
+                    local caps = worker.capabilities or {}
+                    if #caps > 0 then
+                        p.setTextColor(colors.gray)
+                        p.write("     Can do: ")
+                        p.setTextColor(colors.lightGray)
+                        local capLabels = {}
+                        for _, cap in ipairs(caps) do
+                            local typeInfo = workerConfig.TASK_TYPES[cap]
+                            capLabels[#capLabels + 1] = typeInfo and typeInfo.label or cap
+                        end
+                        p.print(table.concat(capLabels, ", "))
+                    else
+                        p.setTextColor(colors.red)
+                        p.print("     No capabilities (use 'workers cap " .. worker.id .. " add <type>')")
+                    end
+                    
+                    -- Progress line (if working) or stats
                     p.setTextColor(colors.gray)
                     if worker.status == "working" and worker.progress then
                         local prog = worker.progress
@@ -2445,14 +2603,14 @@ local commands = {
                 end
                 p.print("")
                 p.setTextColor(colors.lightBlue)
-                p.print("Subcommands: tasks, add, edit, remove, enable, disable")
+                p.print("Subcommands: tasks, add, edit, remove, enable, disable, cap, label")
                 p.show()
             end
         end,
         complete = function(args)
             if #args == 1 then
                 local query = (args[1] or ""):lower()
-                local options = {"tasks", "add", "edit", "remove", "enable", "disable"}
+                local options = {"tasks", "add", "edit", "remove", "enable", "disable", "cap", "label"}
                 local matches = {}
                 for _, opt in ipairs(options) do
                     if opt:find(query, 1, true) == 1 then
@@ -2469,7 +2627,7 @@ local commands = {
                     end
                 end
                 return matches
-            elseif #args == 2 and args[1] == "edit" then
+            elseif #args == 2 and (args[1] == "edit" or args[1] == "remove" or args[1] == "enable" or args[1] == "disable") then
                 -- Complete task IDs
                 local query = (args[2] or ""):lower()
                 local tasks = workerConfig.getAllTasks()
@@ -2477,6 +2635,37 @@ local commands = {
                 for taskId, _ in pairs(tasks) do
                     if taskId:lower():find(query, 1, true) == 1 then
                         table.insert(matches, taskId)
+                    end
+                end
+                return matches
+            elseif #args == 2 and (args[1] == "cap" or args[1] == "capabilities" or args[1] == "label") then
+                -- Complete worker IDs
+                local query = (args[2] or ""):lower()
+                local allWorkers = workerManager.getWorkers()
+                local matches = {}
+                for _, w in ipairs(allWorkers) do
+                    local idStr = tostring(w.id)
+                    if idStr:find(query, 1, true) == 1 then
+                        table.insert(matches, idStr)
+                    end
+                end
+                return matches
+            elseif #args == 3 and (args[1] == "cap" or args[1] == "capabilities") then
+                local query = (args[3] or ""):lower()
+                local options = {"add", "remove", "clear"}
+                local matches = {}
+                for _, opt in ipairs(options) do
+                    if opt:find(query, 1, true) == 1 then
+                        table.insert(matches, opt)
+                    end
+                end
+                return matches
+            elseif #args == 4 and (args[1] == "cap" or args[1] == "capabilities") and (args[3] == "add" or args[3] == "remove" or args[3] == "rm") then
+                local query = (args[4] or ""):lower()
+                local matches = {}
+                for typeName, _ in pairs(workerConfig.TASK_TYPES) do
+                    if typeName:find(query, 1, true) == 1 then
+                        table.insert(matches, typeName)
                     end
                 end
                 return matches

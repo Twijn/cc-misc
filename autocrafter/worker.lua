@@ -741,13 +741,22 @@ local function executeTask(task, quantity)
     
     local success, produced
     
-    if task.type == "cobblestone" then
+    -- Support both old and new task type names
+    local taskType = task.type
+    local typeAliases = {
+        cobblestone = "cobblegen",
+        crop_farm = "farming",
+        custom = "blockbreak",
+    }
+    taskType = typeAliases[taskType] or taskType
+    
+    if taskType == "cobblegen" then
         success, produced = executeCobblestoneTask(task, quantity)
-    elseif task.type == "concrete" then
+    elseif taskType == "concrete" then
         success, produced = executeConcreteTask(task, quantity)
-    elseif task.type == "crop_farm" then
+    elseif taskType == "farming" then
         success, produced = executeCropFarmTask(task, quantity)
-    elseif task.type == "custom" then
+    elseif taskType == "blockbreak" then
         success, produced = executeCustomTask(task, quantity)
     else
         logger.warn("Unknown task type: " .. task.type)

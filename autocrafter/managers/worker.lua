@@ -27,6 +27,7 @@ function manager.init()
             id = tonumber(id),
             label = data.label,
             taskId = data.taskId,
+            capabilities = data.capabilities or {},
             status = "offline",
             lastSeen = 0,
             stats = {},
@@ -54,12 +55,13 @@ function manager.updateStatus(workerId, status, stats, progress)
             workers[workerId].progress = nil
         end
     else
-        -- Auto-register unknown workers
+        -- Auto-register unknown workers (with no capabilities by default)
         workerConfig.registerWorker(workerId)
         workers[workerId] = {
             id = workerId,
             label = "Worker " .. workerId,
             taskId = nil,
+            capabilities = {},
             status = status,
             lastSeen = os.epoch("utc"),
             stats = stats or {},
@@ -68,16 +70,28 @@ function manager.updateStatus(workerId, status, stats, progress)
     end
 end
 
----Get an idle worker
----@return table|nil worker An idle worker or nil
-function manager.getIdleWorker()
+---Get an idle worker that has a specific capability
+---@param taskType? string Required task type capability (nil = any idle worker)
+---@return table|nil worker An idle worker with the capability, or nil
+function manager.getIdleWorker(taskType)
     local now = os.epoch("utc")
     
     for _, worker in pairs(workers) do
         if worker.status == "idle" then
             local age = (now - worker.lastSeen) / 1000
             if age < workerTimeout then
-                return worker
+                -- If no task type filter, return any idle worker
+                if not taskType then
+                    return worker
+                end
+                
+                -- Check if worker has the required capability
+                local caps = worker.capabilities or {}
+                for _, cap in ipairs(caps) do
+                    if cap == taskType then
+                        return worker
+                    end
+                end
             end
         end
     end
@@ -103,6 +117,7 @@ function manager.getWorkers()
             id = worker.id,
             label = worker.label,
             taskId = worker.taskId,
+            capabilities = worker.capabilities or {},
             status = status,
             lastSeen = worker.lastSeen,
             stats = worker.stats,
@@ -247,6 +262,7 @@ function manager.pingAll()
 end
 
 ---Dispatch work to idle workers based on stock levels
+---Only dispatches tasks to workers that have the matching capability
 ---@param stockLevels table Current stock levels
 ---@return number dispatched Number of work requests dispatched
 function manager.dispatchWork(stockLevels)
@@ -254,9 +270,11 @@ function manager.dispatchWork(stockLevels)
     local dispatched = 0
     
     for _, taskInfo in ipairs(tasksNeedingWork) do
-        local worker = manager.getIdleWorker()
+        -- Find an idle worker that has the capability for this task type
+        local worker = manager.getIdleWorker(taskInfo.task.type)
         if not worker then
-            break  -- No more idle workers
+            -- No worker with this capability is idle, skip this task
+            goto nextTask
         end
         
         -- Calculate batch size (don't request more than needed)
@@ -270,6 +288,8 @@ function manager.dispatchWork(stockLevels)
             logger.debug(string.format("Dispatched %s to worker %d (need %d, batch %d)",
                 taskInfo.task.id, worker.id, taskInfo.needed, batchSize))
         end
+        
+        ::nextTask::
     end
     
     return dispatched
