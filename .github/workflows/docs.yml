@@ -23,9 +23,7 @@ jobs:
         python-version: '3.x'
       
     - name: Generate Documentation
-      run: |
-        cd util
-        python3 generate_docs.py
+      run: ./gendocs.sh
 
     - name: Add CNAME
       run: echo 'ccmisc.twijn.dev' > ./docs/CNAME
