@@ -367,13 +367,16 @@ class LuaDocGenerator:
             margin: 0 auto;
         }
         h1 {
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--border);
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
         }
         h2 {
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+            margin-top: 2.5rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.3rem;
+            letter-spacing: 0.01em;
         }
         ul {
             list-style: none;
@@ -389,17 +392,23 @@ class LuaDocGenerator:
             text-decoration: underline;
         }
         .module, .program {
-            padding: 1rem;
-            margin: 0.5rem 0;
+            padding: 1rem 1.25rem;
+            margin: 0.75rem 0;
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
+        }
+        .module:hover, .program:hover {
+            border-color: var(--link);
         }
         .module h3, .program h3 {
-            margin: 0 0 0.5rem 0;
+            margin: 0 0 0.4rem 0;
+            font-size: 1.05rem;
         }
         .module p, .program p {
             color: var(--text);
-            opacity: 0.8;
+            opacity: 0.75;
+            font-size: 0.95rem;
+            line-height: 1.5;
         }
         .version-badge {
             display: inline-block;
@@ -431,13 +440,14 @@ class LuaDocGenerator:
         }
         .section-intro {
             margin-bottom: 1rem;
-            opacity: 0.9;
+            opacity: 0.8;
+            font-size: 0.95rem;
         }
     </style>
 </head>
 <body>
     <h1>CC-Misc Documentation</h1>
-    <p>A collection of utility modules and programs for ComputerCraft development</p>
+    <p style="opacity: 0.75; font-size: 0.95rem; margin-top: 0.4rem;">A collection of utility modules and programs for ComputerCraft development</p>
 """
         
         # Programs section first
@@ -540,15 +550,15 @@ class LuaDocGenerator:
         }}
         h2 {{
             margin-top: 3rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border);
-            font-size: 1.8rem;
+            font-size: 1.6rem;
         }}
         h3 {{
             margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
-            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
         }}
         code {{
             background: var(--code-bg);
@@ -561,7 +571,7 @@ class LuaDocGenerator:
             padding: 1rem;
             border-radius: 4px;
             overflow-x: auto;
-            margin: 1rem 0;
+            margin: 1.25rem 0;
             border: 1px solid var(--border);
         }}
         pre code {{
@@ -570,20 +580,27 @@ class LuaDocGenerator:
             font-size: 0.95em;
         }}
         .function:not(.token) {{
-            margin: 2rem 0;
+            margin: 2.5rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
         }}
         .function h3 {{
             margin-top: 0;
+            margin-bottom: 0.25rem;
+        }}
+        .function .source-link {{
+            display: block;
+            font-size: 0.85em;
+            opacity: 0.6;
+            margin-bottom: 1rem;
         }}
         .function > p {{
-            margin: 1rem 0;
-            line-height: 1.7;
+            margin: 0.75rem 0 1.25rem;
+            line-height: 1.75;
         }}
         .params, .returns {{
-            margin-top: 1rem;
+            margin-top: 1.25rem;
         }}
         .params ul, .returns ul {{
             list-style: none;
@@ -729,6 +746,43 @@ class LuaDocGenerator:
             margin-left: 1rem;
             vertical-align: middle;
         }}
+        .toc {{
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.25rem 1.5rem;
+            margin: 2rem 0;
+        }}
+        .toc h2 {{
+            margin: 0 0 0.75rem;
+            padding: 0;
+            border: none;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            opacity: 0.5;
+        }}
+        .toc ul {{
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            columns: 2;
+            column-gap: 2rem;
+        }}
+        @media (max-width: 600px) {{
+            .toc ul {{ columns: 1; }}
+        }}
+        .toc li {{
+            padding: 0.2rem 0;
+            break-inside: avoid;
+        }}
+        .toc a {{
+            font-size: 0.9em;
+        }}
+        .toc a code {{
+            background: none;
+            padding: 0;
+            font-size: 1em;
+        }}
     </style>
 </head>
 <body>
@@ -847,41 +901,26 @@ local {module['name']} = require(libDir .. "{module['name']}")
     </script>
 """
         
+        # Table of contents
+        if module['functions']:
+            html += "    <nav class='toc'>\n"
+            html += "        <h2>Functions</h2>\n"
+            html += "        <ul>\n"
+            for func in module['functions']:
+                params_str = ', '.join([p['name'] for p in func['params']])
+                anchor = 'func-' + re.sub(r'[^a-zA-Z0-9]', '-', func['name']).lower()
+                html += f"            <li><a href='#{anchor}'><code>{func['name']}({params_str})</code></a></li>\n"
+            html += "        </ul>\n"
+            html += "    </nav>\n"
+
         # Examples
         if module['examples']:
             html += "    <h2>Examples</h2>\n"
-            
-            # Add wget run pattern before examples
-            html += f"""    <h3>Using with Runtime Installation</h3>
-    <p>This example shows how to download and use libraries with automatic installation:</p>
-    <pre><code class="language-lua">-- Auto-install and require libraries
-local libs = {{"{module['name']}"}} -- Add more libraries as needed
-local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
-local allExist = true
 
-for _, lib in ipairs(libs) do
-    if not fs.exists(libDir .. lib .. ".lua") then
-        allExist = false
-        break
-    end
-end
-
-if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
-end
-
-local {module['name']} = require(libDir .. "{module['name']}")
-
--- Use the library
-</code></pre>
-    
-    <h3>Usage Examples</h3>
-"""
-            
             for example in module['examples']:
                 escaped_example = example.replace('<', '&lt;').replace('>', '&gt;')
                 html += f"""    <pre><code class="language-lua">{escaped_example}</code></pre>\n"""
-        
+
         # Classes
         if module['classes']:
             html += "    <h2>Classes</h2>\n"
@@ -890,7 +929,7 @@ local {module['name']} = require(libDir .. "{module['name']}")
                 html += f"        <h3>{cls['name']}</h3>\n"
                 if cls['description']:
                     html += f"        <p>{cls['description']}</p>\n"
-                
+
                 if cls['fields']:
                     html += "        <div class='params'>\n"
                     html += "            <strong>Fields:</strong>\n"
@@ -903,22 +942,23 @@ local {module['name']} = require(libDir .. "{module['name']}")
                     html += "            </ul>\n"
                     html += "        </div>\n"
                 html += "    </div>\n"
-        
+
         # Functions
         if module['functions']:
             html += "    <h2>Functions</h2>\n"
             for func in module['functions']:
-                html += "    <div class='function'>\n"
+                anchor = 'func-' + re.sub(r'[^a-zA-Z0-9]', '-', func['name']).lower()
+                html += f"    <div class='function' id='{anchor}'>\n"
                 params_str = ', '.join([p['name'] for p in func['params']])
                 html += f"        <h3><code>{func['name']}({params_str})</code></h3>\n"
-                
+
                 # Add GitHub link for this function with line number
                 func_github_url = f"{github_repo_url}#L{func.get('line', 1)}"
-                html += f"        <a href='{func_github_url}' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>\n"
-                
+                html += f"        <a href='{func_github_url}' target='_blank' class='source-link'>View source on GitHub</a>\n"
+
                 if func['description']:
                     html += f"        <p>{func['description']}</p>\n"
-                
+
                 if func['params']:
                     html += "        <div class='params'>\n"
                     html += "            <strong>Parameters:</strong>\n"
@@ -930,10 +970,10 @@ local {module['name']} = require(libDir .. "{module['name']}")
                         html += "</li>\n"
                     html += "            </ul>\n"
                     html += "        </div>\n"
-                
+
                 if func['returns']:
                     html += f"        <div class='returns'><strong>Returns:</strong> {func['returns']}</div>\n"
-                
+
                 html += "    </div>\n"
         
         html += """</body>
@@ -1004,19 +1044,19 @@ local {module['name']} = require(libDir .. "{module['name']}")
         h2 {{
             margin-top: 2.5rem;
             margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
+            padding-bottom: 0.4rem;
             border-bottom: 1px solid var(--border);
-            font-size: 1.6rem;
+            font-size: 1.4rem;
         }}
         h3 {{
-            margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
-            font-size: 1.3rem;
+            margin-top: 1.75rem;
+            margin-bottom: 0.5rem;
+            font-size: 1.15rem;
         }}
         h4 {{
             margin-top: 1.25rem;
-            margin-bottom: 0.5rem;
-            font-size: 1.1rem;
+            margin-bottom: 0.4rem;
+            font-size: 1.05rem;
         }}
         code {{
             background: var(--code-bg);
@@ -1158,7 +1198,7 @@ local {module['name']} = require(libDir .. "{module['name']}")
             line-height: 1.8;
         }}
         .content p {{
-            margin: 1rem 0;
+            margin: 1.1rem 0;
         }}
         .feature-list {{
             list-style: disc;
@@ -1166,7 +1206,8 @@ local {module['name']} = require(libDir .. "{module['name']}")
             margin: 1rem 0;
         }}
         .feature-list li {{
-            margin: 0.5rem 0;
+            margin: 0.6rem 0;
+            line-height: 1.6;
         }}
     </style>
 </head>
@@ -1310,6 +1351,10 @@ local {module['name']} = require(libDir .. "{module['name']}")
                     with open(html_path, 'w', encoding='utf-8') as f:
                         f.write(html_content)
         
+        # Sort modules and programs alphabetically before generating index
+        self.modules.sort(key=lambda m: m['name'].lower())
+        self.programs.sort(key=lambda p: (p['title'] or p['name']).lower())
+
         # Generate index
         index_html = self.generate_html_index(self.modules, self.programs)
         with open(self.output_dir / 'index.html', 'w', encoding='utf-8') as f:
@@ -1354,6 +1399,8 @@ local {module['name']} = require(libDir .. "{module['name']}")
             with open(lib_file, 'w', encoding='utf-8') as f:
                 json.dump(lib_info, f, indent=2)
         
+        libraries.sort(key=lambda l: l['name'].lower())
+
         # Generate main libraries.json
         api_data = {
             'libraries': libraries,
