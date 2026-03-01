@@ -9,14 +9,22 @@
 --- and event-driven architecture.
 ---
 ---@usage
----local shopk = require("/lib.shopk")
+---local shopk = require("shopk")
 ---
 ---local client = shopk({
 ---  privatekey = "testing123", -- keep this safe!
 ---})
 ---
 ---client.on("transaction", function(tx)
----  print(tx.id, "From: ", tx.from, "To:", tx.to, "Value: ", tx.value)
+---  print(("%s -> %s : %.2f KRO"):format(tx.from, tx.to, tx.value))
+---  if tx.hasMeta("test") then -- checks if there is a standalone value of the string,
+---    -- i.e "unre=lated;test" would match but "unre=lated;test=ing" would not
+---    tx.refund(tx.value, "Refunding full amount for test metadata", function(data)
+---      if data.ok then
+---        print("Refund successful!")
+---      end
+---    end)
+---  end
 ---end)
 ---
 ---client.on("connected", function(isGuest, address)
@@ -30,7 +38,7 @@
 ---client.on("error", function(err)
 ---  print("Error: " .. tostring(err))
 ---end)
-
+---
 ----- The client has errored or disconnected and is starting to reconnect
 ---client.on("connecting", function()
 ---  print("Connecting...")
@@ -217,6 +225,7 @@ return function(options)
     local function wrapTransaction(transaction)
         transaction.meta = parseMetadata(transaction.metadata or "")
         transaction.refunded = 0
+
         transaction.refund = function(amount, message, cb)
             if transaction.refunded + amount > transaction.value then
                 local err = "Refund amount exceeds remaining transaction value"
@@ -239,6 +248,15 @@ return function(options)
                 end
                 if cb then cb(data) end
             end)
+        end
+
+        transaction.hasMeta = function(meta, caseSensitive)
+            for _, v in pairs(transaction.meta.values) do
+                if (caseSensitive and v == meta) or (not caseSensitive and v:lower() == meta:lower()) then
+                    return true
+                end
+            end
+            return false
         end
     end
 
