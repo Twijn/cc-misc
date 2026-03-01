@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>s - CC-Misc Utilities</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
         :root {
@@ -52,50 +55,131 @@
         }
         h2 {
             margin-top: 3rem;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid var(--border);
-            font-size: 1.8rem;
+            font-size: 1.6rem;
         }
         h3 {
             margin-top: 1.5rem;
-            margin-bottom: 0.75rem;
-            font-size: 1.3rem;
+            margin-bottom: 0.5rem;
+            font-size: 1.2rem;
         }
         code {
             background: var(--code-bg);
             padding: 0.2rem 0.4rem;
             border-radius: 3px;
-            font-family: 'Monaco', 'Courier New', monospace;
+            font-family: 'JetBrains Mono', 'Fira Code', 'Monaco', 'Courier New', monospace;
             font-size: 0.9em;
         }
         pre {
-            padding: 1rem;
-            border-radius: 4px;
+            padding: 0;
+            border-radius: 0 0 8px 8px;
             overflow-x: auto;
-            margin: 1rem 0;
-            border: 1px solid var(--border);
+            margin: 0;
+            border: none;
+            background: #1e1e1e;
         }
         pre code {
             background: none;
-            padding: 0;
-            font-size: 0.95em;
+            padding: 1rem 1.25rem;
+            font-size: 0.9em;
+            display: block;
+            line-height: 1.6;
+            tab-size: 4;
+        }
+        .code-block {
+            border-radius: 8px;
+            overflow: hidden;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border);
+            background: #1e1e1e;
+        }
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.6rem 1rem;
+            background: #2d2d2d;
+            border-bottom: 1px solid #3d3d3d;
+        }
+        .code-lang {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #a0a0a0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .code-lang::before {
+            content: '';
+            width: 12px;
+            height: 12px;
+            background: #51a8ff;
+            border-radius: 50%;
+        }
+        .code-copy-btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: #a0a0a0;
+            padding: 0.35rem 0.75rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-family: inherit;
+            transition: all 0.15s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .code-copy-btn:hover {
+            background: #3d3d3d;
+            color: #e0e0e0;
+            border-color: #666;
+        }
+        .code-copy-btn.copied {
+            background: #28a745;
+            border-color: #28a745;
+            color: white;
+        }
+        .code-copy-btn svg {
+            width: 14px;
+            height: 14px;
+        }
+        pre code .line-numbers {
+            display: inline-block;
+            width: 2.5em;
+            padding-right: 1em;
+            margin-right: 1em;
+            text-align: right;
+            color: #555;
+            border-right: 1px solid #3d3d3d;
+            user-select: none;
         }
         .function:not(.token) {
-            margin: 2rem 0;
+            margin: 2.5rem 0;
             padding: 1.5rem;
             border: 1px solid var(--border);
             border-radius: 6px;
         }
         .function h3 {
             margin-top: 0;
+            margin-bottom: 0.25rem;
+        }
+        .function .source-link {
+            display: block;
+            font-size: 0.85em;
+            opacity: 0.6;
+            margin-bottom: 1rem;
         }
         .function > p {
-            margin: 1rem 0;
-            line-height: 1.7;
+            margin: 0.75rem 0 1.25rem;
+            line-height: 1.75;
         }
         .params, .returns {
-            margin-top: 1rem;
+            margin-top: 1.25rem;
         }
         .params ul, .returns ul {
             list-style: none;
@@ -241,6 +325,43 @@
             margin-left: 1rem;
             vertical-align: middle;
         }
+        .toc {
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 1.25rem 1.5rem;
+            margin: 2rem 0;
+        }
+        .toc h2 {
+            margin: 0 0 0.75rem;
+            padding: 0;
+            border: none;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            opacity: 0.5;
+        }
+        .toc ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            columns: 2;
+            column-gap: 2rem;
+        }
+        @media (max-width: 600px) {
+            .toc ul { columns: 1; }
+        }
+        .toc li {
+            padding: 0.2rem 0;
+            break-inside: avoid;
+        }
+        .toc a {
+            font-size: 0.9em;
+        }
+        .toc a code {
+            background: none;
+            padding: 0;
+            font-size: 1em;
+        }
     </style>
 </head>
 <body>
@@ -266,7 +387,15 @@
             <button class="collapsible" onclick="toggleCollapsible(this)">Advanced: Runtime Download with wget run</button>
             <div class="collapsible-content">
                 <p style="margin-top: 0.5rem;">This pattern downloads and runs libraries at runtime, automatically installing any that are missing:</p>
-                <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
+                <div class="code-block" style="margin: 1rem 0;">
+                    <div class="code-header">
+                        <span class="code-lang">Lua</span>
+                        <button class="code-copy-btn" onclick="copyCodeBlock(this, 'advanced-usage')">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                            Copy
+                        </button>
+                    </div>
+                    <pre><code class="language-lua" id="advanced-usage">-- Auto-install and require libraries
 local libs = {"s"} -- Add more libraries as needed
 local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
 local allExist = true
@@ -287,107 +416,137 @@ local s = require(libDir .. "s")
 -- Use the library
 -- (your code here)
 </code></pre>
-                <div class="install-controls">
-                    <button class="copy-btn" onclick="copyCode(this, 'advanced-usage')">Copy Code</button>
                 </div>
             </div>
     </div>
     
     <script>
-        function copyCommand(btn, cmdId) {{
+        function copyCommand(btn, cmdId) {
             const cmd = document.getElementById(cmdId).textContent;
-            navigator.clipboard.writeText(cmd).then(() => {{
+            navigator.clipboard.writeText(cmd).then(() => {
                 const originalText = btn.textContent;
                 btn.textContent = '✓ Copied!';
                 btn.classList.add('copied');
-                setTimeout(() => {{
+                setTimeout(() => {
                     btn.textContent = originalText;
                     btn.classList.remove('copied');
-                }}, 2000);
-            }}).catch(err => {{
+                }, 2000);
+            }).catch(err => {
                 console.error('Failed to copy:', err);
                 btn.textContent = '✗ Failed';
-                setTimeout(() => {{
+                setTimeout(() => {
                     btn.textContent = 'Copy Command';
-                }}, 2000);
-            }});
-        }}
+                }, 2000);
+            });
+        }
         
-        function copyCode(btn, codeId) {{
+        function copyCode(btn, codeId) {
             const code = document.getElementById(codeId).textContent;
-            navigator.clipboard.writeText(code).then(() => {{
+            navigator.clipboard.writeText(code).then(() => {
                 const originalText = btn.textContent;
                 btn.textContent = '✓ Copied!';
                 btn.classList.add('copied');
-                setTimeout(() => {{
+                setTimeout(() => {
                     btn.textContent = originalText;
                     btn.classList.remove('copied');
-                }}, 2000);
-            }}).catch(err => {{
+                }, 2000);
+            }).catch(err => {
                 console.error('Failed to copy:', err);
                 btn.textContent = '✗ Failed';
-                setTimeout(() => {{
+                setTimeout(() => {
                     btn.textContent = 'Copy Code';
-                }}, 2000);
-            }});
-        }}
+                }, 2000);
+            });
+        }
         
-        function toggleCollapsible(btn) {{
+        function copyCodeBlock(btn, codeId) {
+            const code = document.getElementById(codeId).textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const svg = btn.querySelector('svg');
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg> Copied!';
+                btn.classList.add('copied');
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+            });
+        }
+        
+        function toggleCollapsible(btn) {
             btn.classList.toggle('active');
             const content = btn.nextElementSibling;
             content.classList.toggle('active');
-            if (content.style.maxHeight) {{
+            if (content.style.maxHeight) {
                 content.style.maxHeight = null;
-            }} else {{
+            } else {
                 content.style.maxHeight = content.scrollHeight + 'px';
-            }}
-        }}
+            }
+        }
     </script>
+    <nav class='toc'>
+        <h2>Functions</h2>
+        <ul>
+            <li><a href='#func-module-peripheral'><code>module.peripheral(name, type, sideOnly?)</code></a></li>
+            <li><a href='#func-module-number'><code>module.number(name, from?, to?, default?)</code></a></li>
+            <li><a href='#func-module-string'><code>module.string(name, default?)</code></a></li>
+            <li><a href='#func-module-boolean'><code>module.boolean(name)</code></a></li>
+            <li><a href='#func-module-color'><code>module.color(name, default?)</code></a></li>
+            <li><a href='#func-module-useform'><code>module.useForm(title?)</code></a></li>
+            <li><a href='#func-forminterface-peripheral'><code>formInterface.peripheral(name, type, sideOnly?)</code></a></li>
+            <li><a href='#func-forminterface-number'><code>formInterface.number(name, from?, to?, default?)</code></a></li>
+            <li><a href='#func-forminterface-string'><code>formInterface.string(name, default?)</code></a></li>
+            <li><a href='#func-forminterface-boolean'><code>formInterface.boolean(name)</code></a></li>
+            <li><a href='#func-forminterface-color'><code>formInterface.color(name, default?)</code></a></li>
+            <li><a href='#func-forminterface-submit'><code>formInterface.submit()</code></a></li>
+        </ul>
+    </nav>
     <h2>Examples</h2>
-    <h3>Using with Runtime Installation</h3>
-    <p>This example shows how to download and use libraries with automatic installation:</p>
-    <pre><code class="language-lua">-- Auto-install and require libraries
-local libs = {"s"} -- Add more libraries as needed
-local libDir = (fs.exists("disk") and "disk/lib/" or "/lib/")
-local allExist = true
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-lang">Lua</span>
+            <button class="code-copy-btn" onclick="copyCodeBlock(this, 'example-0')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy
+            </button>
+        </div>
+        <pre><code class="language-lua" id="example-0">local s = require("s")
 
-for _, lib in ipairs(libs) do
-    if not fs.exists(libDir .. lib .. ".lua") then
-        allExist = false
-        break
-    end
-end
-
-if not allExist then
-    shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
-end
-
-local s = require(libDir .. "s")
-
--- Use the library
-</code></pre>
-    
-    <h3>Usage Examples</h3>
-    <pre><code class="language-lua">local s = require("s")
 local modem = s.peripheral("modem", "modem", true)
 local port = s.number("port", 1, 65535, 8080)
 local name = s.string("server_name", "MyServer")
-local enabled = s.boolean("enabled")</code></pre>
-    <pre><code class="language-lua">local s = require("s")
+local enabled = s.boolean("enabled")
+</code></pre>
+    </div>
+    <div class="code-block">
+        <div class="code-header">
+            <span class="code-lang">Lua</span>
+            <button class="code-copy-btn" onclick="copyCodeBlock(this, 'example-1')">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                Copy
+            </button>
+        </div>
+        <pre><code class="language-lua" id="example-1">local s = require("s")
 local form = s.useForm("My App Configuration")
+
 local modem = form.peripheral("modem", "modem", true)
 local port = form.number("port", 1, 65535, 8080)
 local name = form.string("server_name", "MyServer")
 local enabled = form.boolean("enabled")
+
 if form.submit() then
  print("Settings saved!")
  print("Modem:", modem())
  print("Port:", port())
-end</code></pre>
+end
+</code></pre>
+    </div>
     <h2>Functions</h2>
-    <div class='function'>
+    <div class='function' id='func-module-peripheral'>
         <h3><code>module.peripheral(name, type, sideOnly?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L118' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L118' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Get or configure a peripheral setting with automatic validation and recovery</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -399,9 +558,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> table # The wrapped peripheral object</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-module-number'>
         <h3><code>module.number(name, from?, to?, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L148' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L148' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Get or configure a number setting with range validation</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -414,9 +573,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> number # The configured number value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-module-string'>
         <h3><code>module.string(name, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L185' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L185' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Get or configure a string setting with optional default value</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -427,9 +586,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> string # The configured string value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-module-boolean'>
         <h3><code>module.boolean(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L212' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L212' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Get or configure a boolean setting using an interactive menu</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -439,9 +598,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> boolean # The configured boolean value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-module-color'>
         <h3><code>module.color(name, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L227' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L227' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Get or configure a color setting using an interactive menu</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -452,9 +611,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> number # The configured color value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-module-useform'>
         <h3><code>module.useForm(title?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L254' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L254' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Create a form-based settings interface using formui.lua Requires formui.lua to be installed. Returns a table with form-based versions of all s.lua functions.  local s = require("s") local form = s.useForm("My App Configuration")  local modem = form.peripheral("modem", "modem", true) local port = form.number("port", 1, 65535, 8080) local name = form.string("server_name", "MyServer") local enabled = form.boolean("enabled")  if form.submit() then print("Settings saved!") print("Modem:", modem()) print("Port:", port()) end </p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -464,9 +623,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> table # Form interface with peripheral, number, string, boolean, and submit functions</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-forminterface-peripheral'>
         <h3><code>formInterface.peripheral(name, type, sideOnly?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L280' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L280' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a peripheral field to the form</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -478,9 +637,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> function # Getter function that returns the peripheral name</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-forminterface-number'>
         <h3><code>formInterface.number(name, from?, to?, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L305' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L305' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a number field to the form</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -493,9 +652,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> function # Getter function that returns the number value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-forminterface-string'>
         <h3><code>formInterface.string(name, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L328' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L328' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a string field to the form</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -506,9 +665,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> function # Getter function that returns the string value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-forminterface-boolean'>
         <h3><code>formInterface.boolean(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L345' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L345' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a boolean field to the form</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -518,9 +677,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> function # Getter function that returns the boolean value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-forminterface-color'>
         <h3><code>formInterface.color(name, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L363' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L363' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a color field to the form</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -531,9 +690,9 @@ end</code></pre>
         </div>
         <div class='returns'><strong>Returns:</strong> function # Getter function that returns the color value</div>
     </div>
-    <div class='function'>
+    <div class='function' id='func-forminterface-submit'>
         <h3><code>formInterface.submit()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L380' target='_blank' style='font-size: 0.85em; opacity: 0.7;'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/s.lua#L380' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add submit and cancel buttons, then run the form</p>
         <div class='returns'><strong>Returns:</strong> boolean # True if submitted, false if cancelled</div>
     </div>

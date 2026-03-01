@@ -7,12 +7,14 @@ A dynamic form user interface library for ComputerCraft that provides interactiv
 ```lua
 local FormUI = require("formui")
 local form = FormUI.new("Configuration")
+
 local nameField = form:text("Name", "default")
 local portField = form:number("Port", 8080)
 local modemField = form:peripheral("Modem", "modem")
 local enabledField = form:checkbox("Enabled", true)
 local featuresField = form:multiselect("Features", {"feature1", "feature2", "feature3"})
 local itemsField = form:list("Items", {"item1", "item2"}, "string")
+
 form:addSubmitCancel()
 local result = form:run()
 if result then
@@ -21,6 +23,7 @@ if result then
  print("Enabled:", enabledField())
  print("Features:", table.concat(featuresField(), ", "))
 end
+
 ```
 
 ## Functions

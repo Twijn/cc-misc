@@ -6,9 +6,11 @@ Pager utility for ComputerCraft that displays long output with pagination Simila
 
 ```lua
 local pager = require("pager")
+
 -- Display a table of lines
 local lines = {"Line 1", "Line 2", ...}
 pager.display(lines, "My Title")
+
 -- Use the pager collector to build output
 local p = pager.new("Results")
 p:print("Some text")
@@ -17,6 +19,7 @@ p:print("line")
 p:setColor(colors.lime)
 p:print("Green text")
 p:show()
+
 ```
 
 ## Functions

@@ -6,24 +6,29 @@ A settings management module for ComputerCraft that provides interactive configu
 
 ```lua
 local s = require("s")
+
 local modem = s.peripheral("modem", "modem", true)
 local port = s.number("port", 1, 65535, 8080)
 local name = s.string("server_name", "MyServer")
 local enabled = s.boolean("enabled")
+
 ```
 
 ```lua
 local s = require("s")
 local form = s.useForm("My App Configuration")
+
 local modem = form.peripheral("modem", "modem", true)
 local port = form.number("port", 1, 65535, 8080)
 local name = form.string("server_name", "MyServer")
 local enabled = form.boolean("enabled")
+
 if form.submit() then
  print("Settings saved!")
  print("Modem:", modem())
  print("Port:", port())
 end
+
 ```
 
 ## Functions

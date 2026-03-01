@@ -6,17 +6,22 @@ A package updater module for CC-Misc utilities that checks for and installs upda
 
 ```lua
 local updater = require("updater")
+
 -- Check for updates
 local updates = updater.checkUpdates()
 for _, update in ipairs(updates) do
  print(update.name .. ": " .. update.current .. " -> " .. update.latest)
 end
+
 -- Update a specific package
 updater.update("s")
+
 -- Update all packages
 updater.updateAll()
+
 -- Enable verbose mode for debugging
 updater.setVerbose(true)
+
 -- Project mode (for application updaters)
 updater.withProject("AutoCrafter")
  .withRequiredLibs({"s", "tables", "log"})
@@ -26,6 +31,7 @@ updater.withProject("AutoCrafter")
    {url = "https://...", path = "lib/ui.lua", required = true},
  })
  .run()
+
 ```
 
 ## Functions

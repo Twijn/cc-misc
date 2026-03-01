@@ -36,13 +36,16 @@
             margin: 0 auto;
         }
         h1 {
-            margin-bottom: 1rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--border);
+            margin-bottom: 0.5rem;
+            font-size: 2rem;
         }
         h2 {
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+            margin-top: 2.5rem;
+            margin-bottom: 0.75rem;
+            padding-bottom: 0.4rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.3rem;
+            letter-spacing: 0.01em;
         }
         ul {
             list-style: none;
@@ -58,17 +61,23 @@
             text-decoration: underline;
         }
         .module, .program {
-            padding: 1rem;
-            margin: 0.5rem 0;
+            padding: 1rem 1.25rem;
+            margin: 0.75rem 0;
             border: 1px solid var(--border);
-            border-radius: 4px;
+            border-radius: 6px;
+        }
+        .module:hover, .program:hover {
+            border-color: var(--link);
         }
         .module h3, .program h3 {
-            margin: 0 0 0.5rem 0;
+            margin: 0 0 0.4rem 0;
+            font-size: 1.05rem;
         }
         .module p, .program p {
             color: var(--text);
-            opacity: 0.8;
+            opacity: 0.75;
+            font-size: 0.95rem;
+            line-height: 1.5;
         }
         .version-badge {
             display: inline-block;
@@ -100,21 +109,18 @@
         }
         .section-intro {
             margin-bottom: 1rem;
-            opacity: 0.9;
+            opacity: 0.8;
+            font-size: 0.95rem;
         }
     </style>
 </head>
 <body>
     <h1>CC-Misc Documentation</h1>
-    <p>A collection of utility modules and programs for ComputerCraft development</p>
+    <p style="opacity: 0.75; font-size: 0.95rem; margin-top: 0.4rem;">A collection of utility modules and programs for ComputerCraft development</p>
 
     <h2>Programs</h2>
     <p class="section-intro">Complete applications and systems for ComputerCraft</p>
     <div class="programs">
-        <div class="program">
-            <h3><a href="programs/signshop.html">SignShop</a><span class="program-badge">Program</span></h3>
-            <p>CC: Tweaked program that creates plugin-like SignShops with automated item dispensing and Krist payment processing.</p>
-        </div>
         <div class="program">
             <h3><a href="programs/autocrafter.html">AutoCrafter - Automated Crafting & Storage System</a><span class="program-badge">Program</span></h3>
             <p>A fully-featured automated crafting and storage system for ComputerCraft that maintains a desired set of items by automatically crafting them when stock runs low.</p>
@@ -122,6 +128,10 @@
         <div class="program">
             <h3><a href="programs/farm.html">Farming Program</a><span class="program-badge">Program</span></h3>
             <p>A horrible farming program I made that automatically adjusts what it's farming to what's needed in the network.</p>
+        </div>
+        <div class="program">
+            <h3><a href="programs/router.html">Hierarchical Router System</a><span class="program-badge">Program</span></h3>
+            <p>A modular hierarchical routing system for CC:Tweaked, designed for apartment complex networks.</p>
         </div>
         <div class="program">
             <h3><a href="programs/netherite.html">Netherite Mining Program</a><span class="program-badge">Program</span></h3>
@@ -132,8 +142,8 @@
             <p>A multi-turtle road building system for ComputerCraft with wireless control. Build roads automatically with GPS positioning, configurable road widths, and ender storage integration for extended operat...</p>
         </div>
         <div class="program">
-            <h3><a href="programs/router.html">Hierarchical Router System</a><span class="program-badge">Program</span></h3>
-            <p>A modular hierarchical routing system for CC:Tweaked, designed for apartment complex networks.</p>
+            <h3><a href="programs/signshop.html">SignShop</a><span class="program-badge">Program</span></h3>
+            <p>CC: Tweaked program that creates plugin-like SignShops with automated item dispensing and Krist payment processing.</p>
         </div>
         <div class="program">
             <h3><a href="programs/spleef.html">Spleef</a><span class="program-badge">Program</span></h3>
@@ -145,20 +155,28 @@
     <p class="section-intro">Utility libraries for building ComputerCraft applications</p>
     <div class="modules">
         <div class="module">
+            <h3><a href="attach.html">attach</a><span class="version-badge">v1.0.3</span></h3>
+            <p>A turtle utility module for ComputerCraft that provides safe block interaction, automatic tool management, and peripheral handling for turtles. Features: Automatic tool equipping based on action type ...</p>
+        </div>
+        <div class="module">
             <h3><a href="cmd.html">cmd</a><span class="version-badge">v1.3.0</span></h3>
             <p>Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, ...</p>
+        </div>
+        <div class="module">
+            <h3><a href="formui.html">formui</a><span class="version-badge">v0.4.0</span></h3>
+            <p>A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select d...</p>
         </div>
         <div class="module">
             <h3><a href="installer.html">installer</a><span class="version-badge">v3.2.0</span></h3>
             <p>Installer for CC-Misc Utilities Interactive tool to install ComputerCraft libraries with dependency management This tool provides a user-friendly interface to select and install libraries from the cc-...</p>
         </div>
         <div class="module">
-            <h3><a href="turtle-tracker.html">turtle-tracker</a><span class="version-badge">v1.0.0</span></h3>
-            <p>A turtle API client module for ComputerCraft that provides easy integration with the krawlet-api turtle tracking system. Features: Automatic stat tracking, position reporting, configurable API endpoin...</p>
+            <h3><a href="log.html">log</a><span class="version-badge">v1.5.1</span></h3>
+            <p>A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for war...</p>
         </div>
         <div class="module">
-            <h3><a href="shopk.html">shopk</a><span class="version-badge">v0.0.4</span></h3>
-            <p>A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via ...</p>
+            <h3><a href="pager.html">pager</a><span class="version-badge">v1.0.0</span></h3>
+            <p>Pager utility for ComputerCraft that displays long output with pagination Similar to 'less' or 'more' on Unix systems. Allows scrolling through content that exceeds the terminal height. Features: Page...</p>
         </div>
         <div class="module">
             <h3><a href="persist.html">persist</a><span class="version-badge">v1.1.1</span></h3>
@@ -169,32 +187,24 @@
             <p>A settings management module for ComputerCraft that provides interactive configuration with automatic validation, peripheral detection, and persistent storage using CC settings. Features: Interactive ...</p>
         </div>
         <div class="module">
-            <h3><a href="attach.html">attach</a><span class="version-badge">v1.0.3</span></h3>
-            <p>A turtle utility module for ComputerCraft that provides safe block interaction, automatic tool management, and peripheral handling for turtles. Features: Automatic tool equipping based on action type ...</p>
-        </div>
-        <div class="module">
-            <h3><a href="log.html">log</a><span class="version-badge">v1.5.1</span></h3>
-            <p>A logging utility module for ComputerCraft that provides colored console output and automatic file logging with daily log rotation. Features: Color-coded console output (red for errors, yellow for war...</p>
-        </div>
-        <div class="module">
-            <h3><a href="updater.html">updater</a><span class="version-badge">v2.0.0</span></h3>
-            <p>A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and ...</p>
+            <h3><a href="shopk.html">shopk</a><span class="version-badge">v1.0.0</span></h3>
+            <p>A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via ...</p>
         </div>
         <div class="module">
             <h3><a href="tables.html">tables</a><span class="version-badge">v1.0.1</span></h3>
             <p>A utility module for table operations in ComputerCraft providing common table manipulation functions like searching, counting, copying, and comparison operations. Features: Element existence checking ...</p>
         </div>
         <div class="module">
-            <h3><a href="pager.html">pager</a><span class="version-badge">v1.0.0</span></h3>
-            <p>Pager utility for ComputerCraft that displays long output with pagination Similar to 'less' or 'more' on Unix systems. Allows scrolling through content that exceeds the terminal height. Features: Page...</p>
-        </div>
-        <div class="module">
             <h3><a href="timeutil.html">timeutil</a><span class="version-badge">v1.0.0</span></h3>
             <p>A timing utility module for ComputerCraft that provides persistent interval management with two different timing modes: absolute time-based and accumulated runtime-based. Features: Absolute time inter...</p>
         </div>
         <div class="module">
-            <h3><a href="formui.html">formui</a><span class="version-badge">v0.4.0</span></h3>
-            <p>A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select d...</p>
+            <h3><a href="turtle-tracker.html">turtle-tracker</a><span class="version-badge">v1.0.0</span></h3>
+            <p>A turtle API client module for ComputerCraft that provides easy integration with the krawlet-api turtle tracking system. Features: Automatic stat tracking, position reporting, configurable API endpoin...</p>
+        </div>
+        <div class="module">
+            <h3><a href="updater.html">updater</a><span class="version-badge">v2.0.0</span></h3>
+            <p>A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and ...</p>
         </div>
     </div>
 </body>

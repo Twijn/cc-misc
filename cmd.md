@@ -6,6 +6,7 @@ Command-line interface module for ComputerCraft that provides a REPL-style comma
 
 ```lua
 local cmd = require("cmd")
+
 local customCommands = {
  hello = {
    description = "Say hello to someone",
@@ -28,8 +29,10 @@ local customCommands = {
    end
  }
 }
+
 -- Basic usage
 cmd("MyApp", "1.0.0", customCommands)
+
 -- With exit hooks via options
 cmd("MyApp", "1.0.0", customCommands, {
  onExit = function(context)
@@ -40,12 +43,14 @@ cmd("MyApp", "1.0.0", customCommands, {
    function() closeConnections() end,
  }
 })
+
 -- Or register hooks at runtime from within commands
 execute = function(args, context)
  context.onExit(function()
    print("Cleanup complete!")
  end)
 end
+
 ```
 
 ## Functions

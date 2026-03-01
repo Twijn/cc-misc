@@ -6,7 +6,9 @@ Installer for CC-Misc Utilities Interactive tool to install ComputerCraft librar
 
 ```lua
 wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua
+
 Or pre-select libraries:
 wget run https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua cmd s
+
 ```
 

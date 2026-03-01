@@ -6,13 +6,17 @@ A timing utility module for ComputerCraft that provides persistent interval mana
 
 ```lua
 local timeutil = require("timeutil")
+
 timeutil.every(function()
  print("Running backup...")
 end, 600, "backup_last_run")
+
 timeutil.everyLoaded(function()
  print("Heartbeat")
 end, 30, "heartbeat_elapsed")
+
 timeutil.run()
+
 ```
 
 ## Functions

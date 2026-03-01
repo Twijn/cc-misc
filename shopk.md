@@ -6,29 +6,58 @@ A Kromer cryptocurrency API client for ComputerCraft that provides real-time tra
 
 ```lua
 local shopk = require("shopk")
-local client = shopk({ privatekey = "your_key" })
-client.on("ready", function()
- print("Connected!")
- client.me(function(data)
-   print("Balance:", data.balance)
- end)
-end)
+
+local client = shopk({
+ privatekey = "testing123", -- keep this safe!
+})
+
 client.on("transaction", function(tx)
- print("Received:", tx.value, "from", tx.from)
+ print(("%s -> %s : %.2f KRO"):format(tx.from, tx.to, tx.value))
+ if tx.hasMeta("test") then -- checks if there is a standalone value of the string,
+   -- i.e "unre=lated;test" would match but "unre=lated;test=ing" would not
+   tx.refund(tx.value, "Refunding full amount for test metadata", function(data)
+     if data.ok then
+       print("Refund successful!")
+     end
+   end)
+ end
 end)
+
+client.on("connected", function(isGuest, address)
+ if isGuest then
+   print("Connected! Logged in as guest.")
+ else
+   print(("Connected! Logged in as %s with %.2f KRO."):format(address.address, address.balance))
+ end
+end)
+
+client.on("error", function(err)
+ print("Error: " .. tostring(err))
+end)
+
+-- The client has errored or disconnected and is starting to reconnect
+client.on("connecting", function()
+ print("Connecting...")
+end)
+
+client.on("closed", function()
+ print("Closed!")
+end)
+
 client.run()
+
 ```
 
 ## Functions
 
 ### `module.on(event, listener)`
 
-Register an event listener
+Register an event listener Starting in 1.0.0, "ready" was renamed to "connected", and additional state management events have been added. "connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.
 
 **Parameters:**
 
-- `event` ("ready"|"transaction"|"transactions"): Event type to listen for
-- `listener` (function): Function to call when event occurs
+- `event` ("transaction"|"connecting"|"connected"|"closed"|"error"): Event type to listen for.
+- `listener` (function): Function to call when the event occurs.
 
 ### `module.run()`
 
@@ -40,7 +69,7 @@ Close the WebSocket connection and stop reconnecting
 
 ### `module.me(cb?)`
 
-Get information about the current wallet
+Get information about the current wallet Starting in 1.0.0, this data is passed by the "connected" event for easy access
 
 **Parameters:**
 

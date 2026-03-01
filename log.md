@@ -6,12 +6,15 @@ A logging utility module for ComputerCraft that provides colored console output 
 
 ```lua
 local log = require("log")
+
 log.debug("This is a debug message")
 log.info("Server started")
 log.warn("High memory usage detected")
 log.error("Failed to connect to database")
+
 log.setLevel("debug")  -- Show all messages including debug
 log.setLevel("warn")   -- Show only warnings and errors
+
 ```
 
 ## Functions

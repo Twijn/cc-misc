@@ -6,10 +6,13 @@ A utility module for table operations in ComputerCraft providing common table ma
 
 ```lua
 local tables = require("tables")
+
 local myTable = {1, 2, 3, nested = {a = 1}}
 print(tables.includes(myTable, 2)) -- true
+
 local copy = tables.recursiveCopy(myTable)
 print(tables.recursiveEquals(myTable, copy)) -- true
+
 ```
 
 ## Functions

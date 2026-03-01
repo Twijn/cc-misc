@@ -6,17 +6,22 @@ A turtle utility module for ComputerCraft that provides safe block interaction, 
 
 ```lua
 local attach = require("attach")
+
 -- Set up default tools
 attach.setDefaultEquipped("minecraft:diamond_pickaxe", "minecraft:diamond_sword")
 attach.setAlwaysEquipped("computercraft:wireless_modem_advanced")
+
 -- Safe digging (won't dig chests, other turtles, etc.)
 attach.dig()      -- Automatically equips pickaxe
 attach.digUp()    -- Also safe
 attach.digDown()  -- Also safe
+
 -- Attack with automatic sword equipping
 attach.attack()
+
 -- Find and wrap a peripheral
 local modem = attach.find("modem")
+
 ```
 
 ## Functions

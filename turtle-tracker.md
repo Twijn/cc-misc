@@ -6,20 +6,27 @@ A turtle API client module for ComputerCraft that provides easy integration with
 
 ```lua
 local turtleApi = require("turtleApi")
+
 -- Configure the API endpoint
 turtleApi.setEndpoint("http://localhost:3000")
+
 -- Initialize with turtle ID (defaults to os.getComputerID())
 turtleApi.init()
+
 -- Update stats
 turtleApi.incrementStat("blocks_mined")
 turtleApi.incrementStat("debris_found", 5)
+
 -- Update position
 turtleApi.setAbsolutePosition(100, 64, -200)
 turtleApi.setRelativePosition(5, 0, 10)
+
 -- Push data to server
 turtleApi.sync()
+
 -- Or use auto-sync (syncs every N seconds)
 turtleApi.startAutoSync(30)
+
 ```
 
 ## Functions
