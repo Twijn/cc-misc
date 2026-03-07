@@ -50,10 +50,10 @@
 ---
 ---client.run()
 ---
----@version 1.0.0
+---@version 1.0.1
 -- @module shopk
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 
 ---@class ShopkOptions
 ---@field syncNode? string The Kromer API endpoint URL (defaults to official endpoint)
@@ -344,7 +344,7 @@ return function(options)
     end
 
     ---Register an event listener
-    ---Starting in 1.0.0, "ready" was renamed to "connected", and additional state management events have been added.
+    ---Starting in 1.0.1, "ready" was renamed to "connected", and additional state management events have been added.
     ---"connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.
     ---@param event "transaction"|"connecting"|"connected"|"closed"|"error" Event type to listen for.
     ---@param listener function Function to call when the event occurs.
@@ -417,7 +417,7 @@ return function(options)
 
     local meResponse = nil
     ---Get information about the current wallet
-    ---Starting in 1.0.0, this data is passed by the "connected" event for easy access
+    ---Starting in 1.0.1, this data is passed by the "connected" event for easy access
     ---@param cb? function Optional callback to receive wallet data
     function module.me(cb)
         if meResponse then
@@ -441,7 +441,6 @@ return function(options)
         -- rate limit transaction events to prevent potential infinite loops or spam from the server
         if not module._sendLimiter:hit() then
             local err = "Rate limit exceeded for outgoing transactions"
-            fire("error", err)
             if cb then cb({ ok = false, error = err }) end
             return
         end
