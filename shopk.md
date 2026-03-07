@@ -52,7 +52,7 @@ client.run()
 
 ### `module.on(event, listener)`
 
-Register an event listener Starting in 1.0.0, "ready" was renamed to "connected", and additional state management events have been added. "connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.
+Register an event listener Starting in 1.0.1, "ready" was renamed to "connected", and additional state management events have been added. "connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.
 
 **Parameters:**
 
@@ -69,7 +69,7 @@ Close the WebSocket connection and stop reconnecting
 
 ### `module.me(cb?)`
 
-Get information about the current wallet Starting in 1.0.0, this data is passed by the "connected" event for easy access
+Get information about the current wallet Starting in 1.0.1, this data is passed by the "connected" event for easy access
 
 **Parameters:**
 

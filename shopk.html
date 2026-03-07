@@ -367,7 +367,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>shopk <span class="version-badge">v1.0.0</span></h1>
+        <h1>shopk <span class="version-badge">v1.0.1</span></h1>
         <p>A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.</p>
     </div>
     
@@ -552,7 +552,7 @@ client.run()
     <div class='function' id='func-module-on'>
         <h3><code>module.on(event, listener)</code></h3>
         <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L346' target='_blank' class='source-link'>View source on GitHub</a>
-        <p>Register an event listener Starting in 1.0.0, "ready" was renamed to "connected", and additional state management events have been added. "connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.</p>
+        <p>Register an event listener Starting in 1.0.1, "ready" was renamed to "connected", and additional state management events have been added. "connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.</p>
         <div class='params'>
             <strong>Parameters:</strong>
             <ul>
@@ -574,7 +574,7 @@ client.run()
     <div class='function' id='func-module-me'>
         <h3><code>module.me(cb?)</code></h3>
         <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L419' target='_blank' class='source-link'>View source on GitHub</a>
-        <p>Get information about the current wallet Starting in 1.0.0, this data is passed by the "connected" event for easy access</p>
+        <p>Get information about the current wallet Starting in 1.0.1, this data is passed by the "connected" event for easy access</p>
         <div class='params'>
             <strong>Parameters:</strong>
             <ul>
