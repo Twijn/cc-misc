@@ -13,10 +13,10 @@
 ---config.set("name", "MyServer")
 ---print(config.get("port")) -- 8080
 ---
----@version 1.1.1
+---@version 1.1.2
 -- @module persist
 
-local VERSION = "1.1.1"
+local VERSION = "1.1.2"
 
 local dataDir = "data/"
 fs.makeDir(dataDir)
@@ -45,7 +45,7 @@ return function(fileName, useSerialize)
 
     ---Create a deep copy of a table while avoiding circular references
     ---@param original any The value to copy
-    ---@param seen? table<string, boolean> Internal tracking table for circular reference detection
+    ---@param seen? table<table, table> Internal tracking table mapping original tables to their copies
     ---@return any # Deep copy of the original value
     local function deepCopy(original, seen)
         seen = seen or {}
@@ -54,22 +54,16 @@ return function(fileName, useSerialize)
             return original
         end
         
-        -- Check if we've already processed this table
-        local tableId = tostring(original)
-        if seen[tableId] then
-            return nil  -- Break circular reference
+        -- Check if we've already processed this table - return the existing copy
+        if seen[original] then
+            return seen[original]
         end
-        seen[tableId] = true
         
         local copy = {}
+        seen[original] = copy  -- Store mapping before recursing to handle circular refs
+        
         for key, value in pairs(original) do
-            -- Skip if key and value are identical strings (common cause of repeated entries)
-            if type(key) == "string" and type(value) == "string" and key == value then
-                -- Skip this entry to avoid repeated key-value pairs
-                print("Warning: Skipping repeated entry where key=value: " .. key)
-            else
-                copy[key] = deepCopy(value, seen)
-            end
+            copy[key] = deepCopy(value, seen)
         end
         
         return copy
