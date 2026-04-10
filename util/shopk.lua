@@ -72,6 +72,9 @@ local VERSION = "1.0.1"
 ---@field name? string Transaction name
 ---@field metadata? string Raw metadata string
 ---@field meta ShopkMetadata Parsed metadata object
+---@field refunded number Amount that has been refunded so far
+---@field refund fun(amount: number, message: string, cb?: function): nil Refund a specified amount with an optional message; calls cb with the result of the refund transaction
+---@field hasMeta fun(meta: string, caseSensitive: boolean): boolean Check if the transaction metadata contains a specific standalone value (not part of a key=value pair), with optional case sensitivity (defaults to false)
 
 ---@class ShopkMetadata
 ---@field keys table<string, string> Key-value pairs from metadata
@@ -83,14 +86,22 @@ local VERSION = "1.0.1"
 ---@field amount number Amount to send
 ---@field metadata? string Transaction metadata
 
+---@class ShopkAddress
+---@field address string Wallet address
+---@field balance number Wallet balance
+
+---@class ShopkMeResponse
+---@field is_guest boolean Whether this connection is guest-authenticated
+---@field address ShopkAddress? Wallet details when authenticated
+
 ---@class ShopkModule
 ---@field _v string Version number
 ---@field state "connecting"|"connected"|"closed"|"error" The state of the websocket
 ---@field stateMessage string The human-readable message for the state of the websocket.
----@field lastError string The last error recorded by shopk.
+---@field lastError string? The last error recorded by shopk.
 ---@field isGuest boolean Whether the connection is authenticated; false when a valid privatekey is used
----@field address string? The wallet address of the authenticated account, or nil if guest
----@field on fun(event: "connecting"|"connected"|"closed"|"error"|"transaction", listener: function, filters?: table): nil Register event listener. The "ready" listener receives (isGuest: boolean, address: string?); "transaction" receives (tx: ShopkTransaction)
+---@field address ShopkAddress? The authenticated wallet details, or nil if guest
+---@field on fun(event: "connecting"|"connected"|"closed"|"error"|"transaction", listener: function): nil Register event listener. The "ready" listener receives (isGuest: boolean, address: string?); "transaction" receives (tx: ShopkTransaction)
 ---@field run fun(): nil Start the WebSocket connection and event loop
 ---@field close fun(): nil Close the connection and stop reconnecting
 ---@field me fun(cb?: function): nil Get current wallet information
@@ -183,6 +194,7 @@ return function(options)
         options.syncNode = options.syncNode .. "/"
     end
 
+    ---@type ShopkModule
     local module = {
         _v = VERSION,
         _sendLimiter = limiter(
@@ -190,8 +202,14 @@ return function(options)
             options.sendLimit
         ),
         state = "connecting",
+        stateMessage = "Connecting",
         isGuest = true,
         address = nil,
+        on = function() end,
+        run = function() end,
+        close = function() end,
+        me = function() end,
+        send = function() end,
     }
 
     local listeners = {
@@ -204,7 +222,8 @@ return function(options)
 
     local replyHandlers = {}
 
-    local wsUri = nil
+    local wsUri
+    ---@type any?
     local ws = nil
     local nextId = 1
 
@@ -227,9 +246,14 @@ return function(options)
         transaction.refunded = 0
 
         transaction.refund = function(amount, message, cb)
+            if transaction.meta.msg or transaction.meta.message or transaction.meta.error then
+                local err = "Refunds are not allowed for transactions with message or error metadata"
+                if cb then cb({ ok = false, error = err }) end
+                return
+            end
+
             if transaction.refunded + amount > transaction.value then
                 local err = "Refund amount exceeds remaining transaction value"
-                fire("error", err)
                 if cb then cb({ ok = false, error = err }) end
                 return
             end
@@ -346,7 +370,7 @@ return function(options)
     ---Register an event listener
     ---Starting in 1.0.1, "ready" was renamed to "connected", and additional state management events have been added.
     ---"connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.
-    ---@param event "transaction"|"connecting"|"connected"|"closed"|"error" Event type to listen for.
+    ---@param event string Event type to listen for.
     ---@param listener function Function to call when the event occurs.
     function module.on(event, listener)
         if module.state == "closed" then error("This shopk.lua instance has closed") end
@@ -415,6 +439,7 @@ return function(options)
         end
     end
 
+    ---@type ShopkMeResponse?
     local meResponse = nil
     ---Get information about the current wallet
     ---Starting in 1.0.1, this data is passed by the "connected" event for easy access

@@ -1,0 +1,7 @@
+{
+  "diagnostics": {
+    "disable": [
+      "annotation-usage-error"
+    ]
+  }
+}
