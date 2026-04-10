@@ -244,6 +244,15 @@ return function(options)
                 end
             },
             {
+                name = "Transaction does not reference another transaction",
+                check = function(transaction)
+                    if transaction.meta.ref then
+                        return false, "Refunds are not allowed for transactions that reference another transaction"
+                    end
+                    return true
+                end
+            },
+            {
                 name = "Refund Amount Does Not Exceed Remaining Value",
                 check = function(transaction, amount)
                     if transaction.refunded + amount > transaction.value then
