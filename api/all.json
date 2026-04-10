@@ -1044,7 +1044,7 @@
     },
     "shopk": {
       "name": "shopk",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "description": "A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/shopk.lua",
@@ -1055,7 +1055,7 @@
           "params": [
             {
               "name": "event",
-              "type": "\"transaction\"|\"connecting\"|\"connected\"|\"closed\"|\"error\"",
+              "type": "string",
               "description": "Event type to listen for."
             },
             {
@@ -1066,21 +1066,21 @@
           ],
           "returns": "",
           "description": "Register an event listener Starting in 1.0.1, \"ready\" was renamed to \"connected\", and additional state management events have been added. \"connected\" now also calls with (isGuest: boolean, address: table?) when the connection is established.",
-          "line": 346
+          "line": 450
         },
         {
           "name": "module.run",
           "params": [],
           "returns": "",
           "description": "Start the WebSocket connection and enter the main event loop This function blocks until the connection is closed",
-          "line": 362
+          "line": 466
         },
         {
           "name": "module.close",
           "params": [],
           "returns": "",
           "description": "Close the WebSocket connection and stop reconnecting",
-          "line": 409
+          "line": 513
         },
         {
           "name": "module.me",
@@ -1093,7 +1093,7 @@
           ],
           "returns": "",
           "description": "Get information about the current wallet Starting in 1.0.1, this data is passed by the \"connected\" event for easy access",
-          "line": 419
+          "line": 524
         },
         {
           "name": "module.send",
@@ -1111,7 +1111,38 @@
           ],
           "returns": "",
           "description": "Send a Kromer transaction",
-          "line": 437
+          "line": 542
+        },
+        {
+          "name": "module.addCheck",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "A unique name for the check (used for management and debugging)"
+            },
+            {
+              "name": "checkFn",
+              "type": "function",
+              "description": "A function that takes a transaction and refund amount as arguments and returns `true` if the refund is allowed, or `false` and an error message if it should be blocked"
+            }
+          ],
+          "returns": "",
+          "description": "Add a custom check function that runs before processing a refund. This can be used to implement additional safeguards or restrictions on refunds, such as checking against an external database or applying custom business logic. The check function should return `true` if the refund is allowed, or `false` and an error message if it should be blocked.",
+          "line": 575
+        },
+        {
+          "name": "module.removeCheck",
+          "params": [
+            {
+              "name": "name",
+              "type": "string",
+              "description": "The name of the check to remove"
+            }
+          ],
+          "returns": "",
+          "description": "Remove a previously added refund check by name",
+          "line": 585
         }
       ],
       "classes": []
@@ -1972,5 +2003,5 @@
       "classes": []
     }
   },
-  "updated": "2026-03-08T02:28:46Z"
+  "updated": "2026-04-10T05:08:27Z"
 }

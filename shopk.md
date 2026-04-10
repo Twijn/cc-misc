@@ -56,7 +56,7 @@ Register an event listener Starting in 1.0.1, "ready" was renamed to "connected"
 
 **Parameters:**
 
-- `event` ("transaction"|"connecting"|"connected"|"closed"|"error"): Event type to listen for.
+- `event` (string): Event type to listen for.
 - `listener` (function): Function to call when the event occurs.
 
 ### `module.run()`
@@ -83,4 +83,21 @@ Send a Kromer transaction
 
 - `data` (ShopkSendData): Transaction details
 - `cb?` (function): Optional callback to receive transaction result
+
+### `module.addCheck(name, checkFn)`
+
+Add a custom check function that runs before processing a refund. This can be used to implement additional safeguards or restrictions on refunds, such as checking against an external database or applying custom business logic. The check function should return `true` if the refund is allowed, or `false` and an error message if it should be blocked.
+
+**Parameters:**
+
+- `name` (string): A unique name for the check (used for management and debugging)
+- `checkFn` (function): A function that takes a transaction and refund amount as arguments and returns `true` if the refund is allowed, or `false` and an error message if it should be blocked
+
+### `module.removeCheck(name)`
+
+Remove a previously added refund check by name
+
+**Parameters:**
+
+- `name` (string): The name of the check to remove
 
