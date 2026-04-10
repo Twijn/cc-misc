@@ -1044,7 +1044,7 @@
     },
     "shopk": {
       "name": "shopk",
-      "version": "1.0.2",
+      "version": "1.0.3",
       "description": "A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/shopk.lua",
@@ -1066,21 +1066,21 @@
           ],
           "returns": "",
           "description": "Register an event listener Starting in 1.0.1, \"ready\" was renamed to \"connected\", and additional state management events have been added. \"connected\" now also calls with (isGuest: boolean, address: table?) when the connection is established.",
-          "line": 459
+          "line": 499
         },
         {
           "name": "module.run",
           "params": [],
           "returns": "",
           "description": "Start the WebSocket connection and enter the main event loop This function blocks until the connection is closed",
-          "line": 475
+          "line": 515
         },
         {
           "name": "module.close",
           "params": [],
           "returns": "",
           "description": "Close the WebSocket connection and stop reconnecting",
-          "line": 522
+          "line": 565
         },
         {
           "name": "module.me",
@@ -1093,7 +1093,7 @@
           ],
           "returns": "",
           "description": "Get information about the current wallet Starting in 1.0.1, this data is passed by the \"connected\" event for easy access",
-          "line": 533
+          "line": 576
         },
         {
           "name": "module.send",
@@ -1111,7 +1111,7 @@
           ],
           "returns": "",
           "description": "Send a Kromer transaction",
-          "line": 551
+          "line": 594
         },
         {
           "name": "module.addCheck",
@@ -1129,7 +1129,7 @@
           ],
           "returns": "",
           "description": "Add a custom check function that runs before processing a refund. This can be used to implement additional safeguards or restrictions on refunds, such as checking against an external database or applying custom business logic. The check function should return `true` if the refund is allowed, or `false` and an error message if it should be blocked.",
-          "line": 584
+          "line": 628
         },
         {
           "name": "module.removeCheck",
@@ -1142,7 +1142,7 @@
           ],
           "returns": "",
           "description": "Remove a previously added refund check by name",
-          "line": 594
+          "line": 638
         }
       ],
       "classes": []
@@ -2003,5 +2003,5 @@
       "classes": []
     }
   },
-  "updated": "2026-04-10T05:38:23Z"
+  "updated": "2026-04-10T06:11:43Z"
 }

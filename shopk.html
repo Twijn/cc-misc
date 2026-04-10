@@ -367,7 +367,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>shopk <span class="version-badge">v1.0.2</span></h1>
+        <h1>shopk <span class="version-badge">v1.0.3</span></h1>
         <p>A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.</p>
     </div>
     
@@ -515,6 +515,7 @@ local client = shopk({
 })
 
 client.on("transaction", function(tx)
+ --if tx.to ~= client.address.address then return end -- uncomment to only process incoming transactions to the connected wallet
  print(("%s -&gt; %s : %.2f KRO"):format(tx.from, tx.to, tx.value))
  if tx.hasMeta("test") then -- checks if there is a standalone value of the string,
    -- i.e "unre=lated;test" would match but "unre=lated;test=ing" would not
@@ -535,7 +536,7 @@ client.on("connected", function(isGuest, address)
 end)
 
 client.on("error", function(err)
- print("Error: " .. tostring(err))
+ print(("Error [%s]: %s"):format(err.error, err.message))
 end)
 
 -- The client has errored or disconnected and is starting to reconnect
@@ -553,7 +554,7 @@ client.run()
     <h2>Functions</h2>
     <div class='function' id='func-module-on'>
         <h3><code>module.on(event, listener)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L459' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L499' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Register an event listener Starting in 1.0.1, "ready" was renamed to "connected", and additional state management events have been added. "connected" now also calls with (isGuest: boolean, address: table?) when the connection is established.</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -565,17 +566,17 @@ client.run()
     </div>
     <div class='function' id='func-module-run'>
         <h3><code>module.run()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L475' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L515' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Start the WebSocket connection and enter the main event loop This function blocks until the connection is closed</p>
     </div>
     <div class='function' id='func-module-close'>
         <h3><code>module.close()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L522' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L565' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Close the WebSocket connection and stop reconnecting</p>
     </div>
     <div class='function' id='func-module-me'>
         <h3><code>module.me(cb?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L533' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L576' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Get information about the current wallet Starting in 1.0.1, this data is passed by the "connected" event for easy access</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -586,7 +587,7 @@ client.run()
     </div>
     <div class='function' id='func-module-send'>
         <h3><code>module.send(data, cb?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L551' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L594' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Send a Kromer transaction</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -598,7 +599,7 @@ client.run()
     </div>
     <div class='function' id='func-module-addcheck'>
         <h3><code>module.addCheck(name, checkFn)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L584' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L628' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a custom check function that runs before processing a refund. This can be used to implement additional safeguards or restrictions on refunds, such as checking against an external database or applying custom business logic. The check function should return `true` if the refund is allowed, or `false` and an error message if it should be blocked.</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -610,7 +611,7 @@ client.run()
     </div>
     <div class='function' id='func-module-removecheck'>
         <h3><code>module.removeCheck(name)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L594' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/shopk.lua#L638' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Remove a previously added refund check by name</p>
         <div class='params'>
             <strong>Parameters:</strong>

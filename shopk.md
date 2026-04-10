@@ -12,6 +12,7 @@ local client = shopk({
 })
 
 client.on("transaction", function(tx)
+ --if tx.to ~= client.address.address then return end -- uncomment to only process incoming transactions to the connected wallet
  print(("%s -> %s : %.2f KRO"):format(tx.from, tx.to, tx.value))
  if tx.hasMeta("test") then -- checks if there is a standalone value of the string,
    -- i.e "unre=lated;test" would match but "unre=lated;test=ing" would not
@@ -32,7 +33,7 @@ client.on("connected", function(isGuest, address)
 end)
 
 client.on("error", function(err)
- print("Error: " .. tostring(err))
+ print(("Error [%s]: %s"):format(err.error, err.message))
 end)
 
 -- The client has errored or disconnected and is starting to reconnect
