@@ -16,6 +16,7 @@
 ---})
 ---
 ---client.on("transaction", function(tx)
+---  --if tx.to ~= client.address.address then return end -- uncomment to only process incoming transactions to the connected wallet
 ---  print(("%s -> %s : %.2f KRO"):format(tx.from, tx.to, tx.value))
 ---  if tx.hasMeta("test") then -- checks if there is a standalone value of the string,
 ---    -- i.e "unre=lated;test" would match but "unre=lated;test=ing" would not
@@ -36,7 +37,7 @@
 ---end)
 ---
 ---client.on("error", function(err)
----  print("Error: " .. tostring(err))
+---  print(("Error [%s]: %s"):format(err.error, err.message))
 ---end)
 ---
 ----- The client has errored or disconnected and is starting to reconnect
@@ -50,10 +51,10 @@
 ---
 ---client.run()
 ---
----@version 1.0.2
+---@version 1.0.3
 -- @module shopk
 
-local VERSION = "1.0.2"
+local VERSION = "1.0.3"
 
 ---@class ShopkOptions
 ---@field syncNode? string The Kromer API endpoint URL (defaults to official endpoint)
@@ -102,14 +103,18 @@ local VERSION = "1.0.2"
 ---@field is_guest boolean Whether this connection is guest-authenticated
 ---@field address ShopkAddress? Wallet details when authenticated
 
+---@class ShopkError
+---@field error string Machine-readable error code
+---@field message string Human-readable error message
+
 ---@class ShopkModule
 ---@field _v string Version number
 ---@field state "connecting"|"connected"|"closed"|"error" The state of the websocket
 ---@field stateMessage string The human-readable message for the state of the websocket.
----@field lastError string? The last error recorded by shopk.
+---@field lastError ShopkError? The last error recorded by shopk.
 ---@field isGuest boolean Whether the connection is authenticated; false when a valid privatekey is used
 ---@field address ShopkAddress? The authenticated wallet details, or nil if guest
----@field on fun(event: "connecting"|"connected"|"closed"|"error"|"transaction", listener: function): nil Register event listener. The "ready" listener receives (isGuest: boolean, address: string?); "transaction" receives (tx: ShopkTransaction)
+---@field on fun(event: "connecting"|"connected"|"closed"|"error"|"transaction", listener: function): nil Register event listener. The "ready" listener receives (isGuest: boolean, address: string?); the "error" listener receives (err: ShopkError); "transaction" receives (tx: ShopkTransaction)
 ---@field run fun(): nil Start the WebSocket connection and event loop
 ---@field close fun(): nil Close the connection and stop reconnecting
 ---@field me fun(cb?: function): nil Get current wallet information
@@ -199,6 +204,34 @@ local function parseMetadata(str)
     end
 
     return result
+end
+
+---@param code string
+---@param message string
+---@return ShopkError
+local function createError(code, message)
+    return {
+        error = code,
+        message = message,
+    }
+end
+
+---@param err any
+---@param defaultCode string
+---@param defaultMessage? string
+---@return ShopkError
+local function normalizeError(err, defaultCode, defaultMessage)
+    if type(err) == "table" then
+        local errorCode = err.error or defaultCode
+        local message = err.message or defaultMessage or tostring(err.error or "Unknown error")
+        return createError(errorCode, message)
+    end
+
+    if err == nil then
+        return createError(defaultCode, defaultMessage or "Unknown error")
+    end
+
+    return createError(defaultCode, tostring(err))
 end
 
 ---Create a new Shopk client instance for interacting with the Kromer network
@@ -326,13 +359,16 @@ return function(options)
             assert(type(message) == "nil" or type(message) == "string", "Refund message must be a string or nil")
             assert(type(messageType) == "nil" or type(messageType) == "string", "Refund messageType must be a string or nil")
 
-            local function cbErr(err)
-                if cb then cb({ ok = false, error = err }) end
+            local function cbErr(err, code)
+                if cb then cb(normalizeError(err, code or "refund_failed")) end
             end
 
             local normalizedMessageType = (messageType or defaultRefundMessageType):lower()
             if not ALLOWED_REFUND_MESSAGE_TYPES[normalizedMessageType] then
-                cbErr("Refund messageType must be one of: message, msg, error, success")
+                cbErr(
+                    "Refund messageType must be one of: message, msg, error, success",
+                    "invalid_refund_message_type"
+                )
                 return
             end
 
@@ -342,7 +378,7 @@ return function(options)
             for _, v in pairs(module._refundChecks) do
                 local ok, err = v.check(transaction, amount)
                 if not ok then
-                    cbErr(err)
+                    cbErr(err, "refund_check_failed")
                     return
                 end
             end
@@ -373,7 +409,7 @@ return function(options)
         end
     end
 
-    local function setState(state, error)
+    local function setState(state, stateError)
         module.state = state
         if state == "connecting" then
             module.stateMessage = "Connecting"
@@ -384,14 +420,18 @@ return function(options)
         elseif state == "error" then
             module.stateMessage = "Error"
         end
-        if error then module.lastError = error end
+        local normalizedStateError = nil
+        if stateError then
+            normalizedStateError = normalizeError(stateError, "unknown_error")
+            module.lastError = normalizedStateError
+        end
 
         if state == "connected" then
             module.me(function(data)
                 fire(state, data.is_guest, data.address)
             end)
         else
-            fire(state, error)
+            fire(state, normalizedStateError)
         end
     end
 
@@ -420,14 +460,14 @@ return function(options)
 
         if not getWS or getWS.getResponseCode() ~= 200 then
             if not err then err = "Unknown Error" end
-            error("Failed "..uri..": " .. err)
+            error(createError("websocket_start_failed", "Failed " .. uri .. ": " .. tostring(err)))
         end
 
         local data = textutils.unserializeJSON(getWS.readAll())
         wsUri = data.url
 
         if not wsUri then
-            error("Unable to extract ws uri")
+            error(createError("invalid_websocket_start_response", "Unable to extract ws uri"))
         end
 
         http.websocketAsync(wsUri)
@@ -436,7 +476,7 @@ return function(options)
     local function connect()
         local ok, err = pcall(internalConnect)
         if not ok then
-            setState("error", err)
+            setState("error", normalizeError(err, "connection_failed"))
         end
     end
 
@@ -483,6 +523,9 @@ return function(options)
                 if e == "websocket_message" then
                     local data = textutils.unserializeJSON(msg)
                     if data then
+                        if data.error and data.message and data.ok == nil then
+                            data.ok = false
+                        end
                         if data.id then
                             if replyHandlers[data.id] then
                                 replyHandlers[data.id](data)
@@ -503,11 +546,11 @@ return function(options)
                 elseif e == "websocket_success" then
                     ws = msg
                 elseif e == "websocket_failure" then
-                    setState("error", "WebSocket connection failed: " .. tostring(msg))
+                    setState("error", createError("websocket_connection_failed", "WebSocket connection failed: " .. tostring(msg)))
                     ws = nil
                 elseif e == "websocket_closed" and module.state ~= "closed" then
                     -- this could be the server closing the connection or a network error, so we should attempt to reconnect after a delay
-                    setState("error", "WebSocket connection closed")
+                    setState("error", createError("websocket_closed", "WebSocket connection closed"))
                     ws = nil
                 end
             end
@@ -554,8 +597,9 @@ return function(options)
     function module.send(data, cb)
         -- rate limit transaction events to prevent potential infinite loops or spam from the server
         if not module._sendLimiter:hit() then
-            local err = "Rate limit exceeded for outgoing transactions"
-            if cb then cb({ ok = false, error = err }) end
+            if cb then
+                cb(createError("rate_limit_exceeded", "Rate limit exceeded for outgoing transactions"))
+            end
             return
         end
 
