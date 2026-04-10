@@ -50,10 +50,10 @@
 ---
 ---client.run()
 ---
----@version 1.0.1
+---@version 1.0.2
 -- @module shopk
 
-local VERSION = "1.0.1"
+local VERSION = "1.0.2"
 
 ---@class ShopkOptions
 ---@field syncNode? string The Kromer API endpoint URL (defaults to official endpoint)
@@ -62,6 +62,8 @@ local VERSION = "1.0.1"
 ---@field reconnectDelay? number Seconds to wait before reconnecting after an error (defaults to 30)
 ---@field sendDuration? number Time window in seconds for rate limiting sends (defaults to 60)
 ---@field sendLimit? number Maximum number of sends allowed within the sendDuration window (defaults to 20)
+---@field onlyOwnTransactions? boolean If true, only receive transactions involving the authenticated wallet (requires privatekey)
+---@field refundMessageTypeDefault? "message"|"msg"|"error"|"success" Default metadata key used by `tx.refund(...)` when messageType is omitted
 
 ---@class ShopkTransaction
 ---@field id number Transaction ID
@@ -73,8 +75,14 @@ local VERSION = "1.0.1"
 ---@field metadata? string Raw metadata string
 ---@field meta ShopkMetadata Parsed metadata object
 ---@field refunded number Amount that has been refunded so far
----@field refund fun(amount: number, message: string, cb?: function): nil Refund a specified amount with an optional message; calls cb with the result of the refund transaction
+---@field refund fun(amountOrData: number|ShopkRefundData, message?: string, cb?: function, messageType?: string): nil Refund using positional args or a table `{ amount, message, cb, messageType }`; calls cb with the result of the refund transaction
 ---@field hasMeta fun(meta: string, caseSensitive: boolean): boolean Check if the transaction metadata contains a specific standalone value (not part of a key=value pair), with optional case sensitivity (defaults to false)
+
+---@class ShopkRefundData
+---@field amount number Amount to refund
+---@field message? string Refund message text
+---@field cb? function Callback for refund result
+---@field messageType? "message"|"msg"|"error"|"success" Metadata key for refund message (defaults to "message")
 
 ---@class ShopkMetadata
 ---@field keys table<string, string> Key-value pairs from metadata
@@ -106,6 +114,8 @@ local VERSION = "1.0.1"
 ---@field close fun(): nil Close the connection and stop reconnecting
 ---@field me fun(cb?: function): nil Get current wallet information
 ---@field send fun(data: ShopkSendData, cb?: function): nil Send a transaction
+---@field addCheck fun(name: string, checkFn: function): nil Add a custom refund check function that runs before processing refunds
+---@field removeCheck fun(name: string): nil Remove a previously added refund check by name
 
 local DEFAULT_OPTIONS = {
     syncNode = "https://kromer.reconnected.cc/api/krist/",
@@ -113,7 +123,15 @@ local DEFAULT_OPTIONS = {
     reconnectDelay = 30,
     sendDuration = 60,
     sendLimit = 20,
+    refundMessageTypeDefault = "message",
     onlyOwnTransactions = false,
+}
+
+local ALLOWED_REFUND_MESSAGE_TYPES = {
+    message = true,
+    msg = true,
+    error = true,
+    success = true,
 }
 
 local function limiter(duration, limit)
@@ -190,6 +208,13 @@ return function(options)
     options = options or {}
     applyDefaults(options, DEFAULT_OPTIONS)
 
+    assert(type(options.refundMessageTypeDefault) == "string", "refundMessageTypeDefault must be a string")
+    local defaultRefundMessageType = options.refundMessageTypeDefault:lower()
+    assert(
+        ALLOWED_REFUND_MESSAGE_TYPES[defaultRefundMessageType],
+        "refundMessageTypeDefault must be one of: message, msg, error, success"
+    )
+
     if options.syncNode and options.syncNode:sub(-1) ~= "/" then
         options.syncNode = options.syncNode .. "/"
     end
@@ -201,6 +226,33 @@ return function(options)
             options.sendDuration,
             options.sendLimit
         ),
+        _refundChecks = {
+            -- These checks are performed before attempting a refund to prevent unnecessary transactions and potential abuse. They can be customized or extended as needed.
+            {
+                name = "Positive Amount",
+                check = function(transaction, amount)
+                    return amount > 0, "Refund amount must be greater than zero"
+                end
+            },
+            {
+                name = "No Message/Errors in Original Transaction",
+                check = function(transaction)
+                    if transaction.meta.msg or transaction.meta.message or transaction.meta.error then
+                        return false, "Refunds are not allowed for transactions with message or error metadata"
+                    end
+                    return true
+                end
+            },
+            {
+                name = "Refund Amount Does Not Exceed Remaining Value",
+                check = function(transaction, amount)
+                    if transaction.refunded + amount > transaction.value then
+                        return false, "Refund amount exceeds remaining transaction value"
+                    end
+                    return true
+                end
+            },
+        },
         state = "connecting",
         stateMessage = "Connecting",
         isGuest = true,
@@ -210,6 +262,8 @@ return function(options)
         close = function() end,
         me = function() end,
         send = function() end,
+        addCheck = function() end,
+        removeCheck = function() end,
     }
 
     local listeners = {
@@ -241,21 +295,47 @@ return function(options)
         end
     end
 
+    local function sanitizeMetadataValue(value)
+        -- Remove metadata separators to prevent key/value injection via message content.
+        return value:gsub("[;=]", "")
+    end
+
     local function wrapTransaction(transaction)
         transaction.meta = parseMetadata(transaction.metadata or "")
         transaction.refunded = 0
 
-        transaction.refund = function(amount, message, cb)
-            if transaction.meta.msg or transaction.meta.message or transaction.meta.error then
-                local err = "Refunds are not allowed for transactions with message or error metadata"
+        transaction.refund = function(amountOrData, message, cb, messageType)
+            local amount = amountOrData
+            if type(amountOrData) == "table" then
+                amount = amountOrData.amount
+                message = amountOrData.message
+                cb = amountOrData.cb
+                messageType = amountOrData.messageType
+            end
+
+            assert(type(amount) == "number", "Refund amount must be a number")
+            assert(type(message) == "nil" or type(message) == "string", "Refund message must be a string or nil")
+            assert(type(messageType) == "nil" or type(messageType) == "string", "Refund messageType must be a string or nil")
+
+            local function cbErr(err)
                 if cb then cb({ ok = false, error = err }) end
+            end
+
+            local normalizedMessageType = (messageType or defaultRefundMessageType):lower()
+            if not ALLOWED_REFUND_MESSAGE_TYPES[normalizedMessageType] then
+                cbErr("Refund messageType must be one of: message, msg, error, success")
                 return
             end
 
-            if transaction.refunded + amount > transaction.value then
-                local err = "Refund amount exceeds remaining transaction value"
-                if cb then cb({ ok = false, error = err }) end
-                return
+            local sanitizedMessage = sanitizeMetadataValue(message or "")
+
+            -- Run refund checks
+            for _, v in pairs(module._refundChecks) do
+                local ok, err = v.check(transaction, amount)
+                if not ok then
+                    cbErr(err)
+                    return
+                end
             end
 
             -- Optimistically update refunded to prevent race conditions
@@ -264,7 +344,7 @@ return function(options)
             module.send({
                 to = transaction.from,
                 amount = amount,
-                metadata = ("ref=%d;type=refund;original=%.2f;message=%s"):format(transaction.id, transaction.value, message or "")
+                metadata = ("ref=%d;type=refund;original=%.5f;%s=%s"):format(transaction.id, transaction.value, normalizedMessageType, sanitizedMessage)
             }, function(data)
                 if not data.ok then
                     -- Rollback on failure
@@ -490,6 +570,27 @@ return function(options)
             amount = amount,
             metadata = metadata
         }, cb)
+    end
+
+    ---Add a custom check function that runs before processing a refund. This can be used to implement additional safeguards or restrictions on refunds, such as checking against an external database or applying custom business logic. The check function should return `true` if the refund is allowed, or `false` and an error message if it should be blocked.
+    ---@param name string A unique name for the check (used for management and debugging)
+    ---@param checkFn function A function that takes a transaction and refund amount as arguments and returns `true` if the refund is allowed, or `false` and an error message if it should be blocked
+    function module.addCheck(name, checkFn)
+        table.insert(module._refundChecks, {
+            name = name,
+            check = checkFn,
+        })
+    end
+
+    ---Remove a previously added refund check by name
+    ---@param name string The name of the check to remove
+    function module.removeCheck(name)
+        for i, v in pairs(module._refundChecks) do
+            if v.name == name then
+                table.remove(module._refundChecks, i)
+                return
+            end
+        end
     end
 
     return module
