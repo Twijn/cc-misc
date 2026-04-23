@@ -58,6 +58,7 @@ end
 local s = require("s")
 local shopk = require("shopk")
 local log = require("log")
+local hasKlog, klogFactory = pcall(require, "klog")
 
 local config = require("data.config")
 
@@ -80,6 +81,141 @@ local broadcastShopSync  -- ShopSync broadcast function
 
 local client = nil
 local kromerAddress = nil
+local klogClient = nil
+local pendingKlogTransfers = {}
+local klogTransferQueue = {}
+
+local function getFirstPeripheralByType(typeName)
+    for _, name in ipairs(peripheral.getNames()) do
+        local types = table.pack(peripheral.getType(name))
+        for _, t in ipairs(types) do
+            if t == typeName then
+                return name
+            end
+        end
+    end
+    return nil
+end
+
+local function ensureKlogClient()
+    if klogClient then
+        return true
+    end
+
+    if not hasKlog or type(klogFactory) ~= "function" then
+        return false, "klog module unavailable"
+    end
+
+    local apiKey = config.klogApiKey or settings.get("klog.apiKey")
+    if not apiKey or apiKey == "" then
+        return false, "missing klog API key (set config.klogApiKey or settings klog.apiKey)"
+    end
+
+    local estorageName = config.klogPeripheral or getFirstPeripheralByType("ender_storage")
+    if not estorageName then
+        return false, "no ender_storage found (set config.klogPeripheral)"
+    end
+
+    local ok, instanceOrErr = pcall(klogFactory, estorageName, {
+        apiKey = apiKey,
+        apiUrl = config.klogApiUrl,
+        wsUrl = config.klogWsUrl,
+        inputExcludes = config.klogInputExcludes,
+    })
+
+    if not ok then
+        return false, tostring(instanceOrErr)
+    end
+
+    klogClient = instanceOrErr
+    log.info("Initialized klog client using " .. estorageName)
+    return true
+end
+
+local function queueKlogTransferIfReady(queueKey)
+    if not queueKey then return end
+
+    for _, queuedJob in pairs(jobQueue) do
+        if queuedJob.meta and queuedJob.meta.klog and queuedJob.meta.klog.queueKey == queueKey then
+            return
+        end
+    end
+
+    local pending = pendingKlogTransfers[queueKey]
+    if not pending or pending.quantity <= 0 then
+        return
+    end
+
+    table.insert(klogTransferQueue, pending)
+    pendingKlogTransfers[queueKey] = nil
+end
+
+local function recordCompletedKlogBatch(job)
+    if not job or not job.meta or not job.meta.klog then return end
+
+    local meta = job.meta.klog
+    local queueKey = meta.queueKey
+    if not queueKey then return end
+
+    local pending = pendingKlogTransfers[queueKey]
+    if not pending then
+        pending = {
+            queueKey = queueKey,
+            to = meta.to,
+            potionHash = meta.potionHash,
+            itemName = meta.itemName,
+            itemNbt = meta.itemNbt,
+            displayName = meta.displayName,
+            quantity = 0,
+        }
+        pendingKlogTransfers[queueKey] = pending
+    end
+
+    pending.quantity = pending.quantity + 3
+end
+
+local function processKlogTransfer(transfer)
+    local ok, err = ensureKlogClient()
+    if not ok then
+        log.warn("Skipping klog transfer: " .. tostring(err))
+        return
+    end
+
+    local clientRef = klogClient
+    if not clientRef or type(clientRef.transfer) ~= "function" then
+        log.warn("Skipping klog transfer: client is not ready")
+        return
+    end
+
+    local memo = string.format("brewery:%s:%s", transfer.potionHash, transfer.displayName or transfer.itemName or "potion")
+    local data, transferErr = clientRef.transfer({
+        to = transfer.to,
+        quantity = transfer.quantity,
+        itemName = transfer.itemName,
+        itemNbt = transfer.itemNbt,
+        memo = memo,
+    })
+
+    if not data then
+        log.error(string.format("klog transfer failed to %s (%s x%d): %s",
+            tostring(transfer.to), tostring(transfer.displayName or transfer.itemName), transfer.quantity, tostring(transferErr)))
+        return
+    end
+
+    log.info(string.format("klog transfer completed: %s x%d -> %s (id=%s)",
+        tostring(transfer.displayName or transfer.itemName), transfer.quantity, tostring(transfer.to), tostring(data.id or "unknown")))
+end
+
+local function klogTransferLoop()
+    while true do
+        if #klogTransferQueue == 0 then
+            sleep(0.5)
+        else
+            local transfer = table.remove(klogTransferQueue, 1)
+            processKlogTransfer(transfer)
+        end
+    end
+end
 
 -- ShopSync broadcast function
 local function buildShopSyncData()
@@ -265,7 +401,41 @@ local function shopkLoop()
 
         -- Add individual jobs for each batch (allows parallel brewing)
         log.info(string.format("Received payment of %.03f KRO from %s for %d batch(es) of %s", tx.value, tx.from, batches, recipe.displayName))
-        addJobs(recipe, tx, batches)
+        local jobMeta = nil
+        if tx.hasMeta and tx.hasMeta("klog") then
+            local metaKeys = tx.meta and tx.meta.keys or {}
+            local recipient =
+                metaKeys.useruuid or
+                metaKeys.userUUID or
+                metaKeys.uuid or
+                metaKeys.username or
+                metaKeys.user
+
+            if recipient and recipient ~= "" then
+                local potionHash = metaKeys.hash or sha256(recipe.id)
+                local itemName = "minecraft:potion"
+                if recipe.potionType == "splash" then
+                    itemName = "minecraft:splash_potion"
+                elseif recipe.potionType == "lingering" then
+                    itemName = "minecraft:lingering_potion"
+                end
+
+                jobMeta = {
+                    klog = {
+                        to = recipient,
+                        potionHash = potionHash,
+                        queueKey = recipient .. ":" .. potionHash,
+                        itemName = itemName,
+                        itemNbt = recipe.nbt,
+                        displayName = recipe.displayName,
+                    }
+                }
+            else
+                log.warn("klog metadata present but missing useruuid/username; skipping klog transfer")
+            end
+        end
+
+        addJobs(recipe, tx, batches, jobMeta)
 
         -- Send change if any
         if change > 0.001 then -- Small threshold to avoid dust
@@ -1360,6 +1530,7 @@ local function brewJob(name, stand)
 
         local success, err = brewChain(job.recipe, id)
         if not success then
+            local failedKlogMeta = job.meta and job.meta.klog
             updateJobStatus(id, JOB_STATUS.FAILED, err or "Brew failed")
             log.error("Job #" .. id .. " failed: " .. (err or "unknown error"))
 
@@ -1370,6 +1541,9 @@ local function brewJob(name, stand)
 
             sleep(2) -- Show failure status briefly
             deleteJob(id)
+            if failedKlogMeta then
+                queueKlogTransferIfReady(failedKlogMeta.queueKey)
+            end
             return
         end
 
@@ -1385,9 +1559,17 @@ local function brewJob(name, stand)
         -- Refresh item cache after brewing
         getAllItems(true)
 
+        local completedKlogMeta = job.meta and job.meta.klog
+        if completedKlogMeta then
+            recordCompletedKlogBatch(job)
+        end
+
         updateJobStatus(id, JOB_STATUS.COMPLETE, "Complete!")
         sleep(1) -- Show completion status briefly
         deleteJob(id)
+        if completedKlogMeta then
+            queueKlogTransferIfReady(completedKlogMeta.queueKey)
+        end
     end
 
     return function()
@@ -1494,7 +1676,8 @@ parallel.waitForAll(
     safe(monitorTouchLoop, "monitorTouchLoop", 1),
     safe(shopkLoop, "shopkLoop", 5),
     safe(startBrewJobs, "startBrewJobs", 1),
-    safe(stockMaintenanceLoop, "stockMaintenanceLoop", 1)
+    safe(stockMaintenanceLoop, "stockMaintenanceLoop", 1),
+    safe(klogTransferLoop, "klogTransferLoop", 2)
 )
 
 shopkClose()
