@@ -160,7 +160,7 @@ broadcastShopSync = function()
     if not data then return end
 
     local jsonData = textutils.serializeJSON(data)
-    radioTower.open(SHOPSYNC_CHANNEL)
+    radioTower.setFrequency(SHOPSYNC_CHANNEL)
     radioTower.broadcast(string.pack("ss", jsonData, sha256(jsonData)))
 
     sleep(1)
