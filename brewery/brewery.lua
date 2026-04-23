@@ -31,7 +31,7 @@ end
 
 -- Install klog
 if not fs.exists(libDir .. "klog.lua") then
-    shell.run("wget", "run", "https://krawlet.cc/klog.lua", libDir .. "klog.lua")
+    shell.run("wget", "https://krawlet.cc/klog.lua", libDir .. "klog.lua")
 end
 
 -- Add to path
