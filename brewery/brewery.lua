@@ -224,7 +224,7 @@ local function shopkLoop()
         if not recipe then
             local attemptedMeta = tx.meta.values[1] or "(none)"
             log.warn(string.format("Invalid recipe '%s' in transaction from %s, refunding %.03f KRO", attemptedMeta, tx.from, tx.value))
-            tx.refund(tx.value, "Invalid potion type: " .. attemptedMeta, "error")
+            tx.refund(tx.value, "Invalid potion type: " .. attemptedMeta, nil, "error")
             return
         end
 
@@ -236,7 +236,7 @@ local function shopkLoop()
         -- Insufficient payment for even one batch
         if batches <= 0 then
             log.warn(string.format("Insufficient payment from %s: %.03f KRO for %s (min %.03f KRO)", tx.from, tx.value, recipe.displayName, costPerBatch))
-            tx.refund(tx.value, string.format("Insufficient: need %.03f KRO for %s", costPerBatch, recipe.displayName), "error")
+            tx.refund(tx.value, string.format("Insufficient: need %.03f KRO for %s", costPerBatch, recipe.displayName), nil, "error")
             return
         end
 
@@ -246,7 +246,7 @@ local function shopkLoop()
 
         if maxBatches <= 0 then
             log.warn(string.format("Out of stock for %s, refunding %s", recipe.displayName, tx.from))
-            tx.refund(tx.value, "Out of stock: " .. recipe.displayName, "error")
+            tx.refund(tx.value, "Out of stock: " .. recipe.displayName, nil, "error")
             return
         end
 
@@ -256,7 +256,7 @@ local function shopkLoop()
             local excessAmount = excessBatches * costPerBatch
             batches = maxBatches
             log.info(string.format("Limited order to %d batches due to stock, refunding %.03f KRO", maxBatches, excessAmount))
-            tx.refund(excessAmount, string.format("Partial stock: only %d batches available", maxBatches), "error")
+            tx.refund(excessAmount, string.format("Partial stock: only %d batches available", maxBatches), nil, "error")
         end
 
         -- Calculate change
@@ -269,7 +269,7 @@ local function shopkLoop()
 
         -- Send change if any
         if change > 0.001 then -- Small threshold to avoid dust
-            tx.refund(change, "Here is your change!", "message")
+            tx.refund(change, "Here is your change!", nil, "message")
         end
     end)
 
