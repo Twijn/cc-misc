@@ -29,6 +29,11 @@ if not allExist then
     shell.run("wget", "run", "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/installer.lua", table.unpack(libs))
 end
 
+-- Install klog
+if not fs.exists(libDir .. "klog.lua") then
+    shell.run("wget", "run", "https://krawlet.cc/klog.lua", libDir .. "klog.lua")
+end
+
 -- Add to path
 if not package.path:find("disk/lib") then
     package.path = package.path .. ";/disk/lib/?.lua;/lib/?.lua"
@@ -59,8 +64,6 @@ local getRecipeCost
 local addJob
 local addJobs
 local refundJob  -- refund function set by shopkLoop, used by job processor
-local checkPendingRefunds  -- timer callback for batched refunds
-local getPendingTimers  -- get pending timer mappings
 local broadcastShopSync  -- ShopSync broadcast function
 
 local client = nil
@@ -69,15 +72,15 @@ local kromerAddress = nil
 -- ShopSync broadcast function
 local function buildShopSyncData()
     if not kromerAddress then return nil end
-    
+
     local items = {}
-    
+
     -- Add all recipes as shop items
     for _, recipe in pairs(recipes) do
         if recipe.id ~= "water" then  -- Don't list water bottles
             local stock = getRecipeStock(recipe)
             local cost = getRecipeCost(recipe)
-            
+
             -- Build potion item name based on type
             local itemName = "minecraft:potion"
             if recipe.potionType == "splash" then
@@ -85,7 +88,7 @@ local function buildShopSyncData()
             elseif recipe.potionType == "lingering" then
                 itemName = "minecraft:lingering_potion"
             end
-            
+
             table.insert(items, {
                 prices = {
                     {
@@ -117,7 +120,7 @@ local function buildShopSyncData()
             dimension = "overworld",
         }
     end
-    
+
     return {
         type = "ShopSync",
         version = 1,
@@ -140,16 +143,14 @@ end
 broadcastShopSync = function()
     if not shopsyncModem then return end
     if not kromerAddress then return end
-    
+
     local data = buildShopSyncData()
     if not data then return end
-    
+
     shopsyncModem.open(SHOPSYNC_CHANNEL)
     shopsyncModem.transmit(SHOPSYNC_CHANNEL, os.getComputerID() % 65536, data)
     log.debug("Broadcasted ShopSync data with " .. #data.items .. " items")
 end
-
--- shopk
 
 local function shopkClose()
     if client and client.close then
@@ -166,88 +167,28 @@ local function shopkLoop()
         syncNode = config.syncNode,
     })
 
-    local function refund(address, amount, reason, originalTx)
-        if amount <= 0 then return end
-        local meta = "error=" .. reason
-        if originalTx then
-            meta = ("ref=%d;type=refund;original=%.03f;message=%s"):format(originalTx.id, originalTx.value, reason)
-        end
-        log.info(string.format("Refunding %.03f KRO to %s: %s", amount, address, reason))
-        client.send({
-            to = address,
-            amount = amount,
-            metadata = meta,
-        })
-    end
-
-    -- Pending refunds batched by transaction ID
-    local pendingRefunds = {}  -- { [txId] = { address, amount, reason, tx, timerId } }
-    local pendingTimers = {}   -- { [timerId] = txId } - maps timer IDs to transaction IDs
-    local REFUND_BATCH_DELAY = 3  -- seconds to wait before sending batched refund
-
-    local function processPendingRefund(txId)
-        local pending = pendingRefunds[txId]
-        if pending and pending.amount > 0 then
-            refund(pending.address, pending.amount, pending.reason, pending.tx)
-        end
-        -- Clean up timer mapping if it exists
-        if pending and pending.timerId then
-            pendingTimers[pending.timerId] = nil
-        end
-        pendingRefunds[txId] = nil
-    end
-
-    -- Expose refund for job processor to use on failures (batches refunds from same tx)
+    -- Expose refund for job processor to use on failures.
     refundJob = function(job, reason)
-        if not job or not job.tx or not job.meta or not job.meta.payer then
-            log.warn("Cannot refund job: missing transaction or payer info")
+        if not job or not job.tx then
+            log.warn("Cannot refund job: missing transaction info")
             return
         end
+
+        if not job.tx.refund then
+            log.warn("Cannot refund job: transaction does not support tx.refund")
+            return
+        end
+
         local costPerBatch = getRecipeCost(job.recipe)
-        local txId = job.tx.id
+        job.tx.refund(costPerBatch, reason or "Brewing failed", function(result)
+            if result and result.ok then
+                log.info(string.format("Refunded %.03f KRO for failed job #%d", costPerBatch, job.id))
+                return
+            end
 
-        -- Add to pending refunds for this transaction
-        if not pendingRefunds[txId] then
-            local timerId = os.startTimer(REFUND_BATCH_DELAY)
-            pendingRefunds[txId] = {
-                address = job.meta.payer,
-                amount = 0,
-                reason = reason or "Brewing failed",
-                tx = job.tx,
-                timerId = timerId,
-            }
-            pendingTimers[timerId] = txId
-        end
-        pendingRefunds[txId].amount = pendingRefunds[txId].amount + costPerBatch
-        -- Update reason to show count if multiple
-        local batchCount = math.floor(pendingRefunds[txId].amount / costPerBatch + 0.5)
-        if batchCount > 1 then
-            pendingRefunds[txId].reason = string.format("%s (%d batches)", reason or "Brewing failed", batchCount)
-        end
-    end
-
-    -- Process a specific timer's refund (exposed globally)
-    checkPendingRefunds = function(timerId)
-        if timerId and pendingTimers[timerId] then
-            local txId = pendingTimers[timerId]
-            processPendingRefund(txId)
-        end
-    end
-
-    -- Get the pending timers table (exposed for the timer loop)
-    getPendingTimers = function()
-        return pendingTimers
-    end
-
-    local function sendChange(address, amount, originalTx)
-        if amount <= 0 then return end
-        local meta = ("ref=%d;type=change;original=%.03f"):format(originalTx.id, originalTx.value)
-        log.info(string.format("Sending %.03f KRO change to %s", amount, address))
-        client.send({
-            to = address,
-            amount = amount,
-            metadata = meta,
-        })
+            local err = result and (result.message or result.error) or "unknown error"
+            log.error(string.format("Failed to refund %.03f KRO for job #%d: %s", costPerBatch, job.id, err))
+        end)
     end
 
     client.on("transaction", function(tx)
@@ -265,7 +206,7 @@ local function shopkLoop()
         if not recipe then
             local attemptedMeta = tx.meta.values[1] or "(none)"
             log.warn(string.format("Invalid recipe '%s' in transaction from %s, refunding %.03f KRO", attemptedMeta, tx.from, tx.value))
-            refund(tx.from, tx.value, "Invalid potion type: " .. attemptedMeta, tx)
+            tx.refund(tx.value, "Invalid potion type: " .. attemptedMeta)
             return
         end
 
@@ -277,7 +218,7 @@ local function shopkLoop()
         -- Insufficient payment for even one batch
         if batches <= 0 then
             log.warn(string.format("Insufficient payment from %s: %.03f KRO for %s (min %.03f KRO)", tx.from, tx.value, recipe.displayName, costPerBatch))
-            refund(tx.from, tx.value, string.format("Insufficient: need %.03f KRO for %s", costPerBatch, recipe.displayName), tx)
+            tx.refund(tx.value, string.format("Insufficient: need %.03f KRO for %s", costPerBatch, recipe.displayName))
             return
         end
 
@@ -287,7 +228,7 @@ local function shopkLoop()
 
         if maxBatches <= 0 then
             log.warn(string.format("Out of stock for %s, refunding %s", recipe.displayName, tx.from))
-            refund(tx.from, tx.value, "Out of stock: " .. recipe.displayName, tx)
+            tx.refund(tx.value, "Out of stock: " .. recipe.displayName)
             return
         end
 
@@ -297,7 +238,7 @@ local function shopkLoop()
             local excessAmount = excessBatches * costPerBatch
             batches = maxBatches
             log.info(string.format("Limited order to %d batches due to stock, refunding %.03f KRO", maxBatches, excessAmount))
-            refund(tx.from, excessAmount, string.format("Partial stock: only %d batches available", maxBatches), tx)
+            tx.refund(excessAmount, string.format("Partial stock: only %d batches available", maxBatches))
         end
 
         -- Calculate change
@@ -306,25 +247,36 @@ local function shopkLoop()
 
         -- Add individual jobs for each batch (allows parallel brewing)
         log.info(string.format("Received payment of %.03f KRO from %s for %d batch(es) of %s", tx.value, tx.from, batches, recipe.displayName))
-        addJobs(recipe, tx, batches, { payer = tx.from })
+        addJobs(recipe, tx, batches)
 
         -- Send change if any
         if change > 0.001 then -- Small threshold to avoid dust
-            sendChange(tx.from, change, tx)
+            tx.refund(change, "Here is your change!")
         end
     end)
 
-    client.on("ready", function()
-        log.debug("Connected to Kromer websocket. Finding self...")
-        client.me(function(data)
-            if data.is_guest or not data.address then
-                error("you may not log in as guest! return a privatekey from data/config.lua")
-            end
-            kromerAddress = data.address.address
-            log.info("Connected to Kromer as " .. kromerAddress)
-            drawMonitor()
-            -- ShopSync will broadcast from stockMaintenanceLoop after 10 sec delay
-        end)
+    client.on("connecting", function()
+        log.debug("Connecting to Kromer websocket...")
+    end)
+
+    client.on("error", function(err)
+        local errCode = err and err.error or "unknown_error"
+        local errMessage = err and err.message or "Unknown error"
+        log.error(string.format("Shopk error [%s]: %s", errCode, errMessage))
+    end)
+
+    client.on("closed", function()
+        log.warn("Kromer websocket closed")
+    end)
+
+    client.on("connected", function(isGuest, address)
+        if isGuest or not address then
+            error("you may not log in as guest! return a privatekey from data/config.lua")
+        end
+        kromerAddress = address.address
+        log.info("Connected to Kromer as " .. kromerAddress)
+        drawMonitor()
+        -- ShopSync will broadcast from stockMaintenanceLoop after 10 sec delay
     end)
 
     client.run()
@@ -396,12 +348,12 @@ end
 -- Get potion duration and strength info from recipe fields
 local function getPotionInfo(recipe)
     if not recipe then return nil, nil, nil end
-    
+
     -- Read directly from recipe fields
     local duration = recipe.duration  -- String like "3:00" or nil
     local level = recipe.level or 1
     local instant = recipe.instant or false
-    
+
     return duration, level, instant
 end
 
@@ -422,8 +374,11 @@ local function getPotionItemName(potionType)
 end
 
 local cachedItems = nil
+local lastTotalStock = 0
 local function getAllItems(forceRefresh)
     if cachedItems and not forceRefresh then return cachedItems end
+
+    local totalStock = 0
 
     local items = {}
     for _, chest in ipairs(table.pack(peripheral.find("inventory"))) do
@@ -451,9 +406,19 @@ local function getAllItems(forceRefresh)
                 items[key] = 0
             end
             items[key] = items[key] + item.count
+            totalStock = totalStock + item.count
         end
     end
     cachedItems = items
+
+    if totalStock ~= lastTotalStock then
+        print(string.format("Total stock updated: %d potions", totalStock))
+        lastTotalStock = totalStock
+
+        -- Broadcast ShopSync data (also happens on inventory changes)
+        broadcastShopSync()
+    end
+
     return items
 end
 
@@ -721,26 +686,26 @@ function drawMonitor()
     for col, recipeId in pairs(navigation) do
         local baseRecipe = getRecipeById(recipeId)
         local colStartX = (col - 1) * columnWidth + 1
-        
+
         -- Only draw header if it won't overlap with the right panel
         if baseRecipe and colStartX + columnWidth <= rightPanelStart then
             local headerName = baseRecipe.displayName or recipeId
-            
+
             -- Highlight if this is the current selection path
             if currentRecipe and (currentRecipe.basePotionId == recipeId or currentRecipe.id == recipeId) then
                 setColor(colors.yellow, colors.black)
             else
                 setColor(colors.lightGray, colors.gray)
             end
-            
+
             mon.setCursorPos(colStartX + 1, 1)
             mon.write(string.rep(" ", columnWidth - 2))
             mon.setCursorPos(colStartX + math.floor((columnWidth / 2) - (#headerName / 2)), 1)
             mon.write(headerName)
-            
+
             setColor(colors.white, colors.black)
         end
-        
+
         for num, recipe in pairs(getRecipesWithBase(recipeId)) do
             drawRecipe(recipe, col, num)
         end
@@ -1391,7 +1356,7 @@ local function brewJob(name, stand)
         end
 
         updateJobStatus(id, JOB_STATUS.DISPENSING, "Dispensing...")
-        
+
         -- Stock maintenance jobs go to storage, customer jobs go to output
         if job.meta and job.meta.isStockJob then
             dispenseToStorage()
@@ -1437,20 +1402,6 @@ local function startBrewJobs()
     parallel.waitForAll(table.unpack(jobFuncs))
 end
 
--- Timer loop for processing batched refunds
-local function refundTimerLoop()
-    while true do
-        local _, timerId = os.pullEvent("timer")
-        -- Only process if this is one of our refund timers
-        if checkPendingRefunds and getPendingTimers then
-            local pendingTimers = getPendingTimers()
-            if pendingTimers and pendingTimers[timerId] then
-                checkPendingRefunds(timerId)
-            end
-        end
-    end
-end
-
 -- Stock maintenance loop - keeps intermediate potions stocked
 local STOCK_CHECK_INTERVAL = 30  -- seconds between stock checks
 
@@ -1467,30 +1418,28 @@ end
 
 local function stockMaintenanceLoop()
     sleep(10)  -- Initial delay to let everything initialize
-    
+
+    local lastTotalStock = 0
     while true do
         -- Refresh inventory cache
         getAllItems(true)
-        
-        -- Broadcast ShopSync data (also happens on inventory changes)
-        broadcastShopSync()
-        
+
         -- Check each recipe for keep requirements
         for _, recipe in pairs(recipes) do
             if recipe.keep and recipe.keep > 0 then
                 local currentStock = getBrewedPotionStock(recipe.potion, recipe.potionType)
-                
+
                 -- Account for batches already in queue (each batch = 3 potions)
                 local queuedBatches = getQueuedBatchesForRecipe(recipe.id)
                 local pendingPotions = queuedBatches * 3
                 local effectiveStock = currentStock + pendingPotions
-                
+
                 local deficit = recipe.keep - effectiveStock
-                
+
                 if deficit > 0 then
                     -- Calculate how many batches needed (each batch = 3 potions)
                     local batchesNeeded = math.ceil(deficit / 3)
-                    
+
                     -- Check if we have the ingredients to brew
                     local canBrew = true
                     if recipe.ingredient then
@@ -1502,11 +1451,11 @@ local function stockMaintenanceLoop()
                             end
                         end
                     end
-                    
+
                     if canBrew and batchesNeeded > 0 then
                         log.info(string.format("Stock maintenance: Queuing %d batch(es) of %s (current: %d, queued: %d, keep: %d)",
                             batchesNeeded, recipe.displayName, currentStock, queuedBatches, recipe.keep))
-                        
+
                         -- Add stock jobs (no transaction, no payer - these are internal)
                         for i = 1, batchesNeeded do
                             addJob(recipe, nil, { isStockJob = true })
@@ -1516,7 +1465,7 @@ local function stockMaintenanceLoop()
                 end
             end
         end
-        
+
         sleep(STOCK_CHECK_INTERVAL)
     end
 end
@@ -1527,7 +1476,6 @@ parallel.waitForAll(
     safe(monitorTouchLoop, "monitorTouchLoop", 1),
     safe(shopkLoop, "shopkLoop", 5),
     safe(startBrewJobs, "startBrewJobs", 1),
-    safe(refundTimerLoop, "refundTimerLoop", 1),
     safe(stockMaintenanceLoop, "stockMaintenanceLoop", 1)
 )
 
