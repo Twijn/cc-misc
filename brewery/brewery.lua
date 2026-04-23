@@ -82,6 +82,7 @@ local broadcastShopSync  -- ShopSync broadcast function
 local client = nil
 local kromerAddress = nil
 local klogClient = nil
+local klogEstorageName = nil  -- excluded from brewery storage pool
 local pendingKlogTransfers = {}
 local klogTransferQueue = {}
 
@@ -128,6 +129,7 @@ local function ensureKlogClient()
     end
 
     klogClient = instanceOrErr
+    klogEstorageName = estorageName
     log.info("Initialized klog client using " .. estorageName)
     return true
 end
@@ -162,7 +164,6 @@ local function recordCompletedKlogBatch(job)
         pending = {
             queueKey = queueKey,
             to = meta.to,
-            potionHash = meta.potionHash,
             itemName = meta.itemName,
             itemNbt = meta.itemNbt,
             displayName = meta.displayName,
@@ -187,7 +188,7 @@ local function processKlogTransfer(transfer)
         return
     end
 
-    local memo = string.format("brewery:%s:%s", transfer.potionHash, transfer.displayName or transfer.itemName or "potion")
+    local memo = string.format("Brewed %s x%d for %s", transfer.displayName or transfer.itemName or "potion", transfer.quantity, transfer.to)
     local data, transferErr = clientRef.transfer({
         to = transfer.to,
         quantity = transfer.quantity,
@@ -280,7 +281,7 @@ local function buildShopSyncData()
             multiShop = nil,
             software = {
                 name = "cc-misc/brewery.lua",
-                version = "1.0.0",
+                version = "1.1.0 +klog",
             },
             location = location,
         },
@@ -411,8 +412,9 @@ local function shopkLoop()
                 metaKeys.username or
                 metaKeys.user
 
+            local displayRecipient = metaKeys.username or recipient
+
             if recipient and recipient ~= "" then
-                local potionHash = metaKeys.hash or sha256(recipe.id)
                 local itemName = "minecraft:potion"
                 if recipe.potionType == "splash" then
                     itemName = "minecraft:splash_potion"
@@ -423,8 +425,7 @@ local function shopkLoop()
                 jobMeta = {
                     klog = {
                         to = recipient,
-                        potionHash = potionHash,
-                        queueKey = recipient .. ":" .. potionHash,
+                        queueKey = recipient .. ":" .. recipe.id,
                         itemName = itemName,
                         itemNbt = recipe.nbt,
                         displayName = recipe.displayName,
@@ -1248,7 +1249,7 @@ end
 local function getStorageInventories()
     local inventories = {}
     for _, name in pairs(peripheral.getNames()) do
-        if isStorageType(name) then
+        if isStorageType(name) and name ~= klogEstorageName then
             table.insert(inventories, peripheral.wrap(name))
         end
     end
