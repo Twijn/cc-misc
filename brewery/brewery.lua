@@ -98,6 +98,18 @@ local function getFirstPeripheralByType(typeName)
     return nil
 end
 
+local function chatTell(user, message)
+    if not user or user == "" or not message or message == "" then
+        return
+    end
+
+    if not chatbox or type(chatbox.tell) ~= "function" then
+        return
+    end
+
+    pcall(chatbox.tell, user, message)
+end
+
 local function resolveKlogEstorageName()
     if klogEstorageName and peripheral.isPresent(klogEstorageName) then
         return klogEstorageName
@@ -183,6 +195,7 @@ local function recordCompletedKlogBatch(job)
         pending = {
             queueKey = queueKey,
             to = meta.to,
+            notifyUser = meta.notifyUser,
             itemName = meta.itemName,
             itemNbt = meta.itemNbt,
             displayName = meta.displayName,
@@ -198,12 +211,16 @@ local function processKlogTransfer(transfer)
     local ok, err = ensureKlogClient()
     if not ok then
         log.warn("Skipping klog transfer: " .. tostring(err))
+        chatTell(transfer.notifyUser, string.format("Brewery: unable to deliver %s x%d via Klog right now (%s).",
+            transfer.displayName or transfer.itemName or "potion", transfer.quantity, tostring(err)))
         return
     end
 
     local clientRef = klogClient
     if not clientRef or type(clientRef.transfer) ~= "function" then
         log.warn("Skipping klog transfer: client is not ready")
+        chatTell(transfer.notifyUser, string.format("Brewery: unable to deliver %s x%d via Klog (client not ready).",
+            transfer.displayName or transfer.itemName or "potion", transfer.quantity))
         return
     end
 
@@ -219,11 +236,15 @@ local function processKlogTransfer(transfer)
     if not data then
         log.error(string.format("klog transfer failed to %s (%s x%d): %s",
             tostring(transfer.to), tostring(transfer.displayName or transfer.itemName), transfer.quantity, tostring(transferErr)))
+        chatTell(transfer.notifyUser, string.format("Brewery: Klog delivery failed for %s x%d (%s).",
+            transfer.displayName or transfer.itemName or "potion", transfer.quantity, tostring(transferErr or "unknown error")))
         return
     end
 
     log.info(string.format("klog transfer completed: %s x%d -> %s (id=%s)",
         tostring(transfer.displayName or transfer.itemName), transfer.quantity, tostring(transfer.to), tostring(data.id or "unknown")))
+    chatTell(transfer.notifyUser, string.format("Brewery: delivered %s x%d via Klog.",
+        transfer.displayName or transfer.itemName or "potion", transfer.quantity))
 end
 
 local function klogTransferLoop()
@@ -444,12 +465,15 @@ local function shopkLoop()
                 jobMeta = {
                     klog = {
                         to = recipient,
+                        notifyUser = displayRecipient,
                         queueKey = recipient .. ":" .. recipe.id,
                         itemName = itemName,
                         itemNbt = recipe.nbt,
                         displayName = recipe.displayName,
                     }
                 }
+
+                chatTell(displayRecipient, string.format("Brewery: queued %d batch(es) of %s for Klog delivery.", batches, recipe.displayName))
             else
                 log.warn("klog metadata present but missing useruuid/username; skipping klog transfer")
             end
@@ -1560,6 +1584,9 @@ local function brewJob(name, stand)
                 refundJob(job, err or "Brewing failed")
             end
 
+            chatTell(failedKlogMeta and failedKlogMeta.notifyUser,
+                string.format("Brewery: brewing failed for %s, Klog delivery canceled.", job.recipe.displayName or "potion"))
+
             sleep(2) -- Show failure status briefly
             deleteJob(id)
             if failedKlogMeta then
@@ -1583,6 +1610,8 @@ local function brewJob(name, stand)
         local completedKlogMeta = job.meta and job.meta.klog
         if completedKlogMeta then
             recordCompletedKlogBatch(job)
+            chatTell(completedKlogMeta.notifyUser,
+                string.format("Brewery: brewed %s batch, preparing Klog delivery.", job.recipe.displayName or "potion"))
         end
 
         updateJobStatus(id, JOB_STATUS.COMPLETE, "Complete!")
