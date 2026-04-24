@@ -12,7 +12,7 @@ sha256         = loadstring(g(
                 "S", " local "), "T", ",0x"), "U", " return "), "V", " end "), "W", "or "), "X", "bit32."), "Y",
     "function "), "Z",
   " do "))()
-  
+
 local brewingStands = table.pack(peripheral.find("minecraft:brewing_stand"))
 
 assert(brewingStands.n > 0, "No brewing stands found!")
@@ -98,6 +98,25 @@ local function getFirstPeripheralByType(typeName)
     return nil
 end
 
+local function resolveKlogEstorageName()
+    if klogEstorageName and peripheral.isPresent(klogEstorageName) then
+        return klogEstorageName
+    end
+
+    local configured = config.klogPeripheral
+    if configured and configured ~= "" and peripheral.isPresent(configured) then
+        klogEstorageName = configured
+        return klogEstorageName
+    end
+
+    local detected = getFirstPeripheralByType("ender_storage")
+    if detected then
+        klogEstorageName = detected
+    end
+
+    return klogEstorageName
+end
+
 local function ensureKlogClient()
     if klogClient then
         return true
@@ -112,7 +131,7 @@ local function ensureKlogClient()
         return false, "missing klog API key (set config.klogApiKey or settings klog.apiKey)"
     end
 
-    local estorageName = config.klogPeripheral or getFirstPeripheralByType("ender_storage")
+    local estorageName = resolveKlogEstorageName()
     if not estorageName then
         return false, "no ender_storage found (set config.klogPeripheral)"
     end
@@ -250,7 +269,7 @@ local function buildShopSyncData()
                 item = {
                     name = itemName,
                     nbt = recipe.nbt,
-                    displayName = recipe.displayName,
+                    displayName = recipe.displayName .. " (x3 batch)",
                     description = recipe.potionType ~= "normal" and (recipe.potionType .. " potion") or nil,
                 },
                 dynamicPrice = false,
@@ -1247,9 +1266,10 @@ local function isStorageType(name)
 end
 
 local function getStorageInventories()
+    local excludedKlogName = resolveKlogEstorageName()
     local inventories = {}
     for _, name in pairs(peripheral.getNames()) do
-        if isStorageType(name) and name ~= klogEstorageName then
+        if isStorageType(name) and name ~= excludedKlogName then
             table.insert(inventories, peripheral.wrap(name))
         end
     end
