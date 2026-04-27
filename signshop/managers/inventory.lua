@@ -235,35 +235,33 @@ function manager.dispense(product, maxCount)
 
     if chestName == aisle.self then
       logger.info(string.format("Skipping aisle target inventory %s", chestName))
-      goto continue
-    end
-
-    local items, listErr = callPeripheralWithTimeout(chestName, "list", PERIPHERAL_CALL_TIMEOUT)
-    if not items then
-      logger.warn(string.format("Chest %d (%s) list failed: %s", i, chestName, listErr or "unknown error"))
     else
-      for slot, item in pairs(items) do
-        if dispensed >= maxCount then break end
-        -- Match item: if anyNbt is true, match only by modid; otherwise match both modid and nbt
-        local matches = item.name == product.modid
-        if matches and not product.anyNbt then
-          matches = item.nbt == product.itemnbt
-        end
-        if matches then
-          local remaining = maxCount - dispensed
-          logger.info(string.format("Transferring %d %s from chest %d (%s) slot %d to aisle %s", remaining, product.modid, i, chestName, slot, product.aisleName))
-          local moved, moveErr = callPeripheralWithTimeout(chestName, "pushItems", PERIPHERAL_CALL_TIMEOUT, aisle.self, slot, remaining)
-          if moved and moved > 0 then
-            dispensed = dispensed + moved
-            -- Decrement stock for the specific item that was dispensed
-            decrementStock(item.name, item.nbt, moved)
-          elseif moved == nil then
-            logger.error(string.format("pushItems failed for chest %s slot %d: %s", chestName, slot, moveErr or "unknown error"))
+      local items, listErr = callPeripheralWithTimeout(chestName, "list", PERIPHERAL_CALL_TIMEOUT)
+      if not items then
+        logger.warn(string.format("Chest %d (%s) list failed: %s", i, chestName, listErr or "unknown error"))
+      else
+        for slot, item in pairs(items) do
+          if dispensed >= maxCount then break end
+          -- Match item: if anyNbt is true, match only by modid; otherwise match both modid and nbt
+          local matches = item.name == product.modid
+          if matches and not product.anyNbt then
+            matches = item.nbt == product.itemnbt
+          end
+          if matches then
+            local remaining = maxCount - dispensed
+            logger.info(string.format("Transferring %d %s from chest %d (%s) slot %d to aisle %s", remaining, product.modid, i, chestName, slot, product.aisleName))
+            local moved, moveErr = callPeripheralWithTimeout(chestName, "pushItems", PERIPHERAL_CALL_TIMEOUT, aisle.self, slot, remaining)
+            if moved and moved > 0 then
+              dispensed = dispensed + moved
+              -- Decrement stock for the specific item that was dispensed
+              decrementStock(item.name, item.nbt, moved)
+            elseif moved == nil then
+              logger.error(string.format("pushItems failed for chest %s slot %d: %s", chestName, slot, moveErr or "unknown error"))
+            end
           end
         end
       end
-    end -- end items check
-    ::continue::
+    end
     if dispensed >= maxCount then break end
   end
 
