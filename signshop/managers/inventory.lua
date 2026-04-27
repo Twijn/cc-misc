@@ -14,8 +14,50 @@ local stockCache = persist("stock-cache.json")
 
 local manager = {}
 
+local PERIPHERAL_CALL_TIMEOUT = 2
+
 local function getChests()
-  return table.pack(peripheral.find("inventory"))
+  local chests = {}
+  for _, name in ipairs(peripheral.getNames()) do
+    if peripheral.hasType(name, "inventory") then
+      table.insert(chests, name)
+    end
+  end
+  return chests
+end
+
+--- Run a peripheral method with a timeout to avoid hangs on remote inventories.
+---@param peripheralName string
+---@param method string
+---@param timeout number
+---@param ... any
+---@return any result
+---@return string|nil err
+local function callPeripheralWithTimeout(peripheralName, method, timeout, ...)
+  local args = { ... }
+  local completed = false
+  local ok, result
+
+  local function callLoop()
+    ok, result = pcall(peripheral.call, peripheralName, method, table.unpack(args, 1, #args))
+    completed = true
+  end
+
+  local function timeoutLoop()
+    sleep(timeout)
+  end
+
+  parallel.waitForAny(callLoop, timeoutLoop)
+
+  if not completed then
+    return nil, string.format("timeout after %.1fs", timeout)
+  end
+
+  if not ok then
+    return nil, tostring(result)
+  end
+
+  return result, nil
 end
 
 local function getItemKey(item)
@@ -45,22 +87,26 @@ function manager.rescan()
   local start = os.clock()
   local stock = {}
   local chests = getChests()
-  for _, chest in ipairs(chests) do
-    if chest and chest.list then
-      local items = chest.list()
-      if items then
-        for slot, item in pairs(items) do
-          local key = getItemKey(item)
-          if not detailCache.get(key) then
-            local detail = chest.getItemDetail(slot)
+  for _, chestName in ipairs(chests) do
+    local items, listErr = callPeripheralWithTimeout(chestName, "list", PERIPHERAL_CALL_TIMEOUT)
+    if not items then
+      logger.warn(string.format("Rescan skipped chest %s: %s", chestName, listErr or "unknown error"))
+    else
+      for slot, item in pairs(items) do
+        local key = getItemKey(item)
+        if not detailCache.get(key) then
+          local detail, detailErr = callPeripheralWithTimeout(chestName, "getItemDetail", PERIPHERAL_CALL_TIMEOUT, slot)
+          if detail then
             detail.count = nil -- remove current count from it (will be overwritten in getItemDetail() with the current stock)
             detailCache.set(key, detail)
+          else
+            logger.warn(string.format("Rescan could not get detail for %s slot %d: %s", chestName, slot, detailErr or "unknown error"))
           end
-          if not stock[key] then
-            stock[key] = 0
-          end
-          stock[key] = stock[key] + item.count
         end
+        if not stock[key] then
+          stock[key] = 0
+        end
+        stock[key] = stock[key] + item.count
       end
     end
   end
@@ -184,36 +230,40 @@ function manager.dispense(product, maxCount)
   local chests = getChests()
   logger.info(string.format("Scanning %d chests for %s", #chests, product.modid))
   
-  for i, chest in ipairs(chests) do
-    local items = chest.list()
-    logger.info("on chest " .. i)
-    if not items then
-      logger.warn(string.format("Chest %d returned nil from list(), skipping", i))
-    else
-    for slot, item in pairs(items) do
-      if dispensed >= maxCount then break end
-      -- Match item: if anyNbt is true, match only by modid; otherwise match both modid and nbt
-      local matches = item.name == product.modid
-      if matches and not product.anyNbt then
-        matches = item.nbt == product.itemnbt
-      end
-      if matches then
-        local remaining = maxCount - dispensed
-        logger.info(string.format("Transferring %d %s from chest %d slot %d to aisle %s", remaining, product.modid, i, slot, product.aisleName))
-        local moved = chest.pushItems(aisle.self, slot, remaining)
-        if moved and moved > 0 then
-          dispensed = dispensed + moved
-          -- Decrement stock for the specific item that was dispensed
-          decrementStock(item.name, item.nbt, moved)
-        elseif moved == nil then
-          -- Peripheral became unreachable mid-dispense
-          logger.error(string.format("Lost connection to aisle %s during dispense", product.aisleName))
-          break
-        end
-        sleep()
-      end
+  for i, chestName in ipairs(chests) do
+    logger.info(string.format("Scanning chest %d/%d: %s", i, #chests, chestName))
+
+    if chestName == aisle.self then
+      logger.info(string.format("Skipping aisle target inventory %s", chestName))
+      goto continue
     end
+
+    local items, listErr = callPeripheralWithTimeout(chestName, "list", PERIPHERAL_CALL_TIMEOUT)
+    if not items then
+      logger.warn(string.format("Chest %d (%s) list failed: %s", i, chestName, listErr or "unknown error"))
+    else
+      for slot, item in pairs(items) do
+        if dispensed >= maxCount then break end
+        -- Match item: if anyNbt is true, match only by modid; otherwise match both modid and nbt
+        local matches = item.name == product.modid
+        if matches and not product.anyNbt then
+          matches = item.nbt == product.itemnbt
+        end
+        if matches then
+          local remaining = maxCount - dispensed
+          logger.info(string.format("Transferring %d %s from chest %d (%s) slot %d to aisle %s", remaining, product.modid, i, chestName, slot, product.aisleName))
+          local moved, moveErr = callPeripheralWithTimeout(chestName, "pushItems", PERIPHERAL_CALL_TIMEOUT, aisle.self, slot, remaining)
+          if moved and moved > 0 then
+            dispensed = dispensed + moved
+            -- Decrement stock for the specific item that was dispensed
+            decrementStock(item.name, item.nbt, moved)
+          elseif moved == nil then
+            logger.error(string.format("pushItems failed for chest %s slot %d: %s", chestName, slot, moveErr or "unknown error"))
+          end
+        end
+      end
     end -- end items check
+    ::continue::
     if dispensed >= maxCount then break end
   end
 
