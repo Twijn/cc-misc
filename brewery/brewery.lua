@@ -207,6 +207,27 @@ local function recordCompletedKlogBatch(job)
     pending.quantity = pending.quantity + 3
 end
 
+local function notifyKlogTransfer(clientRef, transferId, message, notifyType)
+    if not clientRef or type(clientRef.notifyTransfer) ~= "function" then
+        return false, "notifyTransfer unavailable"
+    end
+
+    if type(transferId) ~= "string" or transferId == "" then
+        return false, "missing transfer id"
+    end
+
+    local ok, notifOrErr, err = pcall(clientRef.notifyTransfer, transferId, message, notifyType)
+    if not ok then
+        return false, tostring(notifOrErr)
+    end
+
+    if not notifOrErr then
+        return false, tostring(err or "unknown error")
+    end
+
+    return true
+end
+
 local function processKlogTransfer(transfer)
     local ok, err = ensureKlogClient()
     if not ok then
@@ -243,8 +264,19 @@ local function processKlogTransfer(transfer)
 
     log.info(string.format("klog transfer completed: %s x%d -> %s (id=%s)",
         tostring(transfer.displayName or transfer.itemName), transfer.quantity, tostring(transfer.to), tostring(data.id or "unknown")))
-    chatTell(transfer.notifyUser, string.format("Brewery: delivered %s x%d via Klog.",
-        transfer.displayName or transfer.itemName or "potion", transfer.quantity))
+
+    local notifyOk, notifyErr = notifyKlogTransfer(
+        clientRef,
+        data.id,
+        string.format("Brewery: delivered %s x%d via Klog.",
+            transfer.displayName or transfer.itemName or "potion", transfer.quantity),
+        "success"
+    )
+    if not notifyOk then
+        log.warn("klog transfer notification failed: " .. tostring(notifyErr))
+        chatTell(transfer.notifyUser, string.format("Brewery: delivered %s x%d via Klog.",
+            transfer.displayName or transfer.itemName or "potion", transfer.quantity))
+    end
 end
 
 local function klogTransferLoop()
@@ -1273,27 +1305,35 @@ local function safe(fn, name, restartDelay)
     end
 end
 
+local inputTypes = {
+    "ender_storage"
+}
+
 local storageTypes = {
     "sc-goodies:diamond_barrel",
     "sc-goodies:shulker_box_diamond",
-    "ender_storage",
 }
 
-local function isStorageType(name)
+local function isStorageType(name, isExport)
     local types = table.pack(peripheral.getType(name))
     for _, t1 in ipairs(types) do
         for __, t2 in pairs(storageTypes) do
             if t1 == t2 then return true end
         end
+        if not isExport then
+            for __, t2 in pairs(inputTypes) do
+                if t1 == t2 then return true end
+            end
+        end
     end
     return false
 end
 
-local function getStorageInventories()
+local function getStorageInventories(isExport)
     local excludedKlogName = resolveKlogEstorageName()
     local inventories = {}
     for _, name in pairs(peripheral.getNames()) do
-        if isStorageType(name) and name ~= excludedKlogName then
+        if isStorageType(name, isExport) and name ~= excludedKlogName then
             table.insert(inventories, peripheral.wrap(name))
         end
     end
@@ -1316,7 +1356,7 @@ local function brewJob(name, stand)
     local POTION_SLOTS = {1, 2, 3}
 
     local function itemsOut(fromSlot)
-        for _, inv in ipairs(getStorageInventories()) do
+        for _, inv in ipairs(getStorageInventories(true)) do
             local moved = inv.pullItems(name, fromSlot)
             if moved and moved > 0 then
                 if not stand.getItemDetail(fromSlot) then
@@ -1610,8 +1650,7 @@ local function brewJob(name, stand)
         local completedKlogMeta = job.meta and job.meta.klog
         if completedKlogMeta then
             recordCompletedKlogBatch(job)
-            chatTell(completedKlogMeta.notifyUser,
-                string.format("Brewery: brewed %s batch, preparing Klog delivery.", job.recipe.displayName or "potion"))
+            log.debug(string.format("Queued Klog transfer batch for %s", job.recipe.displayName or "potion"))
         end
 
         updateJobStatus(id, JOB_STATUS.COMPLETE, "Complete!")
@@ -1669,7 +1708,6 @@ end
 local function stockMaintenanceLoop()
     sleep(10)  -- Initial delay to let everything initialize
 
-    local lastTotalStock = 0
     while true do
         -- Refresh inventory cache
         getAllItems(true)
