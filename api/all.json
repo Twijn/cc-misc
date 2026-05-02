@@ -96,7 +96,7 @@
     },
     "cmd": {
       "name": "cmd",
-      "version": "1.3.0",
+      "version": "1.3.1",
       "description": "Command-line interface module for ComputerCraft that provides a REPL-style command processor with support for custom commands, autocompletion, and command history. Features: Built-in commands (clear, exit, help), command history navigation, tab autocompletion for commands and arguments, colored output for different message types, table pretty-printing functionality, pager for long output, string utility functions, command categories for organized help display, proper alias handling, and exit hooks.",
       "dependencies": [
         "pager"
@@ -2003,5 +2003,5 @@
       "classes": []
     }
   },
-  "updated": "2026-04-10T06:11:43Z"
+  "updated": "2026-05-02T22:20:23Z"
 }
