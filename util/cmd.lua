@@ -53,10 +53,10 @@
 ---  end)
 ---end
 ---
----@version 1.3.0
+---@version 1.3.1
 -- @module cmd
 
-local VERSION = "1.3.0"
+local CMD_VERSION = "1.3.1"
 local pager = require("pager")
 
 local history = {}
@@ -600,14 +600,18 @@ local function startCmd(name, version, customCommands, options)
   end
   
   -- Register aliases for all commands (after all commands added)
+  local aliasesToAdd = {}
   for cmdName, cmd in pairs(commands) do
     if cmd.aliases then
       for _, alias in ipairs(cmd.aliases) do
         if not commands[alias] then
-          commands[alias] = cmd
+          aliasesToAdd[alias] = cmd
         end
       end
     end
+  end
+  for alias, cmd in pairs(aliasesToAdd) do
+    commands[alias] = cmd
   end
 
   -- === Main REPL loop ===
@@ -651,6 +655,7 @@ return setmetatable({
   onExit = onExit,
   removeExitHook = removeExitHook,
   clearExitHooks = clearExitHooks,
+  VERSION = CMD_VERSION,
 }, {
   __call = function(_, ...)
     return startCmd(...)
