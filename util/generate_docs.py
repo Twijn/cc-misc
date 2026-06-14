@@ -24,7 +24,7 @@ class LuaDocGenerator:
         self.programs = []
         
         # Programs to include from parent directory
-        self.program_dirs = ['signshop', 'autocrafter', 'farm', 'netherite', 'roadbuilder', 'router', 'spleef', 'brewery']
+        self.program_dirs = ['autocrafter', 'farm']
         
     def parse_file(self, filepath: Path) -> Dict[str, Any]:
         """Parse a Lua file and extract documentation"""
