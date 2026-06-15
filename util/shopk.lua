@@ -51,10 +51,10 @@
 ---
 ---client.run()
 ---
----@version 1.0.3
+---@version 1.0.4
 -- @module shopk
 
-local VERSION = "1.0.3"
+local VERSION = "1.0.4"
 
 ---@class ShopkOptions
 ---@field syncNode? string The Kromer API endpoint URL (defaults to official endpoint)
@@ -109,6 +109,7 @@ local VERSION = "1.0.3"
 
 ---@class ShopkModule
 ---@field _v string Version number
+---@field _meResponse ShopkMeResponse? The cached response from the "me" request. You should generally use `address` instead of this field.
 ---@field state "connecting"|"connected"|"closed"|"error" The state of the websocket
 ---@field stateMessage string The human-readable message for the state of the websocket.
 ---@field lastError ShopkError? The last error recorded by shopk.
@@ -190,8 +191,8 @@ end
 ---@return ShopkMetadata # Parsed metadata with keys and values
 local function parseMetadata(str)
     local result = {
-        keys = {},   -- key/value pairs
-        values = {}  -- bare values (no '=')
+        keys = {},  -- key/value pairs
+        values = {} -- bare values (no '=')
     }
 
     for token in string.gmatch(str, "([^;]+)") do
@@ -270,7 +271,7 @@ return function(options)
             {
                 name = "No Message/Errors in Original Transaction",
                 check = function(transaction)
-                    if transaction.meta.msg or transaction.meta.message or transaction.meta.error then
+                    if transaction.meta.keys.msg or transaction.meta.keys.message or transaction.meta.keys.error then
                         return false, "Refunds are not allowed for transactions with message or error metadata"
                     end
                     return true
@@ -279,7 +280,7 @@ return function(options)
             {
                 name = "Transaction does not reference another transaction",
                 check = function(transaction)
-                    if transaction.meta.ref then
+                    if transaction.meta.keys.ref then
                         return false, "Refunds are not allowed for transactions that reference another transaction"
                     end
                     return true
@@ -299,6 +300,7 @@ return function(options)
         stateMessage = "Connecting",
         isGuest = true,
         address = nil,
+        _meResponse = nil,
         on = function() end,
         run = function() end,
         close = function() end,
@@ -327,13 +329,16 @@ return function(options)
     ---@param event string Event name to fire
     ---@param ... any Arguments to pass to listeners
     local function fire(event, ...)
-        local args = {...}
         local l = listeners[event]
         if not l then
             error(("event %s not found"):format(event))
         end
         for _, listener in pairs(l) do
-            listener(table.unpack(args))
+            local ok, err = pcall(listener, ...)
+            if not ok then
+                os.queueEvent("listener_error", err, event)
+                printError(("listener for event %s failed: %s"):format(event, err))
+            end
         end
     end
 
@@ -357,7 +362,8 @@ return function(options)
 
             assert(type(amount) == "number", "Refund amount must be a number")
             assert(type(message) == "nil" or type(message) == "string", "Refund message must be a string or nil")
-            assert(type(messageType) == "nil" or type(messageType) == "string", "Refund messageType must be a string or nil")
+            assert(type(messageType) == "nil" or type(messageType) == "string",
+                "Refund messageType must be a string or nil")
 
             local function cbErr(err, code)
                 if cb then cb(normalizeError(err, code or "refund_failed")) end
@@ -389,7 +395,8 @@ return function(options)
             module.send({
                 to = transaction.from,
                 amount = amount,
-                metadata = ("ref=%d;type=refund;original=%.5f;%s=%s"):format(transaction.id, transaction.value, normalizedMessageType, sanitizedMessage)
+                metadata = ("ref=%d;type=refund;original=%.5f;%s=%s"):format(transaction.id, transaction.value,
+                    normalizedMessageType, sanitizedMessage)
             }, function(data)
                 if not data.ok then
                     -- Rollback on failure
@@ -427,6 +434,7 @@ return function(options)
         end
 
         if state == "connected" then
+            module._meResponse = nil
             module.me(function(data)
                 fire(state, data.is_guest, data.address)
             end)
@@ -485,7 +493,8 @@ return function(options)
     ---@param cb? function Optional callback for response
     local function request(data, cb)
         if not ws then
-            error("WS has not been initialized yet! Make sure you try to send data after shopk.on(\"connected\") has been called.")
+            error(
+                "WS has not been initialized yet! Make sure you try to send data after shopk.on(\"connected\") has been called.")
         end
 
         data.id = nextId
@@ -509,6 +518,8 @@ return function(options)
 
         if listeners[event] then
             table.insert(listeners[event], listener)
+        else
+            error("unknown event: " .. event)
         end
     end
 
@@ -535,7 +546,8 @@ return function(options)
                             setState("connected")
                             request({
                                 type = "subscribe",
-                                event = (options.onlyOwnTransactions and options.privatekey) and "ownTransactions" or "transactions"
+                                event = (options.onlyOwnTransactions and options.privatekey) and "ownTransactions" or
+                                    "transactions"
                             })
                         elseif data.type == "event" and data.event == "transaction" then
                             local transaction = data.transaction
@@ -546,7 +558,8 @@ return function(options)
                 elseif e == "websocket_success" then
                     ws = msg
                 elseif e == "websocket_failure" then
-                    setState("error", createError("websocket_connection_failed", "WebSocket connection failed: " .. tostring(msg)))
+                    setState("error",
+                        createError("websocket_connection_failed", "WebSocket connection failed: " .. tostring(msg)))
                     ws = nil
                 elseif e == "websocket_closed" and module.state ~= "closed" then
                     -- this could be the server closing the connection or a network error, so we should attempt to reconnect after a delay
@@ -571,20 +584,18 @@ return function(options)
         end
     end
 
-    ---@type ShopkMeResponse?
-    local meResponse = nil
     ---Get information about the current wallet
     ---Starting in 1.0.1, this data is passed by the "connected" event for easy access
     ---@param cb? function Optional callback to receive wallet data
     function module.me(cb)
-        if meResponse then
-            if cb then cb(meResponse) end
+        if module._meResponse then
+            if cb then cb(module._meResponse) end
             return
         end
         request({
             type = "me"
         }, function(data)
-            meResponse = data
+            module._meResponse = data
             module.isGuest = data.is_guest
             module.address = data.address
             if cb then cb(data) end
