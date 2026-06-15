@@ -2,8 +2,6 @@
 
 > Yes, a lot of the docs here are AI generated. Sorry.
 
-**The missing standard library for ComputerCraft: Tweaked**
-
 A professional collection of utility modules for ComputerCraft that makes building complex programs easier, cleaner, and more maintainable.
 
 [![Documentation](https://img.shields.io/badge/docs-ccmisc.twijn.dev-blue)](https://ccmisc.twijn.dev)
@@ -369,9 +367,6 @@ cc-misc/
 │   ├── installer.lua       # Interactive installer
 │   └── updater.lua         # Update manager
 ├── farm/                   # Example: Farming automation
-├── brewery/                # Example: Brewery management
-├── signshop/               # Example: Sign shop system
-├── spleef/                 # Example: Spleef game server
 └── docs/                   # Generated documentation
 ```
 
