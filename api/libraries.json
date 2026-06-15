@@ -148,7 +148,7 @@
     },
     {
       "name": "shopk",
-      "version": "1.0.3",
+      "version": "1.0.4",
       "description": "A Kromer cryptocurrency API client for ComputerCraft that provides real-time transaction monitoring and wallet operations through WebSocket connections. Features: Real-time transaction monitoring via WebSocket, automatic reconnection on connection loss, transaction sending with metadata support, wallet information retrieval, metadata parsing for structured data, and event-driven architecture.",
       "dependencies": [],
       "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/shopk.lua",
@@ -195,58 +195,6 @@
       "classes": []
     },
     {
-      "name": "turtle-tracker",
-      "version": "1.0.0",
-      "description": "A turtle API client module for ComputerCraft that provides easy integration with the krawlet-api turtle tracking system. Features: Automatic stat tracking, position reporting, configurable API endpoint, periodic sync support, and simple state management for turtle data.",
-      "dependencies": [
-        "turtleApi"
-      ],
-      "download_url": "https://raw.githubusercontent.com/Twijn/cc-misc/main/util/turtle-tracker.lua",
-      "documentation_url": "https://ccmisc.twijn.dev/turtle-tracker.html",
-      "functions": [
-        "module.setEndpoint",
-        "module.getEndpoint",
-        "module.init",
-        "module.setDefault",
-        "module.getStats",
-        "module.getStat",
-        "module.setStat",
-        "module.incrementStat",
-        "module.decrementStat",
-        "module.setAbsolutePosition",
-        "module.getAbsolutePosition",
-        "module.setRelativePosition",
-        "module.getRelativePosition",
-        "module.moveRelative",
-        "module.moveAbsolute",
-        "module.setLabel",
-        "module.getLabel",
-        "module.updateFuel",
-        "module.setFuel",
-        "module.getFuel",
-        "module.buildPayload",
-        "module.sync",
-        "module.syncStats",
-        "module.syncPosition",
-        "module.fetch",
-        "module.fetchAll",
-        "module.delete",
-        "module.deleteById",
-        "module.startAutoSync",
-        "module.stopAutoSync",
-        "module.isAutoSyncRunning",
-        "module.forward",
-        "module.back",
-        "module.up",
-        "module.down",
-        "module.dig",
-        "module.digUp",
-        "module.digDown",
-        "module._debug"
-      ],
-      "classes": []
-    },
-    {
       "name": "updater",
       "version": "2.0.0",
       "description": "A package updater module for CC-Misc utilities that checks for and installs updates programmatically using the GitHub API. Features: Check for available updates, programmatic package installation and updates, version comparison, dependency resolution, batch update operations, JSON API integration, project file management, interactive UI mode, and detailed logging for debugging.",
@@ -280,5 +228,5 @@
       "classes": []
     }
   ],
-  "updated": "2026-05-02T22:20:23Z"
+  "updated": "2026-06-15T03:40:39Z"
 }
