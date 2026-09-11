@@ -1066,21 +1066,21 @@
           ],
           "returns": "",
           "description": "Register an event listener Starting in 1.0.1, \"ready\" was renamed to \"connected\", and additional state management events have been added. \"connected\" now also calls with (isGuest: boolean, address: table?) when the connection is established.",
-          "line": 508
+          "line": 521
         },
         {
           "name": "module.run",
           "params": [],
           "returns": "",
           "description": "Start the WebSocket connection and enter the main event loop This function blocks until the connection is closed",
-          "line": 526
+          "line": 539
         },
         {
           "name": "module.close",
           "params": [],
           "returns": "",
           "description": "Close the WebSocket connection and stop reconnecting",
-          "line": 578
+          "line": 596
         },
         {
           "name": "module.me",
@@ -1093,7 +1093,7 @@
           ],
           "returns": "",
           "description": "Get information about the current wallet Starting in 1.0.1, this data is passed by the \"connected\" event for easy access",
-          "line": 587
+          "line": 605
         },
         {
           "name": "module.send",
@@ -1111,7 +1111,7 @@
           ],
           "returns": "",
           "description": "Send a Kromer transaction",
-          "line": 605
+          "line": 623
         },
         {
           "name": "module.addCheck",
@@ -1129,7 +1129,7 @@
           ],
           "returns": "",
           "description": "Add a custom check function that runs before processing a refund. This can be used to implement additional safeguards or restrictions on refunds, such as checking against an external database or applying custom business logic. The check function should return `true` if the refund is allowed, or `false` and an error message if it should be blocked.",
-          "line": 639
+          "line": 657
         },
         {
           "name": "module.removeCheck",
@@ -1142,7 +1142,7 @@
           ],
           "returns": "",
           "description": "Remove a previously added refund check by name",
-          "line": 649
+          "line": 667
         }
       ],
       "classes": []
@@ -1567,5 +1567,5 @@
       "classes": []
     }
   },
-  "updated": "2026-06-15T03:40:39Z"
+  "updated": "2026-09-11T23:28:19Z"
 }
