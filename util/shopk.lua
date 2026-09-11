@@ -196,7 +196,7 @@ local function parseMetadata(str)
     }
 
     for token in string.gmatch(str, "([^;]+)") do
-        local key, value = token:match("([^=]+)=([^=]+)")
+        local key, value = token:match("([^=]+)=(.*)")
         if key and value then
             result.keys[key] = value
         else
