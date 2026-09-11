@@ -406,6 +406,15 @@ return function(options)
             end)
         end
 
+        transaction.getMeta = function(meta, caseSensitive)
+            for k, v in pairs(transaction.meta.keys) do
+                if (caseSensitive and k == meta) or (not caseSensitive and k:lower() == meta:lower()) then
+                    return v
+                end
+            end
+            return nil
+        end
+
         transaction.hasMeta = function(meta, caseSensitive)
             for _, v in pairs(transaction.meta.values) do
                 if (caseSensitive and v == meta) or (not caseSensitive and v:lower() == meta:lower()) then
