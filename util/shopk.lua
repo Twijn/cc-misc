@@ -60,7 +60,8 @@ local VERSION = "1.0.4"
 ---@field syncNode? string The Kromer API endpoint URL (defaults to official endpoint)
 ---@field wsStart? string WebSocket start path (defaults to "ws/start")
 ---@field privatekey? string Private key for authenticated operations
----@field reconnectDelay? number Seconds to wait before reconnecting after an error (defaults to 30)
+---@field reconnectDelayStart? number Seconds to wait before reconnecting after an error (defaults to 5)
+---@field reconnectDelayMax? number Maximum number of seconds to wait before reconnecting after an error (defaults to 60)
 ---@field sendDuration? number Time window in seconds for rate limiting sends (defaults to 60)
 ---@field sendLimit? number Maximum number of sends allowed within the sendDuration window (defaults to 20)
 ---@field onlyOwnTransactions? boolean If true, only receive transactions involving the authenticated wallet (requires privatekey)
@@ -110,6 +111,7 @@ local VERSION = "1.0.4"
 ---@class ShopkModule
 ---@field _v string Version number
 ---@field _meResponse ShopkMeResponse? The cached response from the "me" request. You should generally use `address` instead of this field.
+---@field _reconnectDelay number The current reconnect delay in seconds
 ---@field state "connecting"|"connected"|"closed"|"error" The state of the websocket
 ---@field stateMessage string The human-readable message for the state of the websocket.
 ---@field lastError ShopkError? The last error recorded by shopk.
@@ -118,15 +120,16 @@ local VERSION = "1.0.4"
 ---@field on fun(event: "connecting"|"connected"|"closed"|"error"|"transaction", listener: function): nil Register event listener. The "ready" listener receives (isGuest: boolean, address: string?); the "error" listener receives (err: ShopkError); "transaction" receives (tx: ShopkTransaction)
 ---@field run fun(): nil Start the WebSocket connection and event loop
 ---@field close fun(): nil Close the connection and stop reconnecting
----@field me fun(cb?: function): nil Get current wallet information
----@field send fun(data: ShopkSendData, cb?: function): nil Send a transaction
+---@field me fun(cb: function?): nil Get current wallet information
+---@field send fun(data: ShopkSendData, cb: function?): nil Send a transaction
 ---@field addCheck fun(name: string, checkFn: function): nil Add a custom refund check function that runs before processing refunds
 ---@field removeCheck fun(name: string): nil Remove a previously added refund check by name
 
 local DEFAULT_OPTIONS = {
     syncNode = "https://kromer.reconnected.cc/api/krist/",
     wsStart = "ws/start",
-    reconnectDelay = 30,
+    reconnectDelayStart = 5,
+    reconnectDelayMax = 60,
     sendDuration = 60,
     sendLimit = 20,
     refundMessageTypeDefault = "message",
@@ -296,6 +299,7 @@ return function(options)
                 end
             },
         },
+        _reconnectDelay = options.reconnectDelayStart or 5,
         state = "connecting",
         stateMessage = "Connecting",
         isGuest = true,
@@ -565,6 +569,7 @@ return function(options)
                         end
                     end
                 elseif e == "websocket_success" then
+                    module._reconnectDelay = options.reconnectDelayStart or 5
                     ws = msg
                 elseif e == "websocket_failure" then
                     setState("error",
@@ -578,7 +583,11 @@ return function(options)
             end
 
             if not ws and module.state == "error" then
-                sleep(options.reconnectDelay)
+                sleep(module._reconnectDelay or 5)
+                module._reconnectDelay = math.min(
+                    module._reconnectDelay * 2,
+                    options.reconnectDelayMax or 60
+                )
                 connect()
             end
         end
