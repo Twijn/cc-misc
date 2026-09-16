@@ -142,7 +142,7 @@ Add a color selector field
 
 **Returns:** fun(): number # Function to get the selected color value after submission
 
-### `FormUI:multiselect(label, options, defaultIndices?)`
+### `FormUI:multiselect(label, options, defaultIndices?, validator?)`
 
 Add a multi-select dropdown field
 
@@ -151,6 +151,7 @@ Add a multi-select dropdown field
 - `label` (string): The field label
 - `options` (string[]): Available options
 - `defaultIndices?` (number[]): Indices of default selections (1-based)
+- `validator?` (fun(v:): boolean[], f: table): boolean, string # Custom validation function
 
 **Returns:** fun(): string[] # Function to get selected options after submission
 

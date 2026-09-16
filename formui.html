@@ -367,7 +367,7 @@
 <body>
     <div class="back-link"><a href="index.html">← Back to index</a></div>
     <div class="header">
-        <h1>formui <span class="version-badge">v0.4.0</span></h1>
+        <h1>formui <span class="version-badge">v0.5.0</span></h1>
         <p>A dynamic form user interface library for ComputerCraft that provides interactive forms with various field types, validation, and peripheral detection. Features: Text and number input fields, select dropdowns and peripheral selection, checkbox/toggle fields, multi-select dropdowns, list fields with item management, built-in validation system, labels and buttons, real-time peripheral detection, keyboard navigation with arrow keys, and form submission and cancellation.</p>
     </div>
     
@@ -500,7 +500,7 @@ local formui = require(libDir .. "formui")
             <li><a href='#func-formui-button'><code>FormUI:button(text, action?)</code></a></li>
             <li><a href='#func-formui-checkbox'><code>FormUI:checkbox(label, default?)</code></a></li>
             <li><a href='#func-formui-color'><code>FormUI:color(label, default?)</code></a></li>
-            <li><a href='#func-formui-multiselect'><code>FormUI:multiselect(label, options, defaultIndices?)</code></a></li>
+            <li><a href='#func-formui-multiselect'><code>FormUI:multiselect(label, options, defaultIndices?, validator?)</code></a></li>
             <li><a href='#func-formui-list'><code>FormUI:list(label, default?, itemType?)</code></a></li>
             <li><a href='#func-formui-addsubmitcancel'><code>FormUI:addSubmitCancel()</code></a></li>
             <li><a href='#func-formui-validatefield'><code>FormUI:validateField(i)</code></a></li>
@@ -546,7 +546,7 @@ end
     <h2>Functions</h2>
     <div class='function' id='func-formui-new'>
         <h3><code>FormUI.new(title?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L166' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L178' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Create a new FormUI instance</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -558,7 +558,7 @@ end
     </div>
     <div class='function' id='func-formui-addfield'>
         <h3><code>FormUI:addField(field)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L178' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L190' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a field to the form and return a getter function</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -570,7 +570,7 @@ end
     </div>
     <div class='function' id='func-formui-text'>
         <h3><code>FormUI:text(label, default?, validator?, allowEmpty?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L191' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L203' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a text input field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -585,7 +585,7 @@ end
     </div>
     <div class='function' id='func-formui-number'>
         <h3><code>FormUI:number(label, default?, validator?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L213' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L225' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a number input field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -599,7 +599,7 @@ end
     </div>
     <div class='function' id='func-formui-select'>
         <h3><code>FormUI:select(label, options?, defaultIndex?, validator?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L229' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L241' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a select dropdown field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -614,7 +614,7 @@ end
     </div>
     <div class='function' id='func-formui-peripheral'>
         <h3><code>FormUI:peripheral(label, filterType?, validator?, defaultValue?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L247' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L259' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a peripheral selector field that automatically detects peripherals</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -629,7 +629,7 @@ end
     </div>
     <div class='function' id='func-formui-label'>
         <h3><code>FormUI:label(text)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L280' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L292' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a non-interactive label for display purposes</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -641,7 +641,7 @@ end
     </div>
     <div class='function' id='func-formui-button'>
         <h3><code>FormUI:button(text, action?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L293' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L305' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a button that can trigger actions</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -654,7 +654,7 @@ end
     </div>
     <div class='function' id='func-formui-checkbox'>
         <h3><code>FormUI:checkbox(label, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L308' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L320' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a checkbox/toggle field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -667,7 +667,7 @@ end
     </div>
     <div class='function' id='func-formui-color'>
         <h3><code>FormUI:color(label, default?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L323' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L335' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a color selector field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -679,8 +679,8 @@ end
         <div class='returns'><strong>Returns:</strong> fun(): number # Function to get the selected color value after submission</div>
     </div>
     <div class='function' id='func-formui-multiselect'>
-        <h3><code>FormUI:multiselect(label, options, defaultIndices?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L351' target='_blank' class='source-link'>View source on GitHub</a>
+        <h3><code>FormUI:multiselect(label, options, defaultIndices?, validator?)</code></h3>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L363' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a multi-select dropdown field</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -688,13 +688,14 @@ end
                 <li><code>label</code> (string): The field label</li>
                 <li><code>options</code> (string[]): Available options</li>
                 <li><code>defaultIndices?</code> (number[]): Indices of default selections (1-based)</li>
+                <li><code>validator?</code> (fun(v:): boolean[], f: table): boolean, string # Custom validation function</li>
             </ul>
         </div>
         <div class='returns'><strong>Returns:</strong> fun(): string[] # Function to get selected options after submission</div>
     </div>
     <div class='function' id='func-formui-list'>
         <h3><code>FormUI:list(label, default?, itemType?)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L378' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L400' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add a list field (string or number list, with item reordering)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -708,12 +709,12 @@ end
     </div>
     <div class='function' id='func-formui-addsubmitcancel'>
         <h3><code>FormUI:addSubmitCancel()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L403' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L425' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Add standard Submit and Cancel buttons to the form</p>
     </div>
     <div class='function' id='func-formui-validatefield'>
         <h3><code>FormUI:validateField(i)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L409' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L431' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Validate a specific field by index</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -725,13 +726,13 @@ end
     </div>
     <div class='function' id='func-formui-isvalid'>
         <h3><code>FormUI:isValid()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L423' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L445' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Validate all fields in the form</p>
         <div class='returns'><strong>Returns:</strong> boolean # True if all fields are valid</div>
     </div>
     <div class='function' id='func-formui-get'>
         <h3><code>FormUI:get(label)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L437' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L459' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Get the current value of a field by label</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -743,7 +744,7 @@ end
     </div>
     <div class='function' id='func-formui-setvalue'>
         <h3><code>FormUI:setValue(label, value)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L464' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L530' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Set the value of a field by label</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -756,12 +757,12 @@ end
     </div>
     <div class='function' id='func-formui-draw'>
         <h3><code>FormUI:draw()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L532' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L627' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Draw the form to the terminal</p>
     </div>
     <div class='function' id='func-formui-edit'>
         <h3><code>FormUI:edit(index)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L745' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L800' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Edit a field at the specified index</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -773,7 +774,7 @@ end
     </div>
     <div class='function' id='func-formui-nextselectablefield'>
         <h3><code>FormUI:nextSelectableField(from)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L980' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L1174' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Find the next selectable field index (skips labels)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -785,7 +786,7 @@ end
     </div>
     <div class='function' id='func-formui-prevselectablefield'>
         <h3><code>FormUI:prevSelectableField(from)</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L998' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L1192' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Find the previous selectable field index (skips labels)</p>
         <div class='params'>
             <strong>Parameters:</strong>
@@ -797,7 +798,7 @@ end
     </div>
     <div class='function' id='func-formui-run'>
         <h3><code>FormUI:run()</code></h3>
-        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L1016' target='_blank' class='source-link'>View source on GitHub</a>
+        <a href='https://github.com/Twijn/cc-misc/blob/main/util/formui.lua#L1210' target='_blank' class='source-link'>View source on GitHub</a>
         <p>Run the form's main input loop</p>
         <div class='returns'><strong>Returns:</strong> FormResult? result Table of field values indexed by label, or nil if cancelled</div>
     </div>
