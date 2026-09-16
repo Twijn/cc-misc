@@ -27,7 +27,7 @@
 ---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
----@version 0.4.0
+---@version 0.5.0
 -- @module formui
 
 ---@class FormField
@@ -46,7 +46,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.4.0"
+local VERSION = "0.5.0"
 local FormUI = { _v = VERSION }
 
 -- ComputerCraft color names and their values
@@ -58,10 +58,22 @@ local COLOR_NAMES = {
 }
 
 local COLOR_VALUES = {
-    white = colors.white, orange = colors.orange, magenta = colors.magenta, lightBlue = colors.lightBlue,
-    yellow = colors.yellow, lime = colors.lime, pink = colors.pink, gray = colors.gray,
-    lightGray = colors.lightGray, cyan = colors.cyan, purple = colors.purple, blue = colors.blue,
-    brown = colors.brown, green = colors.green, red = colors.red, black = colors.black
+    white = colors.white,
+    orange = colors.orange,
+    magenta = colors.magenta,
+    lightBlue = colors.lightBlue,
+    yellow = colors.yellow,
+    lime = colors.lime,
+    pink = colors.pink,
+    gray = colors.gray,
+    lightGray = colors.lightGray,
+    cyan = colors.cyan,
+    purple = colors.purple,
+    blue = colors.blue,
+    brown = colors.brown,
+    green = colors.green,
+    red = colors.red,
+    black = colors.black
 }
 
 -- Reverse lookup: color value to name
@@ -96,7 +108,7 @@ FormUI.validation = {
     number_range = function(min, max)
         return function(v)
             return (v >= min and v <= max),
-            ("Must be between %d and %d"):format(min, max)
+                ("Must be between %d and %d"):format(min, max)
         end
     end,
     ---Validate that a number is an integer
@@ -117,7 +129,7 @@ FormUI.validation = {
         return function(v)
             local len = #v
             return len >= min and len <= max,
-            ("Text length must be between %d and %d"):format(min, max)
+                ("Text length must be between %d and %d"):format(min, max)
         end
     end,
     ---Create a validator that checks if string matches a pattern
@@ -286,7 +298,7 @@ function FormUI:label(text)
         label = text,
         text = text,
         value = text,
-        validate = function() return true end  -- Labels are always valid
+        validate = function() return true end -- Labels are always valid
     })
 end
 
@@ -299,9 +311,9 @@ function FormUI:button(text, action)
         type = "button",
         label = text,
         text = text,
-        action = action or text:lower(),  -- Default action is lowercase text
+        action = action or text:lower(),      -- Default action is lowercase text
         value = text,
-        validate = function() return true end  -- Buttons are always valid
+        validate = function() return true end -- Buttons are always valid
     })
 end
 
@@ -352,8 +364,9 @@ end
 ---@param label string The field label
 ---@param options string[] Available options
 ---@param defaultIndices? number[] Indices of default selections (1-based)
+---@param validator? fun(v: boolean[], f: table): boolean, string # Custom validation function
 ---@return fun(): string[] # Function to get selected options after submission
-function FormUI:multiselect(label, options, defaultIndices)
+function FormUI:multiselect(label, options, defaultIndices, validator)
     local selected = {}
     if defaultIndices then
         for _, idx in ipairs(defaultIndices) do
@@ -368,9 +381,18 @@ function FormUI:multiselect(label, options, defaultIndices)
         validate = function(v, f)
             local any = false
             for i = 1, #(f.options or {}) do
-                if v[i] then any = true break end
+                if v[i] then
+                    any = true
+                    break
+                end
             end
-            return any, "Must select at least one option"
+            if not any then
+                return false, "Must select at least one option"
+            end
+            if validator then
+                return validator(v, f)
+            end
+            return true
         end
     })
 end
@@ -461,6 +483,50 @@ function FormUI:get(label)
     return nil
 end
 
+local function centeredWindow(parent, title, width, height, footer)
+    local w, h = parent.getSize()
+
+    -- set width and height to defaults
+    width = width or (w - 4)
+    height = height or (h - 2)
+
+    -- ensure symmetry
+    if w % 2 ~= width % 2 then width = width + 1 end
+    if h % 2 ~= height % 2 then height = height + 1 end
+
+    -- calculate position
+    local x = math.ceil((w - width) / 2) + 1
+    local y = math.ceil((h - height) / 2) + 1
+
+    -- create frame
+    local frame = window.create(parent, x, y, width, height)
+
+    frame.setBackgroundColor(colors.gray)
+    frame.clear()
+
+    frame.setBackgroundColor(colors.blue)
+    frame.setTextColor(colors.white)
+    frame.setCursorPos(2, 1)
+    frame.clearLine()
+    frame.write(title)
+
+    frame.setBackgroundColor(colors.black)
+
+    if footer then
+        if type(footer) == "string" then footer = { footer } end
+
+        frame.setBackgroundColor(colors.gray)
+        frame.setTextColor(colors.lightGray)
+        for i = 1, #footer do
+            frame.setCursorPos(2, height - #footer + i)
+            frame.write(footer[i])
+        end
+    end
+
+    local innerWin = window.create(frame, 1, 2, width, height - 1 - (type(footer) == "table" and #footer or 0))
+    return innerWin, frame
+end
+
 ---Set the value of a field by label
 ---@param label string The field label
 ---@param value any The new value to set
@@ -505,12 +571,41 @@ function FormUI:setValue(label, value)
                 end
             elseif f.type == "checkbox" then
                 -- For checkbox fields, set boolean value
-                f.value = not not value  -- Coerce to boolean
+                f.value = not not value -- Coerce to boolean
                 return true
             elseif f.type == "multiselect" then
-                -- For multiselect fields, value should be a table of indices or a table of booleans
+                -- For multiselect fields, value can be a table of indices or a boolean map
                 if type(value) == "table" then
-                    f.value = value
+                    local selected = {}
+                    local isIndexList = true
+
+                    for key, item in pairs(value) do
+                        if type(key) ~= "number" or type(item) ~= "number" then
+                            isIndexList = false
+                            break
+                        end
+
+                        if type(item) ~= "number" then
+                            isIndexList = false
+                            break
+                        end
+                    end
+
+                    if isIndexList then
+                        for _, idx in ipairs(value) do
+                            if type(idx) == "number" and f.options and f.options[idx] then
+                                selected[idx] = true
+                            end
+                        end
+                    else
+                        for idx, isSelected in pairs(value) do
+                            if type(idx) == "number" and isSelected and f.options and f.options[idx] then
+                                selected[idx] = true
+                            end
+                        end
+                    end
+
+                    f.value = selected
                     return true
                 end
             elseif f.type == "list" then
@@ -531,215 +626,175 @@ end
 
 ---Draw the form to the terminal
 function FormUI:draw()
+    local term = self.win or term.current() -- use window if provided
     local w, h = term.getSize()
-    term.setTextColor(colors.white)
-    term.setBackgroundColor(colors.gray)
-    term.clear()
-    centerText(1, "> " .. self.title .. " <", w)
 
-    -- Calculate available space for fields (accounting for header and footer)
-    local headerLines = 3  -- Title and spacing
-    local footerLines = 3  -- Help text
-    local availableLines = h - headerLines - footerLines
-    
-    -- Initialize scroll offset if not set
-    if not self.scrollOffset then
-        self.scrollOffset = 0
-    end
-    
-    -- Calculate how many lines each field takes (accounting for text wrapping)
-    local fieldLines = {}
-    local totalLines = 0
-    for i, f in ipairs(self.fields) do
-        local lines = 1  -- Base field line
-        
-        -- Calculate actual display text to determine wrapping
-        local displayText = ""
+    local function getFieldDisplayText(f, prefix)
         if f.type == "label" then
-            displayText = "  " .. f.text
+            return f.text
         elseif f.type == "button" then
-            displayText = "[ " .. f.text .. " ]"
-        else
-            local display = ""
-            if f.type == "text" or f.type == "number" then
-                display = tostring(f.value)
-            elseif f.type == "select" or f.type == "peripheral" or f.type == "color" then
-                local opts = f.options or {}
-                display = (#opts > 0) and tostring(opts[f.value]) or "(none)"
-            elseif f.type == "checkbox" then
-                display = f.value and "[X]" or "[ ]"
-            elseif f.type == "multiselect" then
-                local opts = f.options or {}
-                local sel = {}
-                for idx, v in ipairs(opts) do
-                    if f.value[idx] then table.insert(sel, v) end
-                end
-                display = (#sel > 0) and table.concat(sel, ", ") or "(none)"
-            elseif f.type == "list" then
-                display = (#f.value > 0) and ("[" .. table.concat(f.value, ", ") .. "]") or "(empty)"
-            end
-            displayText = "> " .. f.label .. ": " .. display
-            if display == "" then
-                displayText = displayText .. "< no value >"
-            end
+            return "[ " .. f.text .. " ]"
         end
-        
-        -- Calculate how many lines this text will take
-        lines = math.ceil(#displayText / w)
-        if lines < 1 then lines = 1 end
-        
-        if f.label and self.errors[f.label] then
-            local errorText = "! " .. self.errors[f.label]
-            lines = lines + math.ceil(#errorText / w)
-        end
-        fieldLines[i] = lines
-        totalLines = totalLines + lines
-    end
-    
-    -- Adjust scroll offset to keep selected field visible
-    local selectedLineStart = 0
-    for i = 1, self.selected - 1 do
-        selectedLineStart = selectedLineStart + fieldLines[i]
-    end
-    local selectedLineEnd = selectedLineStart + fieldLines[self.selected]
-    
-    -- Scroll up if selected field is above visible area
-    if selectedLineStart < self.scrollOffset then
-        self.scrollOffset = selectedLineStart
-    end
-    
-    -- Scroll down if selected field is below visible area
-    if selectedLineEnd > self.scrollOffset + availableLines then
-        self.scrollOffset = selectedLineEnd - availableLines
-    end
-    
-    -- Clamp scroll offset
-    self.scrollOffset = math.max(0, math.min(self.scrollOffset, math.max(0, totalLines - availableLines)))
-    
-    -- Draw fields with scrolling
-    term.setCursorPos(1, headerLines + 1)
-    local currentLine = 0
-    
-    for i, f in ipairs(self.fields) do
-        local prefix = (i == self.selected) and "> " or "  "
-        local display = ""
 
+        local display = ""
         if f.type == "text" or f.type == "number" then
             display = tostring(f.value)
         elseif f.type == "select" or f.type == "peripheral" or f.type == "color" then
             local opts = f.options or {}
-            display = (#opts > 0) and tostring(opts[f.value]) or "(none)"
+            display = (#opts > 0 and opts[f.value] ~= nil) and tostring(opts[f.value]) or "(none)"
         elseif f.type == "checkbox" then
             display = f.value and "[X]" or "[ ]"
         elseif f.type == "multiselect" then
             local opts = f.options or {}
             local sel = {}
-            for idx, v in ipairs(opts) do
-                if f.value[idx] then table.insert(sel, v) end
+            for idx, value in ipairs(opts) do
+                if f.value[idx] then
+                    table.insert(sel, value)
+                end
             end
             display = (#sel > 0) and table.concat(sel, ", ") or "(none)"
         elseif f.type == "list" then
-            display = (#f.value > 0) and ("[" .. table.concat(f.value, ", ") .. "]") or "(empty)"
-        elseif f.type == "label" then
-            display = ""  -- Labels don't show a value, just the text
-        elseif f.type == "button" then
-            display = ""  -- Buttons don't show a value, just the text
+            display = (#(f.value or {}) > 0) and ("[" .. table.concat(f.value, ", ") .. "]") or "(empty)"
+        else
+            display = tostring(f.value or "")
         end
-        
-        -- Check if this field is in the visible area
-        local fieldStartLine = currentLine
-        local fieldEndLine = currentLine + fieldLines[i] - 1
-        
-        -- Only draw if at least part of the field is visible
-        if fieldEndLine >= self.scrollOffset and fieldStartLine < self.scrollOffset + availableLines then
-            local y = headerLines + 1 + (currentLine - self.scrollOffset)
-            
-            if f.type == "label" then
-                -- Labels are shown in light gray and not selectable
-                term.setTextColor(colors.lightGray)
-                local labelText = "  " .. f.text
-                -- Truncate to fit on one line
-                labelText = truncate(labelText, w - 1)
-                term.setCursorPos(1, y)
-                term.clearLine()
-                term.write(labelText)
-            elseif f.type == "button" then
-                -- Buttons are shown with special styling
-                term.setCursorPos(1, y)
-                term.clearLine()
-                if i == self.selected then
-                    term.setTextColor(colors.black)
-                    term.setBackgroundColor(colors.white)
-                    write("[ " .. f.text .. " ]")
-                    term.setBackgroundColor(colors.gray)
-                else
-                    term.setTextColor(colors.lightBlue)
-                    write("[ " .. f.text .. " ]")
-                end
-            else
-                if f.label and self.errors[f.label] then
-                    term.setTextColor(colors.red)
-                elseif i == self.selected then
-                    term.setTextColor(colors.yellow)
-                else
-                    term.setTextColor(colors.white)
-                end
-                
-                local fullText = prefix .. f.label .. ": " .. display
-                if display == "" then
-                    local noValueColor = (term.getTextColor() == colors.white) and colors.lightGray or term.getTextColor()
-                    fullText = prefix .. f.label .. ": "
-                    -- Truncate main part
-                    fullText = truncate(fullText, w - 12) -- Leave room for "< no value >"
-                    term.setCursorPos(1, y)
-                    term.clearLine()
-                    term.write(fullText)
-                    term.setTextColor(noValueColor)
-                    term.write("< no value >")
-                else
-                    -- Truncate to fit on one line
-                    fullText = truncate(fullText, w - 1)
-                    term.setCursorPos(1, y)
-                    term.clearLine()
-                    term.write(fullText)
-                end
-            end
-        end
-        
-        -- Account for the lines this field takes (using pre-calculated value, but capped at 1 for simplicity)
-        currentLine = currentLine + 1
-        
-        -- Draw error message if visible
-        if f.label and self.errors[f.label] then
-            if currentLine >= self.scrollOffset and currentLine < self.scrollOffset + availableLines then
-                local y = headerLines + 1 + (currentLine - self.scrollOffset)
-                term.setCursorPos(1, y)
-                term.clearLine()
-                term.setTextColor(colors.red)
-                local errorText = truncate("! " .. self.errors[f.label], w - 1)
-                term.write(errorText)
-            end
-            currentLine = currentLine + 1
-        end
-    end
-    
-    -- Draw scroll indicators
-    if self.scrollOffset > 0 then
-        term.setCursorPos(w, headerLines + 1)
-        term.setTextColor(colors.white)
-        term.write("^")
-    end
-    if self.scrollOffset + availableLines < totalLines then
-        term.setCursorPos(w, h - footerLines)
-        term.setTextColor(colors.white)
-        term.write("v")
+
+        return (prefix or "") .. f.label .. ": " .. display
     end
 
-    term.setCursorPos(1, h - 2)
-    term.setTextColor(colors.lightGray)
-    print("^ / v - Navigate")
-    print("Enter - Edit/Button | Q - Quit")
-    write("Ctrl+Enter Submit")
+    term.setTextColor(colors.white)
+    term.setBackgroundColor(colors.gray)
+    term.clear()
+
+    -- Layout config
+    local headerLines = 1
+    local availableLines = h - headerLines
+    local baseY = headerLines + 1
+
+    -- Init scroll
+    self.scrollOffset = self.scrollOffset or 0
+
+    -- Calculate field heights
+    local fieldLines = {}
+    local totalLines = 0
+
+    for i, f in ipairs(self.fields) do
+        local displayText
+        if f.type == "label" or f.type == "button" then
+            displayText = getFieldDisplayText(f)
+        else
+            displayText = getFieldDisplayText(f, "> ")
+        end
+
+        local lines = math.max(1, math.ceil(#displayText / (w / 2)))
+
+        if f.label and self.errors[f.label] then
+            lines = lines + math.ceil(#("! " .. self.errors[f.label]) / (w / 2))
+        end
+
+        fieldLines[i] = lines
+        totalLines = totalLines + lines
+    end
+
+    -- Scroll logic
+    local selectedStart = 0
+    for i = 1, self.selected - 1 do
+        selectedStart = selectedStart + fieldLines[i]
+    end
+
+    local selectedEnd = selectedStart + fieldLines[self.selected]
+
+    if selectedStart < self.scrollOffset then
+        self.scrollOffset = selectedStart
+    end
+
+    if selectedEnd > self.scrollOffset + availableLines then
+        self.scrollOffset = selectedEnd - availableLines
+    end
+
+    self.scrollOffset = math.max(0,
+        math.min(self.scrollOffset, math.max(0, totalLines - availableLines))
+    )
+
+    -- DRAW FIELDS
+    local currentLine = 0
+
+    for i, f in ipairs(self.fields) do
+        local startLine = currentLine
+        local endLine = currentLine + fieldLines[i]
+
+        if endLine >= self.scrollOffset and startLine < self.scrollOffset + availableLines then
+            local y = baseY + (currentLine - self.scrollOffset)
+
+            local prefix = (i == self.selected) and "> " or "  "
+
+            local function drawLine(text, color)
+                if y >= baseY and y < baseY + availableLines then
+                    term.setCursorPos(2, y)
+                    term.clearLine()
+                    term.setTextColor(color or colors.white)
+                    term.write(text)
+                end
+                y = y + 1
+            end
+
+            if f.type == "label" then
+                drawLine(f.text, colors.lightBlue)
+            elseif f.type == "button" then
+                if i == self.selected then
+                    term.setBackgroundColor(colors.white)
+                    drawLine("[ " .. f.text .. " ]", colors.black)
+                    term.setBackgroundColor(colors.gray)
+                else
+                    drawLine("[ " .. f.text .. " ]", colors.lightBlue)
+                end
+            else
+                local color = colors.white
+                if f.label and self.errors[f.label] then
+                    color = colors.red
+                elseif i == self.selected then
+                    color = colors.yellow
+                end
+
+                -- wrap text
+                local function wrapText(text, width)
+                    local lines = {}
+                    local i = 1
+
+                    while i <= #text do
+                        table.insert(lines, text:sub(i, i + width - 1))
+                        i = i + width
+                    end
+
+                    return lines
+                end
+
+                local fullText = getFieldDisplayText(f, prefix)
+                for _, line in ipairs(wrapText(fullText, w - 2)) do
+                    drawLine(line, color)
+                end
+            end
+
+            -- Error line
+            if f.label and self.errors[f.label] then
+                drawLine("! " .. self.errors[f.label], colors.red)
+            end
+        end
+
+        currentLine = currentLine + fieldLines[i]
+    end
+
+    -- Scroll indicators
+    term.setTextColor(colors.white)
+    if self.scrollOffset > 0 then
+        term.setCursorPos(w, baseY)
+        term.write("^")
+    end
+
+    if self.scrollOffset + availableLines < totalLines then
+        term.setCursorPos(w, h)
+        term.write("v")
+    end
 end
 
 ---Edit a field at the specified index
@@ -748,62 +803,339 @@ end
 function FormUI:edit(index)
     local f = self.fields[index]
     if not f then return end
-    
+
     -- Labels are not editable
     if f.type == "label" then return end
-    
+
     -- Handle button actions
     if f.type == "button" then
-        return f.action  -- Return the action to be handled by the caller
+        return f.action
     end
-    term.setCursorPos(1, #self.fields + 5)
-    term.setTextColor(colors.white)
-    term.clearLine()
 
     self.errors[f.label] = nil
 
-    if f.type == "text" or f.type == "number" then
-        local prompt = "Enter value for " .. f.label
-        if f.allowEmpty then
-            prompt = prompt .. " (empty to clear)"
+    local function openPrompt(title, height, footer)
+        local previous = term.current()
+        local parent = previous
+
+        if self._nativeTerm and self.frame and previous == self._nativeTerm then
+            parent = self.frame
         end
-        term.setTextColor(colors.white)
-        print(prompt .. ":")
-        term.setTextColor(colors.lightGray)
-        local currentValue = tostring(f.value)
-        print("Current: " .. (currentValue ~= "" and currentValue or "(empty)"))
-        print("(Press Enter to confirm, or type \\c to cancel)")
-        term.setTextColor(colors.white)
-        write("> ")
-        local input = read()
-        
-        -- Check for cancel command
-        if input == "\\c" or input == nil then
-            return -- Keep existing value
+
+        local parentW, parentH = parent.getSize()
+        local promptWidth = math.max(math.floor(parentW * 0.8), 26)
+        local promptHeight = math.max(height or 4, 4)
+        if parentH > 2 then
+            promptHeight = math.min(promptHeight, parentH - 2)
         end
-        
-        if f.type == "number" then
-            if input ~= "" then
-                local num = tonumber(input)
-                if num then
-                    f.value = num
-                else
-                    term.setTextColor(colors.red)
-                    print("Input must be a number!")
-                    sleep(1)
-                end
-            elseif f.allowEmpty then
-                f.value = 0 -- For numbers, empty means 0 if allowed
+
+        local promptWin, promptFrame = centeredWindow(parent, title, promptWidth, promptHeight, footer)
+        term.redirect(promptWin)
+        term.setBackgroundColor(colors.lightGray)
+        term.setTextColor(colors.black)
+        term.clear()
+        return previous, promptFrame, parent
+    end
+
+    local function closePrompt(previous, promptFrame, parent)
+        if promptFrame and promptFrame.setVisible then
+            promptFrame.setVisible(false)
+        end
+        term.redirect(previous)
+        if parent and parent.redraw then
+            parent.redraw()
+        elseif self.frame and self.frame.redraw then
+            self.frame.redraw()
+        elseif previous and previous.redraw then
+            previous.redraw()
+        end
+    end
+
+    local function writeCenteredLine(y, text, textColor, backgroundColor)
+        local w, _ = term.getSize()
+        local display = truncate(tostring(text or ""), w)
+        term.setBackgroundColor(backgroundColor or colors.lightGray)
+        term.setCursorPos(1, y)
+        term.clearLine()
+        term.setTextColor(textColor or colors.black)
+        term.setCursorPos(math.max(1, math.floor((w - #display) / 2) + 1), y)
+        term.write(display)
+    end
+
+    local function cloneArray(values)
+        local copy = {}
+        for i, value in ipairs(values or {}) do
+            copy[i] = value
+        end
+        return copy
+    end
+
+    local function cloneMap(values)
+        local copy = {}
+        for key, value in pairs(values or {}) do
+            copy[key] = value
+        end
+        return copy
+    end
+
+    local function promptInput(label, currentValue, validate, transform)
+        local previous, promptFrame, parent = openPrompt(label, 5)
+        local w, _ = term.getSize()
+        local errorMessage = nil
+        currentValue = currentValue or ""
+
+        while true do
+            term.setBackgroundColor(colors.lightGray)
+            term.clear()
+            term.setCursorPos(2, 2)
+            term.setBackgroundColor(colors.gray)
+            term.setTextColor(colors.white)
+            term.write(string.rep(" ", math.max(1, w - 2)))
+
+            term.setBackgroundColor(colors.lightGray)
+            term.setTextColor(colors.red)
+            term.setCursorPos(2, 3)
+            term.clearLine()
+            if errorMessage then
+                term.write(truncate(tostring(errorMessage), math.max(1, w - 2)))
             end
-            -- If input is "" and allowEmpty is false, keep existing value
+
+            term.setCursorPos(2, 2)
+            term.setBackgroundColor(colors.gray)
+            term.setTextColor(colors.white)
+            currentValue = read(nil, nil, nil, currentValue)
+
+            if not validate then
+                closePrompt(previous, promptFrame, parent)
+                return currentValue
+            end
+
+            local value = transform and transform(currentValue) or currentValue
+            local valid, err = validate(value)
+            if valid then
+                closePrompt(previous, promptFrame, parent)
+                return currentValue
+            end
+
+            errorMessage = err or "Invalid input"
+        end
+    end
+
+    local function renderScrollableOptions(opts, selectedIndex, renderOption)
+        local w, h = term.getSize()
+        term.setBackgroundColor(colors.lightGray)
+        term.clear()
+
+        if #opts == 0 then
+            writeCenteredLine(math.max(1, math.ceil(h / 2)), "(empty)", colors.gray, colors.lightGray)
+            return
+        end
+
+        local centerRow = math.ceil(h / 2)
+        local maxStart = math.max(1, #opts - h + 1)
+        local startIndex = math.max(1, math.min(selectedIndex - centerRow + 1, maxStart))
+
+        for row = 1, h do
+            local optionIndex = startIndex + row - 1
+            if optionIndex <= #opts then
+                local isSelected = optionIndex == selectedIndex
+                local bg = isSelected and colors.gray or colors.lightGray
+                local fg = isSelected and colors.white or colors.black
+                writeCenteredLine(row, renderOption(optionIndex, opts[optionIndex]), fg, bg)
+            else
+                term.setBackgroundColor(colors.lightGray)
+                term.setCursorPos(1, row)
+                term.clearLine()
+            end
+        end
+
+        term.setBackgroundColor(colors.lightGray)
+        term.setTextColor(colors.gray)
+        if startIndex > 1 then
+            term.setCursorPos(w, 1)
+            term.write("^")
+        end
+        if startIndex + h - 1 < #opts then
+            term.setCursorPos(w, h)
+            term.write("v")
+        end
+    end
+
+    local function selectInput(label, opts, currentValue)
+        local previous, promptFrame, parent = openPrompt(label, 12, {
+            "Up/Down: move | Enter: select",
+            "Q/Ctrl: cancel",
+        })
+
+        local sel = tonumber(currentValue) or 1
+        if sel < 1 or sel > #opts then
+            sel = 1
+        end
+
+        while true do
+            renderScrollableOptions(opts, sel, function(_, option)
+                return tostring(option)
+            end)
+
+            local _, key = os.pullEvent("key")
+            if key == keys.up then
+                sel = (sel > 1) and (sel - 1) or #opts
+            elseif key == keys.down then
+                sel = (sel < #opts) and (sel + 1) or 1
+            elseif key == keys.enter then
+                closePrompt(previous, promptFrame, parent)
+                return sel
+            elseif key == keys.q or key == keys.leftCtrl then
+                closePrompt(previous, promptFrame, parent)
+                return nil
+            end
+        end
+    end
+
+    local function multiselectInput(label, opts, currentValue)
+        local previous, promptFrame, parent = openPrompt(label, 12, {
+            "Up/Down: move | Space: toggle",
+            "Enter: save | Q/Ctrl: cancel",
+        })
+
+        local selected = cloneMap(currentValue)
+        local cur = 1
+        if #opts > 0 then
+            for i = 1, #opts do
+                if selected[i] then
+                    cur = i
+                    break
+                end
+            end
+        end
+
+        while true do
+            renderScrollableOptions(opts, cur, function(optionIndex, option)
+                return (selected[optionIndex] and "[X] " or "[ ] ") .. tostring(option)
+            end)
+
+            local _, key = os.pullEvent("key")
+            if key == keys.up then
+                cur = (cur > 1) and (cur - 1) or #opts
+            elseif key == keys.down then
+                cur = (cur < #opts) and (cur + 1) or 1
+            elseif key == keys.space then
+                selected[cur] = not selected[cur]
+            elseif key == keys.enter then
+                closePrompt(previous, promptFrame, parent)
+                return selected
+            elseif key == keys.q or key == keys.leftCtrl then
+                closePrompt(previous, promptFrame, parent)
+                return nil
+            end
+        end
+    end
+
+    local function listInput(label, currentList, itemType)
+        local previous, promptFrame, parent = openPrompt(label .. " (" .. itemType .. ")", 14, {
+            "Up/Down: move | A: add | E: edit | D: delete",
+            "M: move item | Enter: save | Q/Ctrl: cancel",
+        })
+
+        local list = cloneArray(currentList)
+        local cur = (#list > 0) and 1 or 1
+
+        local function validateListItem(value)
+            if value == nil or value == "" then
+                return false, "Item cannot be empty"
+            end
+            if itemType == "number" and tonumber(value) == nil then
+                return false, "Item must be a valid number"
+            end
+            return true
+        end
+
+        local function parseListItem(value)
+            if itemType == "number" then
+                return tonumber(value)
+            end
+            return value
+        end
+
+        while true do
+            local w, h = term.getSize()
+            term.setBackgroundColor(colors.lightGray)
+            term.clear()
+
+            if #list == 0 then
+                writeCenteredLine(math.max(1, math.ceil(h / 2)), "(empty list)", colors.gray, colors.lightGray)
+            else
+                renderScrollableOptions(list, cur, function(optionIndex, option)
+                    return tostring(optionIndex) .. ". " .. tostring(option)
+                end)
+            end
+
+            local _, key = os.pullEvent("key")
+            if key == keys.up and #list > 0 then
+                cur = (cur > 1) and (cur - 1) or #list
+            elseif key == keys.down and #list > 0 then
+                cur = (cur < #list) and (cur + 1) or 1
+            elseif key == keys.a then
+                local input = promptInput("Add item to " .. label, "", validateListItem)
+                if input and input ~= "" then
+                    table.insert(list, parseListItem(input))
+                    cur = #list
+                end
+            elseif key == keys.e and #list > 0 then
+                local input = promptInput("Edit item " .. cur, tostring(list[cur]), validateListItem)
+                if input and input ~= "" then
+                    list[cur] = parseListItem(input)
+                end
+            elseif key == keys.d and #list > 0 then
+                table.remove(list, cur)
+                if #list == 0 then
+                    cur = 1
+                else
+                    cur = math.max(1, math.min(cur, #list))
+                end
+            elseif key == keys.m and #list > 1 then
+                local input = promptInput(
+                    "Move item " .. cur .. " to position",
+                    tostring(cur),
+                    function(value)
+                        local pos = tonumber(value)
+                        return pos ~= nil and pos >= 1 and pos <= #list,
+                            "Position must be between 1 and " .. #list
+                    end
+                )
+                local pos = tonumber(input)
+                if pos and pos >= 1 and pos <= #list then
+                    local item = table.remove(list, cur)
+                    table.insert(list, pos, item)
+                    cur = pos
+                end
+            elseif key == keys.enter then
+                closePrompt(previous, promptFrame, parent)
+                return list
+            elseif key == keys.q or key == keys.leftCtrl then
+                closePrompt(previous, promptFrame, parent)
+                return nil
+            end
+        end
+    end
+
+    if f.type == "text" or f.type == "number" then
+        local currentValue = tostring(f.value)
+        local validate = f.validate
+        local transform = (f.type == "number") and tonumber or nil
+        local input = promptInput("Enter value for " .. f.label, currentValue, validate, transform)
+
+        if f.type == "number" then
+            local num = tonumber(input)
+            if num then
+                f.value = num
+            end
         else
-            -- For text fields, update value
             if input == "" and f.allowEmpty then
                 f.value = ""
             elseif input ~= "" then
                 f.value = input
             end
-            -- If input is "" and allowEmpty is false, keep existing value
         end
     elseif f.type == "select" or f.type == "peripheral" or f.type == "color" then
         local opts = f.options or {}
@@ -812,34 +1144,12 @@ function FormUI:edit(index)
             print("No options available.")
             sleep(1)
         else
-            -- Ensure sel is valid (between 1 and #opts)
-            local sel = f.value
-            if sel < 1 or sel > #opts then
-                sel = 1
-            end
-            
-            while true do
-                term.clear()
-                local w, _ = term.getSize()
-                term.setTextColor(colors.lightGray)
-                centerText(1, "Select Option", w)
-                term.setTextColor(colors.white)
-                centerText(2, f.label, w)
-                for i, v in ipairs(opts) do
-                    term.setCursorPos(4, 3 + i)
-                    term.setTextColor(i == sel and colors.yellow or colors.white)
-                    term.write(tostring(v))
-                end
-                local e, k = os.pullEvent("key")
-                if k == keys.up then sel = (sel > 1) and sel - 1 or #opts
-                elseif k == keys.down then sel = (sel < #opts) and sel + 1 or 1
-                elseif k == keys.enter then f.value = sel; break
-                elseif k == keys.q or k == keys.leftCtrl then break
-                end
+            local selected = selectInput(f.label, opts, f.value)
+            if selected then
+                f.value = selected
             end
         end
     elseif f.type == "checkbox" then
-        -- Toggle the checkbox value
         f.value = not f.value
     elseif f.type == "multiselect" then
         local opts = f.options or {}
@@ -848,132 +1158,16 @@ function FormUI:edit(index)
             print("No options available.")
             sleep(1)
         else
-            local sel = f.value
-            local cur = 1
-            while true do
-                term.clear()
-                local w, _ = term.getSize()
-                term.setTextColor(colors.lightGray)
-                centerText(1, "Multi-Select", w)
-                term.setTextColor(colors.white)
-                centerText(2, f.label, w)
-                for i, v in ipairs(opts) do
-                    term.setCursorPos(4, 3 + i)
-                    local checked = sel[i] and "[X]" or "[ ]"
-                    term.setTextColor(i == cur and colors.yellow or colors.white)
-                    term.write(checked .. " " .. tostring(v))
-                end
-                term.setCursorPos(1, #opts + 5)
-                term.setTextColor(colors.lightGray)
-                term.write("Space: toggle | Enter: done | Up/Down: move")
-                local e, k = os.pullEvent("key")
-                if k == keys.up then cur = (cur > 1) and cur - 1 or #opts
-                elseif k == keys.down then cur = (cur < #opts) and cur + 1 or 1
-                elseif k == keys.space then sel[cur] = not sel[cur]
-                elseif k == keys.enter then break
-                elseif k == keys.q or k == keys.leftCtrl then break
-                end
+            local selected = multiselectInput(f.label, opts, f.value)
+            if selected then
+                f.value = selected
             end
-            f.value = sel
         end
     elseif f.type == "list" then
-        local list = f.value
-        local cur = math.min(1, #list > 0 and #list or 1)
-        while true do
-            term.clear()
-            local w, _ = term.getSize()
-            term.setTextColor(colors.lightGray)
-            centerText(1, "Edit List", w)
-            term.setTextColor(colors.white)
-            centerText(2, f.label .. " (" .. f.itemType .. ")", w)
-            
-            if #list == 0 then
-                term.setCursorPos(4, 4)
-                term.setTextColor(colors.lightGray)
-                term.write("(empty list)")
-            else
-                for i, v in ipairs(list) do
-                    term.setCursorPos(4, 3 + i)
-                    term.setTextColor(i == cur and colors.yellow or colors.white)
-                    term.write(tostring(i) .. ". " .. tostring(v))
-                end
-            end
-            
-            term.setCursorPos(1, math.max(6, #list + 5))
-            term.setTextColor(colors.lightGray)
-            term.write("A: add | D: delete | M: move | E: edit")
-            term.setCursorPos(1, math.max(7, #list + 6))
-            term.write("Up/Down: navigate | Enter: done")
-            
-            local e, k = os.pullEvent("key")
-            if k == keys.up and #list > 0 then 
-                cur = (cur > 1) and cur - 1 or #list
-            elseif k == keys.down and #list > 0 then 
-                cur = (cur < #list) and cur + 1 or 1
-            elseif k == keys.a then
-                term.setCursorPos(1, math.max(8, #list + 7))
-                term.setTextColor(colors.white)
-                term.clearLine()
-                term.write("Add item: ")
-                local input = read()
-                if input and input ~= "" then
-                    if f.itemType == "number" then
-                        local num = tonumber(input)
-                        if num then
-                            table.insert(list, num)
-                            cur = #list
-                        else
-                            term.setTextColor(colors.red)
-                            term.write(" Invalid number!")
-                            sleep(1)
-                        end
-                    else
-                        table.insert(list, input)
-                        cur = #list
-                    end
-                end
-            elseif k == keys.d and #list > 0 then
-                table.remove(list, cur)
-                cur = math.max(1, math.min(cur, #list))
-            elseif k == keys.m and #list > 1 then
-                term.setCursorPos(1, math.max(8, #list + 7))
-                term.setTextColor(colors.white)
-                term.clearLine()
-                term.write("Move to position (1-" .. #list .. "): ")
-                local input = read()
-                local pos = tonumber(input)
-                if pos and pos >= 1 and pos <= #list then
-                    local item = table.remove(list, cur)
-                    table.insert(list, pos, item)
-                    cur = pos
-                end
-            elseif k == keys.e and #list > 0 then
-                term.setCursorPos(1, math.max(8, #list + 7))
-                term.setTextColor(colors.white)
-                term.clearLine()
-                term.write("Edit item " .. cur .. ": ")
-                local input = read()
-                if input and input ~= "" then
-                    if f.itemType == "number" then
-                        local num = tonumber(input)
-                        if num then
-                            list[cur] = num
-                        else
-                            term.setTextColor(colors.red)
-                            term.write(" Invalid number!")
-                            sleep(1)
-                        end
-                    else
-                        list[cur] = input
-                    end
-                end
-            elseif k == keys.enter then 
-                break
-            elseif k == keys.q or k == keys.leftCtrl then 
-                break
-            end
+        local list = listInput(f.label, f.value, f.itemType)
+        if list then
+            f.value = list
         end
-        f.value = list
     end
 end
 
@@ -1016,16 +1210,41 @@ end
 ---Run the form's main input loop
 ---@return FormResult? result Table of field values indexed by label, or nil if cancelled
 function FormUI:run()
-    local w, h = term.getSize()
+    local native = term.current()
+    self._nativeTerm = native
+
     local keysHeld = {}
-    
+
+    local formWindow, formFrame = centeredWindow(term.current(), self.title, nil, nil, {
+        "Arrows: navigate | Enter: edit",
+        "Ctrl+Enter: submit",
+    })
+
+    self.win = formWindow
+    self.frame = formFrame
+
     -- Find the first selectable field
     self.selected = 1
     if self.fields[1] and self.fields[1].type == "label" then
         self.selected = self:nextSelectableField(0)
     end
-    
+
+    local function close()
+        formWindow.setVisible(false)
+        self._nativeTerm = nil
+        term.redirect(native)
+        if native and native.redraw then
+            native.redraw()
+        else
+            term.clear()
+            term.setCursorPos(1, 1)
+        end
+        sleep()
+    end
+
+    term.redirect(formWindow)
     self:draw()
+    term.redirect(native)
 
     while true do
         local e = table.pack(os.pullEvent())
@@ -1045,6 +1264,7 @@ function FormUI:run()
                     if editResult == "submit" then
                         if self:isValid() then break end
                     elseif editResult == "cancel" then
+                        close()
                         return nil
                     elseif editResult then
                         -- Any other button action - return immediately with action info
@@ -1071,16 +1291,17 @@ function FormUI:run()
                                 result[f.label] = f.value
                             end
                         end
-                        result._action = editResult  -- Store the action for easy access
+                        result._action = editResult -- Store the action for easy access
                         self.result = result
-                        term.clear()
-                        term.setCursorPos(1,1)
+
+                        close()
                         return result
                     end
                 end
             elseif k == keys.leftCtrl then
                 keysHeld[k] = true
             elseif k == keys.q then
+                close()
                 return nil
             end
         elseif event == "key_up" then
@@ -1128,7 +1349,10 @@ function FormUI:run()
                 end
             end
         end
+
+        term.redirect(formWindow)
         self:draw()
+        term.redirect(native)
     end
 
     local result = {}
@@ -1151,8 +1375,8 @@ function FormUI:run()
         end
     end
     self.result = result
-    term.clear()
-    term.setCursorPos(1,1)
+
+    close()
     return result
 end
 
