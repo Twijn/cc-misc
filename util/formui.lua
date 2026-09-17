@@ -27,7 +27,7 @@
 ---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
----@version 0.5.0
+---@version 0.5.1
 -- @module formui
 
 ---@class FormField
@@ -46,7 +46,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.5.0"
+local VERSION = "0.5.1"
 local FormUI = { _v = VERSION }
 
 -- ComputerCraft color names and their values
@@ -1375,6 +1375,7 @@ function FormUI:run()
         end
     end
     self.result = result
+    result._action = "submit"
 
     close()
     return result
