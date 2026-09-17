@@ -27,7 +27,7 @@
 ---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
----@version 0.5.1
+---@version 0.5.2
 -- @module formui
 
 ---@class FormField
@@ -46,7 +46,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.5.1"
+local VERSION = "0.5.2"
 local FormUI = { _v = VERSION }
 
 -- ComputerCraft color names and their values
@@ -686,10 +686,10 @@ function FormUI:draw()
             displayText = getFieldDisplayText(f, "> ")
         end
 
-        local lines = math.max(1, math.ceil(#displayText / (w / 2)))
+        local lines = math.max(1, math.ceil(#displayText / (w - 2)))
 
         if f.label and self.errors[f.label] then
-            lines = lines + math.ceil(#("! " .. self.errors[f.label]) / (w / 2))
+            lines = lines + math.ceil(#("! " .. self.errors[f.label]) / (w - 2))
         end
 
         fieldLines[i] = lines
@@ -1375,7 +1375,6 @@ function FormUI:run()
         end
     end
     self.result = result
-    result._action = "submit"
 
     close()
     return result
