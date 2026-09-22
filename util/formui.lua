@@ -27,7 +27,7 @@
 ---  print("Features:", table.concat(featuresField(), ", "))
 ---end
 ---
----@version 0.5.2
+---@version 0.5.3
 -- @module formui
 
 ---@class FormField
@@ -46,7 +46,7 @@
 
 ---@alias ValidationFunction fun(value: any, field?: FormField): boolean, string?
 
-local VERSION = "0.5.2"
+local VERSION = "0.5.3"
 local FormUI = { _v = VERSION }
 
 -- ComputerCraft color names and their values
@@ -728,6 +728,16 @@ function FormUI:draw()
 
             local prefix = (i == self.selected) and "> " or "  "
 
+            local function wrapText(text, width)
+                local lines = {}
+                local i = 1
+                while i <= #text do
+                    table.insert(lines, text:sub(i, i + width - 1))
+                    i = i + width
+                end
+                return lines
+            end
+
             local function drawLine(text, color)
                 if y >= baseY and y < baseY + availableLines then
                     term.setCursorPos(2, y)
@@ -739,7 +749,9 @@ function FormUI:draw()
             end
 
             if f.type == "label" then
-                drawLine(f.text, colors.lightBlue)
+                for _, line in ipairs(wrapText(f.text, w - 2)) do
+                    drawLine(line, colors.lightBlue)
+                end
             elseif f.type == "button" then
                 if i == self.selected then
                     term.setBackgroundColor(colors.white)
@@ -754,19 +766,6 @@ function FormUI:draw()
                     color = colors.red
                 elseif i == self.selected then
                     color = colors.yellow
-                end
-
-                -- wrap text
-                local function wrapText(text, width)
-                    local lines = {}
-                    local i = 1
-
-                    while i <= #text do
-                        table.insert(lines, text:sub(i, i + width - 1))
-                        i = i + width
-                    end
-
-                    return lines
                 end
 
                 local fullText = getFieldDisplayText(f, prefix)
